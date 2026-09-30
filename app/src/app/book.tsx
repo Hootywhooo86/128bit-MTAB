@@ -1,10 +1,19 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { PlayableActions } from '@/components/playable-actions';
-import { Body, Card, Cover, EmptyState, Heading, ProgressBar, Title, formatBytes } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import {
+  Body,
+  Card,
+  Cover,
+  EmptyState,
+  Heading,
+  ProgressBar,
+  Title,
+  formatBytes,
+} from '@/components/ui';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchBook } from '@/lib/addons';
 import { checkTorbox, resolveSource, type ResolveResult } from '@/lib/resolve';
 import { getAddons } from '@/lib/storage';
@@ -20,7 +29,12 @@ function describeSource(s: Source) {
 }
 
 export default function BookScreen() {
-  const { addon: addonId, id } = useLocalSearchParams<{ addon: string; id: string }>();
+  const Colors = useColors();
+  const styles = useStyles();
+  const { addon: addonId, id } = useLocalSearchParams<{
+    addon: string;
+    id: string;
+  }>();
   const [book, setBook] = useState<BookDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resolving, setResolving] = useState<number | null>(null);
@@ -39,9 +53,12 @@ export default function BookScreen() {
     })();
   }, [addonId, id]);
 
-  useEffect(() => () => {
-    if (pollTimer.current) clearTimeout(pollTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+    },
+    [],
+  );
 
   // While TorBox is still downloading, check back every few seconds.
   useEffect(() => {
@@ -75,7 +92,11 @@ export default function BookScreen() {
     return (
       <View style={styles.center}>
         <Stack.Screen options={{ title: '' }} />
-        {error ? <EmptyState title="Couldn't load this book" body={error} /> : <ActivityIndicator color={Colors.accent} />}
+        {error ? (
+          <EmptyState title="Couldn't load this book" body={error} />
+        ) : (
+          <ActivityIndicator color={Colors.accent} />
+        )}
       </View>
     );
   }
@@ -92,7 +113,11 @@ export default function BookScreen() {
           {book.duration ? <Body muted>{book.duration}</Body> : null}
         </View>
       </View>
-      {book.description ? <Body muted numberOfLines={8}>{book.description}</Body> : null}
+      {book.description ? (
+        <Body muted numberOfLines={8}>
+          {book.description}
+        </Body>
+      ) : null}
       {error ? <Body style={{ color: Colors.danger }}>{error}</Body> : null}
 
       {result?.status === 'ready' ? (
@@ -100,7 +125,9 @@ export default function BookScreen() {
       ) : result?.status === 'downloading' ? (
         <Card>
           <Heading>TorBox is fetching this book</Heading>
-          <Body muted>You can leave this screen. It will also show up in Library → TorBox cloud.</Body>
+          <Body muted>
+            You can leave this screen. It will also show up in Library → TorBox cloud.
+          </Body>
           <ProgressBar value={result.progress} />
           <Body muted>{Math.round(result.progress * 100)}%</Body>
         </Card>
@@ -130,11 +157,20 @@ export default function BookScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  content: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    paddingBottom: Spacing.five,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
   header: { flexDirection: 'row', gap: Spacing.three },
   sourceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   sourceName: { color: Colors.text, fontWeight: '700', fontSize: 15 },
-});
+}));

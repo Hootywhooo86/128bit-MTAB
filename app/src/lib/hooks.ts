@@ -1,18 +1,22 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
-import { getAddons } from './storage';
+import { getAddons, isEnabled } from './storage';
 import type { InstalledAddon } from './types';
 
-/** Installed addons, re-read whenever the screen comes into focus. */
+/**
+ * Installed addons, re-read whenever the screen comes into focus.
+ * `addons` is only the switched-on ones; `all` includes switched-off ones.
+ */
 export function useAddons() {
-  const [addons, setAddons] = useState<InstalledAddon[]>([]);
+  const [all, setAll] = useState<InstalledAddon[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
-    setAddons(await getAddons());
+    setAll(await getAddons());
     setLoaded(true);
   }, []);
+  const addons = all.filter(isEnabled);
 
   useFocusEffect(
     useCallback(() => {
@@ -20,5 +24,5 @@ export function useAddons() {
     }, [refresh]),
   );
 
-  return { addons, loaded, refresh };
+  return { addons, all, loaded, refresh };
 }

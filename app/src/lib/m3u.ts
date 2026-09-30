@@ -27,7 +27,11 @@ export async function getPlaylists(): Promise<Playlist[]> {
 
 export async function addPlaylist(name: string, url: string) {
   const list = await getPlaylists();
-  const entry = { id: `${Date.now()}`, name: name.trim() || 'Playlist', url: url.trim() };
+  const entry = {
+    id: `${Date.now()}`,
+    name: name.trim() || 'Playlist',
+    url: url.trim(),
+  };
   await AsyncStorage.setItem(KEY, JSON.stringify([...list, entry]));
   return entry;
 }
@@ -53,7 +57,11 @@ export function parseM3U(text: string, source: string): Channel[] {
         source,
       };
     } else if (!line.startsWith('#')) {
-      channels.push({ ...(pending ?? { name: line, source }), url: line, id: `${source}:${channels.length}` });
+      channels.push({
+        ...(pending ?? { name: line, source }),
+        url: line,
+        id: `${source}:${channels.length}`,
+      });
       pending = null;
     }
   }

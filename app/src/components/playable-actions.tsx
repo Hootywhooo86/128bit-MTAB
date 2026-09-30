@@ -3,13 +3,15 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Body, Button, Heading, formatBytes } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { deleteDownload, downloadBook, isBookDownloaded, offlineSupported } from '@/lib/downloads';
 import { usePlayer } from '@/lib/player';
 import type { PlayableBook } from '@/lib/types';
 
 /** Play / download buttons and the chapter list for a book that is ready. */
 export function PlayableActions({ book }: { book: PlayableBook }) {
+  const Colors = useColors();
+  const styles = useStyles();
   const { playBook, book: current, chapterIndex } = usePlayer();
   const [downloaded, setDownloaded] = useState(() => offlineSupported && isBookDownloaded(book));
   const [progress, setProgress] = useState<string | null>(null);
@@ -59,10 +61,15 @@ export function PlayableActions({ book }: { book: PlayableBook }) {
       <Heading>{book.chapters.length} chapters</Heading>
       {book.chapters.map((c, i) => (
         <Pressable key={c.id} style={styles.chapter} onPress={() => play(i)}>
-          <Text style={[styles.num, isCurrent && i === chapterIndex && { color: Colors.accent }]}>{i + 1}</Text>
+          <Text style={[styles.num, isCurrent && i === chapterIndex && { color: Colors.accent }]}>
+            {i + 1}
+          </Text>
           <Text
             numberOfLines={2}
-            style={[styles.chapterTitle, isCurrent && i === chapterIndex && { color: Colors.accent }]}>
+            style={[
+              styles.chapterTitle,
+              isCurrent && i === chapterIndex && { color: Colors.accent },
+            ]}>
             {c.title}
           </Text>
           {c.size ? <Text style={styles.size}>{formatBytes(c.size)}</Text> : null}
@@ -72,7 +79,7 @@ export function PlayableActions({ book }: { book: PlayableBook }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   chapter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -81,7 +88,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
-  num: { color: Colors.textSecondary, width: 28, fontVariant: ['tabular-nums'] },
+  num: {
+    color: Colors.textSecondary,
+    width: 28,
+    fontVariant: ['tabular-nums'],
+  },
   chapterTitle: { color: Colors.text, flex: 1 },
   size: { color: Colors.textSecondary, fontSize: 12 },
-});
+}));

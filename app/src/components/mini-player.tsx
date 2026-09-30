@@ -3,11 +3,13 @@ import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Cover } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePlayer } from '@/lib/player';
 
 /** Sits above the tab bar whenever an audiobook is loaded. */
 export function MiniPlayer() {
+  const Colors = useColors();
+  const styles = useStyles();
   const { book, playing, loading, position, duration, toggle } = usePlayer();
   if (!book) return null;
   const fraction = duration ? Math.min(1, position / duration) : 0;
@@ -50,8 +52,12 @@ export function MiniPlayer() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { backgroundColor: Colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
+const useStyles = makeStyles((Colors) => ({
+  wrap: {
+    backgroundColor: Colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+  },
   track: { height: 2, backgroundColor: Colors.border },
   fill: { height: 2, backgroundColor: Colors.accent },
   row: {
@@ -71,4 +77,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

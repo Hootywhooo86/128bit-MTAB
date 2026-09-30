@@ -3,7 +3,11 @@
  * and the Stremio addon protocol used for movies, shows and live TV.
  */
 
-export type CatalogExtra = { name: string; options?: string[]; isRequired?: boolean };
+export type CatalogExtra = {
+  name: string;
+  options?: string[];
+  isRequired?: boolean;
+};
 
 export type CatalogDef = {
   /** "audiobook" for 128bit book addons; "movie", "series" or "tv" for Stremio-style video addons. */
@@ -25,6 +29,7 @@ export type Manifest = {
   resources: ResourceDef[];
   catalogs: CatalogDef[];
   idPrefixes?: string[];
+  behaviorHints?: { configurable?: boolean; configurationRequired?: boolean };
 };
 
 /** An installed addon: its manifest plus the base URL it was installed from. */
@@ -32,6 +37,8 @@ export type InstalledAddon = {
   manifest: Manifest;
   /** Manifest URL without the trailing `/manifest.json`. */
   baseUrl: string;
+  /** Turned off addons stay installed but aren't used. Missing means on. */
+  enabled?: boolean;
 };
 
 // --- Video (Stremio protocol) -----------------------------------------------
@@ -120,7 +127,12 @@ export type BookDetail = BookPreview & {
 /** How the player finds the audio for one chapter. TorBox links expire, so they are resolved at play time. */
 export type ChapterRef =
   | { type: 'url'; url: string }
-  | { type: 'torbox'; kind: 'torrent' | 'webdl'; itemId: number; fileId: number };
+  | {
+      type: 'torbox';
+      kind: 'torrent' | 'webdl';
+      itemId: number;
+      fileId: number;
+    };
 
 export type Chapter = {
   id: string;

@@ -14,17 +14,20 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 
 export function Title({ style, ...rest }: TextProps) {
+  const styles = useStyles();
   return <Text style={[styles.title, style]} {...rest} />;
 }
 
 export function Heading({ style, ...rest }: TextProps) {
+  const styles = useStyles();
   return <Text style={[styles.heading, style]} {...rest} />;
 }
 
 export function Body({ style, muted, ...rest }: TextProps & { muted?: boolean }) {
+  const styles = useStyles();
   return <Text style={[styles.body, muted && styles.muted, style]} {...rest} />;
 }
 
@@ -35,7 +38,16 @@ type ButtonProps = PressableProps & {
   style?: StyleProp<ViewStyle>;
 };
 
-export function Button({ label, variant = 'primary', loading, disabled, style, ...rest }: ButtonProps) {
+export function Button({
+  label,
+  variant = 'primary',
+  loading,
+  disabled,
+  style,
+  ...rest
+}: ButtonProps) {
+  const Colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -66,6 +78,8 @@ export function Button({ label, variant = 'primary', loading, disabled, style, .
 }
 
 export function Input(props: TextInputProps) {
+  const Colors = useColors();
+  const styles = useStyles();
   return (
     <TextInput
       placeholderTextColor={Colors.textSecondary}
@@ -78,14 +92,21 @@ export function Input(props: TextInputProps) {
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
 export function Cover({ uri, size = 120 }: { uri?: string; size?: number }) {
+  const styles = useStyles();
   return (
     <View style={[styles.cover, { width: size, height: size }]}>
       {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={150}
+        />
       ) : (
         <Text style={styles.coverFallback}>128</Text>
       )}
@@ -93,20 +114,39 @@ export function Cover({ uri, size = 120 }: { uri?: string; size?: number }) {
   );
 }
 
-export function EmptyState({ title, body, children }: { title: string; body?: string; children?: ReactNode }) {
+export function EmptyState({
+  title,
+  body,
+  children,
+}: {
+  title: string;
+  body?: string;
+  children?: ReactNode;
+}) {
+  const styles = useStyles();
   return (
     <View style={styles.empty}>
       <Heading style={{ textAlign: 'center' }}>{title}</Heading>
-      {body ? <Body muted style={{ textAlign: 'center' }}>{body}</Body> : null}
+      {body ? (
+        <Body muted style={{ textAlign: 'center' }}>
+          {body}
+        </Body>
+      ) : null}
       {children}
     </View>
   );
 }
 
 export function ProgressBar({ value }: { value: number }) {
+  const styles = useStyles();
   return (
     <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` }]} />
+      <View
+        style={[
+          styles.progressFill,
+          { width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` },
+        ]}
+      />
     </View>
   );
 }
@@ -131,8 +171,13 @@ export function formatBytes(bytes?: number) {
   return `${bytes.toFixed(i ? 1 : 0)} ${units[i]}`;
 }
 
-const styles = StyleSheet.create({
-  title: { color: Colors.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+const useStyles = makeStyles((Colors) => ({
+  title: {
+    color: Colors.text,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
   heading: { color: Colors.text, fontSize: 18, fontWeight: '700' },
   body: { color: Colors.text, fontSize: 15, lineHeight: 22 },
   muted: { color: Colors.textSecondary },
@@ -144,8 +189,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonPrimary: { backgroundColor: Colors.accent },
-  buttonSecondary: { backgroundColor: Colors.surfaceRaised, borderWidth: 1, borderColor: Colors.border },
-  buttonDanger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.danger },
+  buttonSecondary: {
+    backgroundColor: Colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  buttonDanger: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
   buttonLabel: { color: Colors.text, fontSize: 15, fontWeight: '700' },
   input: {
     backgroundColor: Colors.surface,
@@ -172,7 +225,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  coverFallback: { color: Colors.accent, fontWeight: '900', fontSize: 20, letterSpacing: 1 },
+  coverFallback: {
+    color: Colors.accent,
+    fontWeight: '900',
+    fontSize: 20,
+    letterSpacing: 1,
+  },
   empty: { alignItems: 'center', gap: Spacing.two, padding: Spacing.five },
   progressTrack: {
     height: 4,
@@ -181,4 +239,4 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: Colors.accent },
-});
+}));

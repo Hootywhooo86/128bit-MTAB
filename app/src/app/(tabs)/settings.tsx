@@ -1,97 +1,63 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Linking, ScrollView, StyleSheet } from 'react-native';
 
-import { Body, Button, Card, Heading, Input } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
-import { getTorboxKey, setTorboxKey } from '@/lib/storage';
-import { testKey } from '@/lib/torbox';
+import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 
 export default function SettingsScreen() {
-  const [key, setKey] = useState('');
-  const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-
-  useEffect(() => {
-    getTorboxKey().then((k) => {
-      if (k) {
-        setKey(k);
-        setSaved(true);
-      }
-    });
-  }, []);
-
-  async function save() {
-    const trimmed = key.trim();
-    setBusy(true);
-    setMessage(null);
-    try {
-      const me = await testKey(trimmed);
-      await setTorboxKey(trimmed);
-      setSaved(true);
-      setMessage({ ok: true, text: `Connected${me.email ? ` as ${me.email}` : ''}.` });
-    } catch (e) {
-      setMessage({ ok: false, text: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disconnect() {
-    await setTorboxKey(null);
-    setKey('');
-    setSaved(false);
-    setMessage(null);
-  }
-
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Card>
-        <Heading>Addons & playlists</Heading>
-        <Body muted>Install addons for shows, movies, live TV and audiobooks, and add M3U playlists.</Body>
-        <Button label="Manage addons" variant="secondary" onPress={() => router.push('/addons')} />
-      </Card>
-
-      <Card>
-        <Heading>TorBox</Heading>
-        <Body muted>
-          128bit sends torrents and links to your TorBox account, then streams the finished files from there
-          (and saves audiobooks to your phone if you want). Your key is stored in the device’s secure storage.
-        </Body>
-        <Input
-          placeholder="TorBox API key"
-          value={key}
-          onChangeText={(t) => {
-            setKey(t);
-            setSaved(false);
-          }}
-          secureTextEntry
+    <SettingsPage title="Settings">
+      <SectionTitle>Account</SectionTitle>
+      <Group>
+        <Row
+          icon="sync"
+          title="Tracking"
+          subtitle="Connect Trakt to scrobble what you watch and power Continue Watching."
+          onPress={() => router.push('/settings/tracking')}
         />
-        {message ? (
-          <Body style={{ color: message.ok ? Colors.success : Colors.danger }}>{message.text}</Body>
-        ) : null}
-        <Button label={saved ? 'Test again' : 'Save & test'} onPress={save} loading={busy} disabled={!key.trim()} />
-        {saved ? <Button label="Disconnect" variant="danger" onPress={disconnect} /> : null}
-        <Button
-          label="Get your API key"
-          variant="secondary"
-          onPress={() => Linking.openURL('https://torbox.app/settings')}
-        />
-      </Card>
+      </Group>
 
-      <Card>
-        <Heading>About</Heading>
-        <Body muted>
-          128bit is a player. It doesn’t host or provide any content. What you can find depends on the addons
-          you install, and you’re responsible for having the rights to what you download.
-        </Body>
-      </Card>
-    </ScrollView>
+      <SectionTitle>General</SectionTitle>
+      <Group>
+        <Row
+          icon="color-palette"
+          title="Layout"
+          subtitle="Accent colour and AMOLED black"
+          onPress={() => router.push('/settings/layout')}
+        />
+        <Row
+          icon="extension-puzzle"
+          title="Content & Discovery"
+          subtitle="Manage addons and Live TV playlists."
+          onPress={() => router.push('/settings/content')}
+        />
+        <Row
+          icon="cloud-download"
+          title="Downloads"
+          subtitle="Manage audiobooks saved on this phone."
+          onPress={() => router.push('/settings/downloads')}
+        />
+        <Row
+          icon="play"
+          title="Playback"
+          subtitle="Skip times, speed, resume and stream order"
+          onPress={() => router.push('/settings/playback')}
+        />
+        <Row
+          icon="link"
+          title="Integrations"
+          subtitle="TorBox"
+          onPress={() => router.push('/settings/integrations')}
+        />
+      </Group>
+
+      <SectionTitle>About</SectionTitle>
+      <Group>
+        <Row
+          icon="information-circle"
+          title="About 128bit"
+          subtitle="Version, data sources and licences"
+          onPress={() => router.push('/settings/about')}
+        />
+      </Group>
+    </SettingsPage>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.three, gap: Spacing.three },
-});

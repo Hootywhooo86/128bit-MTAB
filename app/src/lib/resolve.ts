@@ -3,9 +3,20 @@ import type { BookDetail, Chapter, PlayableBook, Source } from './types';
 
 export type ResolveResult =
   | { status: 'ready'; book: PlayableBook }
-  | { status: 'downloading'; kind: torbox.TorboxItem['kind']; itemId: number; progress: number };
+  | {
+      status: 'downloading';
+      kind: torbox.TorboxItem['kind'];
+      itemId: number;
+      progress: number;
+    };
 
-type Meta = { title?: string; author?: string; narrator?: string; duration?: string; cover?: string };
+type Meta = {
+  title?: string;
+  author?: string;
+  narrator?: string;
+  duration?: string;
+  cover?: string;
+};
 
 export function torboxBookKey(kind: torbox.TorboxItem['kind'], id: number) {
   return `torbox:${kind}:${id}`;
@@ -92,6 +103,7 @@ export async function checkTorbox(
     return { status: 'downloading', kind, itemId, progress: item.progress };
   }
   const playable = bookFromTorboxItem(item, meta);
-  if (!playable.chapters.length) throw new Error('TorBox finished, but there are no audio files in it');
+  if (!playable.chapters.length)
+    throw new Error('TorBox finished, but there are no audio files in it');
   return { status: 'ready', book: playable };
 }

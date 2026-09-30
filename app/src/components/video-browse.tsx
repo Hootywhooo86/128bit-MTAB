@@ -1,19 +1,31 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMetas, isBrowsable, supportsSearch } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
 import type { CatalogDef, InstalledAddon, MetaPreview } from '@/lib/types';
+import { usePrefs } from '@/lib/prefs';
+import { getPlayback, isConnected, traktConfigured } from '@/lib/trakt';
 import { getWatchProgress, type WatchProgress } from '@/lib/video';
 
 type Props = { type: 'movie' | 'series'; noun: string };
 
 /** Home screen for Shows and Movies: search, continue watching, then every addon catalog as a row. */
 export function VideoBrowse({ type, noun }: Props) {
+  const { prefs } = usePrefs();
+  const styles = useStyles();
   const { addons, loaded } = useAddons();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
@@ -21,8 +33,23 @@ export function VideoBrowse({ type, noun }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      getWatchProgress().then((all) => setContinuing(all.filter((p) => p.link?.type === type)));
-    }, [type]),
+      let cancelled = false;
+      (async () => {
+        const local = await getWatchProgress();
+        let merged = local;
+        if (prefs.traktContinueWatching && traktConfigured && (await isConnected())) {
+          // Local entries win (they have exact positions); Trakt fills in the rest.
+          const remote = await getPlayback().catch(() => []);
+          merged = [...local, ...remote.filter((r) => !local.some((l) => l.key === r.key))].sort(
+            (a, b) => b.updatedAt - a.updatedAt,
+          );
+        }
+        if (!cancelled) setContinuing(merged.filter((p) => p.link?.type === type));
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [type, prefs.traktContinueWatching]),
   );
 
   const rows = addons.flatMap((addon) =>
@@ -44,7 +71,12 @@ export function VideoBrowse({ type, noun }: Props) {
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={{
+        paddingVertical: Spacing.three,
+        gap: Spacing.four,
+      }}>
       <View style={{ paddingHorizontal: Spacing.three }}>
         <Input
           placeholder={`Search ${noun}`}
@@ -64,17 +96,27 @@ export function VideoBrowse({ type, noun }: Props) {
             data={continuing}
             keyExtractor={(p) => p.key}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+            contentContainerStyle={{
+              paddingHorizontal: Spacing.three,
+              gap: Spacing.three,
+            }}
             renderItem={({ item }) => (
               <Pressable
                 style={{ width: 200, gap: 6 }}
                 onPress={() =>
                   item.link &&
-                  router.push({ pathname: '/title', params: { type: item.link.type, id: item.link.id } })
+                  router.push({
+                    pathname: '/title',
+                    params: { type: item.link.type, id: item.link.id },
+                  })
                 }>
                 <View style={styles.landscape}>
                   {item.poster ? (
-                    <Image source={{ uri: item.poster }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    <Image
+                      source={{ uri: item.poster }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                    />
                   ) : null}
                 </View>
                 <ProgressBar value={item.duration ? item.position / item.duration : 0} />
@@ -107,7 +149,16 @@ export function VideoBrowse({ type, noun }: Props) {
   );
 }
 
-function CatalogRow({ addon, catalog, search }: { addon: InstalledAddon; catalog: CatalogDef; search?: string }) {
+function CatalogRow({
+  addon,
+  catalog,
+  search,
+}: {
+  addon: InstalledAddon;
+  catalog: CatalogDef;
+  search?: string;
+}) {
+  const Colors = useColors();
   const [metas, setMetas] = useState<MetaPreview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,14 +185,20 @@ function CatalogRow({ addon, catalog, search }: { addon: InstalledAddon; catalog
       {error ? (
         <Body style={{ paddingHorizontal: Spacing.three, color: Colors.danger }}>{error}</Body>
       ) : !metas ? (
-        <ActivityIndicator color={Colors.accent} style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
+        <ActivityIndicator
+          color={Colors.accent}
+          style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }}
+        />
       ) : (
         <FlatList
           horizontal
           data={metas}
           keyExtractor={(m) => m.id}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+          contentContainerStyle={{
+            paddingHorizontal: Spacing.three,
+            gap: Spacing.three,
+          }}
           renderItem={({ item }) => <PosterTile meta={item} addonId={addon.manifest.id} />}
         />
       )}
@@ -150,15 +207,24 @@ function CatalogRow({ addon, catalog, search }: { addon: InstalledAddon; catalog
 }
 
 export function PosterTile({ meta, addonId }: { meta: MetaPreview; addonId?: string }) {
+  const styles = useStyles();
   return (
     <Pressable
       style={{ width: 112, gap: 4 }}
       onPress={() =>
-        router.push({ pathname: '/title', params: { type: meta.type, id: meta.id, addon: addonId ?? '' } })
+        router.push({
+          pathname: '/title',
+          params: { type: meta.type, id: meta.id, addon: addonId ?? '' },
+        })
       }>
       <View style={styles.poster}>
         {meta.poster ? (
-          <Image source={{ uri: meta.poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          <Image
+            source={{ uri: meta.poster }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={150}
+          />
         ) : (
           <Text style={styles.posterFallback} numberOfLines={3}>
             {meta.name}
@@ -173,7 +239,7 @@ export function PosterTile({ meta, addonId }: { meta: MetaPreview; addonId?: str
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   poster: {
     width: 112,
@@ -184,7 +250,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  posterFallback: { color: Colors.textSecondary, textAlign: 'center', padding: Spacing.two, fontSize: 12 },
+  posterFallback: {
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    padding: Spacing.two,
+    fontSize: 12,
+  },
   landscape: {
     width: 200,
     height: 112,
@@ -194,4 +265,4 @@ const styles = StyleSheet.create({
   },
   tileTitle: { color: Colors.text, fontSize: 13, fontWeight: '600' },
   tileSub: { color: Colors.textSecondary, fontSize: 12 },
-});
+}));

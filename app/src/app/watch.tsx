@@ -7,16 +7,21 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePlayer } from '@/lib/player';
+import { usePrefs } from '@/lib/prefs';
+import { scrobble } from '@/lib/trakt';
 import { getNowWatching, getWatchProgress, saveWatchProgress } from '@/lib/video';
 
 const SAVE_EVERY_S = 10;
 
 /** Full-screen video player for movies, episodes and live channels. */
 export default function WatchScreen() {
+  const Colors = useColors();
+  const styles = useStyles();
   const [item] = useState(getNowWatching);
   const audio = usePlayer();
+  const { prefs } = usePrefs();
 
   const player = useVideoPlayer(
     item
@@ -24,7 +29,11 @@ export default function WatchScreen() {
           uri: item.uri,
           headers: item.headers,
           contentType: /\.m3u8(\?|$)/i.test(item.uri) ? 'hls' : 'auto',
-          metadata: { title: item.title, artist: item.subtitle, artwork: item.poster },
+          metadata: {
+            title: item.title,
+            artist: item.subtitle,
+            artwork: item.poster,
+          },
         }
       : null,
     (p) => {
@@ -34,7 +43,9 @@ export default function WatchScreen() {
     },
   );
 
-  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
+  const { status, error } = useEvent(player, 'statusChange', {
+    status: player.status,
+  });
   const resumed = useRef(false);
   const lastSaved = useRef(0);
 
@@ -48,13 +59,14 @@ export default function WatchScreen() {
 
   // Resume where you left off (not for live TV).
   useEffect(() => {
-    if (!item || item.live || status !== 'readyToPlay' || resumed.current) return;
+    if (!item || item.live || !prefs.resumeVideos || status !== 'readyToPlay' || resumed.current)
+      return;
     resumed.current = true;
     getWatchProgress().then((all) => {
       const saved = all.find((p) => p.key === item.key);
       if (saved && saved.position > 30) player.currentTime = saved.position;
     });
-  }, [status, item, player]);
+  }, [status, item, player, prefs.resumeVideos]);
 
   // Remember the position every few seconds, and when leaving.
   useEffect(() => {
@@ -83,6 +95,21 @@ export default function WatchScreen() {
       save();
     };
   }, [item, player]);
+
+  // Tell Trakt what's playing (start / pause / stop).
+  useEffect(() => {
+    if (!item || item.live || !prefs.traktScrobble) return;
+    const percent = () => (player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0);
+    const send = (action: 'start' | 'pause' | 'stop') =>
+      scrobble(action, item.key, item.link?.type, percent()).catch(() => {});
+    const sub = player.addListener('playingChange', ({ isPlaying }) =>
+      send(isPlaying ? 'start' : 'pause'),
+    );
+    return () => {
+      sub.remove();
+      send('stop');
+    };
+  }, [item, player, prefs.traktScrobble]);
 
   if (!item) return <EmptyState title="Nothing to play" />;
 
@@ -126,9 +153,15 @@ export default function WatchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: '#000' },
-  video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  video: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
   top: {
     position: 'absolute',
     top: 0,
@@ -143,7 +176,17 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontWeight: '700', fontSize: 16 },
   subtitle: { color: '#ddd', fontSize: 12 },
   live: { color: Colors.danger, fontWeight: '800', fontSize: 12 },
-  errorBox: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
+  errorBox: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
   errorText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  errorDetail: { color: '#aaa', fontSize: 12, marginTop: 6, textAlign: 'center' },
-});
+  errorDetail: {
+    color: '#aaa',
+    fontSize: 12,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+}));

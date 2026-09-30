@@ -8,7 +8,7 @@ Shows, movies, live TV and audiobooks in one app, powered by **addons**, like St
 | **Movies** | Same for movies. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv` addons, with group filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search icon for finding new books. |
-| **Settings** | TorBox key, addons, M3U playlists. |
+| **Settings** | Tracking (Trakt), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
@@ -63,13 +63,21 @@ Scan the QR code with **Expo Go** on your phone, or press `w` to open it in a br
 
 ### 3. In the app
 
-1. **Settings** → paste your TorBox API key (from torbox.app/settings) → **Save & test**.
-2. **Settings → Manage addons**:
+1. **Settings → Integrations** → paste your TorBox API key (from torbox.app/settings) → **Save & test**.
+2. **Settings → Content & Discovery → Addons**:
    - Tap **Install** on the suggested **Cinemeta** for movie and show catalogs.
    - Paste any Stremio-compatible stream addon's manifest URL.
    - Paste the audiobook addon URL, e.g. `http://<your-computer-ip>:7000/manifest.json`.
-   - Optionally add an M3U playlist for Live TV.
+   - Optionally add an M3U playlist for Live TV (**Content & Discovery → Live TV playlists**).
 3. **Shows / Movies** → pick a title → pick a stream. **Audiobooks** → 🔍 → pick a book → pick a source.
+
+### Optional: Trakt
+
+1. Create an app at <https://trakt.tv/oauth/applications> with redirect URI `urn:ietf:wg:oauth:2.0:oob`.
+2. Copy `app/.env.example` to `app/.env` and fill in the client ID and secret.
+3. Restart `npx expo start`, then go to **Settings → Tracking → Connect Trakt**. Enter the code shown on trakt.tv/activate.
+
+When connected, what you watch is scrobbled to Trakt, and your Trakt paused items show up in Continue Watching.
 
 ## Building a real app
 

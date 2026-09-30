@@ -27,24 +27,31 @@ function setJSON(key: string, value: unknown) {
 
 // --- Addons -----------------------------------------------------------------
 
+/** Every installed addon, in the user's order. */
 export const getAddons = () => getJSON<InstalledAddon[]>(KEYS.addons, []);
 export const saveAddons = (addons: InstalledAddon[]) => setJSON(KEYS.addons, addons);
 
-// --- TorBox API key (SecureStore on device, AsyncStorage on web) -------------
+export const isEnabled = (a: InstalledAddon) => a.enabled !== false;
 
-export async function getTorboxKey(): Promise<string | null> {
-  if (Platform.OS === 'web') return AsyncStorage.getItem(KEYS.torboxKey);
-  return SecureStore.getItemAsync(KEYS.torboxKey);
+/** Only the addons that are switched on. Use this everywhere content is fetched. */
+export const getActiveAddons = async () => (await getAddons()).filter(isEnabled);
+
+// --- Secrets (SecureStore on device, AsyncStorage on web) -------------------
+
+export async function secureGet(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') return AsyncStorage.getItem(key);
+  return SecureStore.getItemAsync(key);
 }
 
-export async function setTorboxKey(key: string | null) {
+export async function secureSet(key: string, value: string | null) {
   if (Platform.OS === 'web') {
-    return key ? AsyncStorage.setItem(KEYS.torboxKey, key) : AsyncStorage.removeItem(KEYS.torboxKey);
+    return value ? AsyncStorage.setItem(key, value) : AsyncStorage.removeItem(key);
   }
-  return key
-    ? SecureStore.setItemAsync(KEYS.torboxKey, key)
-    : SecureStore.deleteItemAsync(KEYS.torboxKey);
+  return value ? SecureStore.setItemAsync(key, value) : SecureStore.deleteItemAsync(key);
 }
+
+export const getTorboxKey = () => secureGet(KEYS.torboxKey);
+export const setTorboxKey = (key: string | null) => secureSet(KEYS.torboxKey, key);
 
 // --- Listening progress -----------------------------------------------------
 
@@ -76,7 +83,12 @@ export async function getProgressMany(bookKeys: string[]): Promise<Record<string
  * How far through the book we are. Chapters are weighted by file size when every
  * chapter has one, otherwise equally.
  */
-export function bookFraction(book: PlayableBook, chapter: number, position: number, duration: number) {
+export function bookFraction(
+  book: PlayableBook,
+  chapter: number,
+  position: number,
+  duration: number,
+) {
   const weights = book.chapters.every((c) => c.size)
     ? book.chapters.map((c) => c.size!)
     : book.chapters.map(() => 1);
@@ -98,7 +110,10 @@ export async function addToLibrary(book: PlayableBook) {
 
 export async function removeFromLibrary(bookKey: string) {
   const books = await getLibrary();
-  await setJSON(KEYS.library, books.filter((b) => b.key !== bookKey));
+  await setJSON(
+    KEYS.library,
+    books.filter((b) => b.key !== bookKey),
+  );
 }
 
 export const getFavorites = () => getJSON<string[]>(KEYS.favorites, []);

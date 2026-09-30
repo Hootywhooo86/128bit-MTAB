@@ -1,11 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useLayoutEffect, useState } from 'react';
-import { Alert, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { BookRow } from '@/components/book-row';
 import { Button, EmptyState } from '@/components/ui';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { deleteDownload, getDownloadedBooks, offlineSupported } from '@/lib/downloads';
 import { usePlayer } from '@/lib/player';
 import {
@@ -42,6 +51,8 @@ function confirm(title: string, message: string, action: string, onConfirm: () =
 }
 
 export default function AudiobooksScreen() {
+  const Colors = useColors();
+  const styles = useStyles();
   const navigation = useNavigation();
   const { playBook } = usePlayer();
   const [tab, setTab] = useState<Tab>('library');
@@ -63,7 +74,7 @@ export default function AudiobooksScreen() {
         </Pressable>
       ),
     });
-  }, [navigation]);
+  }, [navigation, Colors.text]);
 
   const load = useCallback(async () => {
     const [lib, dl, favs] = await Promise.all([getLibrary(), getDownloadedBooks(), getFavorites()]);
@@ -115,7 +126,9 @@ export default function AudiobooksScreen() {
             <Text style={[styles.segmentLabel, tab === t && styles.segmentLabelActive]}>
               {t === 'library' ? 'Library' : 'Downloads'}
             </Text>
-            <Text style={styles.segmentCount}>{plural(t === 'library' ? library.length : downloads.length)}</Text>
+            <Text style={styles.segmentCount}>
+              {plural(t === 'library' ? library.length : downloads.length)}
+            </Text>
             <View style={[styles.underline, tab === t && { backgroundColor: Colors.accent }]} />
           </Pressable>
         ))}
@@ -132,7 +145,9 @@ export default function AudiobooksScreen() {
               key={f.id}
               onPress={() => setFilter(f.id)}
               style={[styles.chip, filter === f.id && styles.chipActive]}>
-              <Text style={[styles.chipText, filter === f.id && { color: Colors.accentText }]}>{f.label}</Text>
+              <Text style={[styles.chipText, filter === f.id && { color: Colors.accentText }]}>
+                {f.label}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -141,13 +156,19 @@ export default function AudiobooksScreen() {
       <FlatList
         data={books}
         keyExtractor={(b) => b.key}
-        contentContainerStyle={{ paddingHorizontal: Spacing.three, paddingBottom: Spacing.five, flexGrow: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.three,
+          paddingBottom: Spacing.five,
+          flexGrow: 1,
+        }}
         ListEmptyComponent={
           tab === 'library' ? (
             library.length ? (
               <EmptyState title="Nothing here" body="No books match this filter." />
             ) : (
-              <EmptyState title="Your library is empty" body="Find a book from your addons or your TorBox cloud.">
+              <EmptyState
+                title="Your library is empty"
+                body="Find a book from your addons or your TorBox cloud.">
                 <Button label="Find audiobooks" onPress={() => router.push('/audiobooks/browse')} />
               </EmptyState>
             )
@@ -178,7 +199,7 @@ export default function AudiobooksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   segments: {
     flexDirection: 'row',
@@ -186,11 +207,25 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   segment: { flex: 1, alignItems: 'center', paddingTop: Spacing.two, gap: 2 },
-  segmentLabel: { color: Colors.textSecondary, fontSize: 16, fontWeight: '700' },
+  segmentLabel: {
+    color: Colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
   segmentLabelActive: { color: Colors.text },
   segmentCount: { color: Colors.textSecondary, fontSize: 13 },
-  underline: { height: 3, alignSelf: 'stretch', marginTop: Spacing.two, borderRadius: 2, backgroundColor: 'transparent' },
-  filters: { gap: Spacing.two, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
+  underline: {
+    height: 3,
+    alignSelf: 'stretch',
+    marginTop: Spacing.two,
+    borderRadius: 2,
+    backgroundColor: 'transparent',
+  },
+  filters: {
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+  },
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: 6,
@@ -199,4 +234,4 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: Colors.accent },
   chipText: { color: Colors.text, fontWeight: '600', fontSize: 13 },
-});
+}));

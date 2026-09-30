@@ -31,7 +31,9 @@ function validateManifest(m: Partial<Manifest>): Manifest {
   if (!m.id || !m.name || !m.version) throw new Error('Manifest is missing id, name or version');
   const types = Array.isArray(m.types) ? m.types : [];
   if (!types.some((t) => SUPPORTED_TYPES.includes(t))) {
-    throw new Error('This addon has nothing 128bit can use (no audiobook, movie, series or tv type)');
+    throw new Error(
+      'This addon has nothing 128bit can use (no audiobook, movie, series or tv type)',
+    );
   }
   return {
     ...m,
@@ -44,10 +46,45 @@ function validateManifest(m: Partial<Manifest>): Manifest {
 export async function installAddon(input: string): Promise<InstalledAddon> {
   const manifestUrl = normalizeManifestUrl(input);
   const manifest = validateManifest(await getJson<Partial<Manifest>>(manifestUrl));
-  const addon: InstalledAddon = { manifest, baseUrl: manifestUrl.replace(/\/manifest\.json$/, '') };
+  const addon: InstalledAddon = {
+    manifest,
+    baseUrl: manifestUrl.replace(/\/manifest\.json$/, ''),
+  };
   const addons = await getAddons();
-  await saveAddons([...addons.filter((a) => a.manifest.id !== manifest.id), addon]);
+  const existing = addons.findIndex((a) => a.manifest.id === manifest.id);
+  if (existing >= 0) {
+    // Reinstalling keeps its place and on/off state.
+    addons[existing] = { ...addon, enabled: addons[existing].enabled };
+    await saveAddons(addons);
+  } else {
+    await saveAddons([...addons, addon]);
+  }
   return addon;
+}
+
+/** Re-downloads the manifest (picks up new catalogs or settings). */
+export async function refreshAddon(id: string) {
+  const addon = (await getAddons()).find((a) => a.manifest.id === id);
+  if (addon) await installAddon(`${addon.baseUrl}/manifest.json`);
+}
+
+export async function setAddonEnabled(id: string, enabled: boolean) {
+  const addons = await getAddons();
+  await saveAddons(addons.map((a) => (a.manifest.id === id ? { ...a, enabled } : a)));
+}
+
+/** Moves an addon up (-1) or down (+1). Order decides which streams and catalogs come first. */
+export async function moveAddon(id: string, delta: -1 | 1) {
+  const addons = await getAddons();
+  const i = addons.findIndex((a) => a.manifest.id === id);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= addons.length) return;
+  [addons[i], addons[j]] = [addons[j], addons[i]];
+  await saveAddons(addons);
+}
+
+export function resourceNames(addon: InstalledAddon) {
+  return addon.manifest.resources.map((r) => (typeof r === 'string' ? r : r.name));
 }
 
 export async function uninstallAddon(id: string) {
@@ -142,7 +179,11 @@ export async function fetchMeta(
   throw lastError;
 }
 
-export type AddonStreams = { addon: InstalledAddon; streams: Stream[]; error?: string };
+export type AddonStreams = {
+  addon: InstalledAddon;
+  streams: Stream[];
+  error?: string;
+};
 
 /** Streams from every addon that offers them for this item, fetched in parallel. */
 export async function fetchStreams(
@@ -159,7 +200,11 @@ export async function fetchStreams(
         );
         return { addon, streams: data.streams ?? [] };
       } catch (e) {
-        return { addon, streams: [], error: e instanceof Error ? e.message : String(e) };
+        return {
+          addon,
+          streams: [],
+          error: e instanceof Error ? e.message : String(e),
+        };
       }
     }),
   );

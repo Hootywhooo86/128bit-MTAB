@@ -1,14 +1,16 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 
 import { Button, Cover, EmptyState, ProgressBar, formatBytes } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getTorboxKey } from '@/lib/storage';
 import { listAudioItems, type TorboxItem } from '@/lib/torbox';
 
 /** Everything with audio files in the user's TorBox account. */
 export default function TorboxCloudScreen() {
+  const Colors = useColors();
+  const styles = useStyles();
   const [items, setItems] = useState<TorboxItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsKey, setNeedsKey] = useState(false);
@@ -37,7 +39,9 @@ export default function TorboxCloudScreen() {
   if (needsKey) {
     return (
       <View style={styles.screen}>
-        <EmptyState title="Connect TorBox" body="Add your TorBox API key to see your cloud audiobooks.">
+        <EmptyState
+          title="Connect TorBox"
+          body="Add your TorBox API key to see your cloud audiobooks.">
           <Button label="Open Settings" onPress={() => router.navigate('/settings')} />
         </EmptyState>
       </View>
@@ -74,7 +78,10 @@ export default function TorboxCloudScreen() {
         <Pressable
           style={styles.row}
           onPress={() =>
-            router.push({ pathname: '/cloud/[kind]/[id]', params: { kind: item.kind, id: String(item.id) } })
+            router.push({
+              pathname: '/cloud/[kind]/[id]',
+              params: { kind: item.kind, id: String(item.id) },
+            })
           }>
           <Cover size={52} />
           <View style={{ flex: 1, gap: 4 }}>
@@ -98,9 +105,9 @@ export default function TorboxCloudScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   title: { color: Colors.text, fontWeight: '600', fontSize: 15 },
   sub: { color: Colors.textSecondary, fontSize: 12 },
-});
+}));

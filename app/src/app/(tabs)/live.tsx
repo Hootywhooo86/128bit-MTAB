@@ -1,13 +1,21 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { Body, Button, EmptyState, Input } from '@/components/ui';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMetas, isBrowsable } from '@/lib/addons';
 import { fetchPlaylist, getPlaylists } from '@/lib/m3u';
-import { getAddons } from '@/lib/storage';
+import { getActiveAddons } from '@/lib/storage';
 import { setNowWatching } from '@/lib/video';
 
 type Row = {
@@ -23,13 +31,15 @@ type Row = {
 const ALL = 'All';
 
 export default function LiveScreen() {
+  const Colors = useColors();
+  const styles = useStyles();
   const [channels, setChannels] = useState<Row[] | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [group, setGroup] = useState(ALL);
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
-    const [playlists, addons] = await Promise.all([getPlaylists(), getAddons()]);
+    const [playlists, addons] = await Promise.all([getPlaylists(), getActiveAddons()]);
     const errs: string[] = [];
     const lists = await Promise.all([
       ...playlists.map((p) =>
@@ -49,7 +59,11 @@ export default function LiveScreen() {
                   name: m.name,
                   logo: m.logo ?? m.poster,
                   group: m.genres?.[0] ?? c.name,
-                  meta: { type: m.type || 'tv', id: m.id, addon: a.manifest.id },
+                  meta: {
+                    type: m.type || 'tv',
+                    id: m.id,
+                    addon: a.manifest.id,
+                  },
                 })),
               )
               .catch((e) => {
@@ -80,7 +94,14 @@ export default function LiveScreen() {
 
   function open(c: Row) {
     if (c.url) {
-      setNowWatching({ key: c.id, title: c.name, subtitle: c.group, poster: c.logo, uri: c.url, live: true });
+      setNowWatching({
+        key: c.id,
+        title: c.name,
+        subtitle: c.group,
+        poster: c.logo,
+        uri: c.url,
+        live: true,
+      });
       router.push('/watch');
     } else if (c.meta) {
       router.push({ pathname: '/title', params: c.meta });
@@ -115,11 +136,24 @@ export default function LiveScreen() {
   return (
     <View style={styles.screen}>
       <View style={{ padding: Spacing.three, gap: Spacing.two }}>
-        <Input placeholder="Search channels" value={query} onChangeText={setQuery} clearButtonMode="while-editing" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two }}>
+        <Input
+          placeholder="Search channels"
+          value={query}
+          onChangeText={setQuery}
+          clearButtonMode="while-editing"
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: Spacing.two }}>
           {groups.map((g) => (
-            <Pressable key={g} onPress={() => setGroup(g)} style={[styles.chip, g === group && styles.chipActive]}>
-              <Text style={[styles.chipText, g === group && { color: Colors.accentText }]}>{g}</Text>
+            <Pressable
+              key={g}
+              onPress={() => setGroup(g)}
+              style={[styles.chip, g === group && styles.chipActive]}>
+              <Text style={[styles.chipText, g === group && { color: Colors.accentText }]}>
+                {g}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -127,17 +161,31 @@ export default function LiveScreen() {
       <FlatList
         data={visible}
         keyExtractor={(c) => c.id}
-        contentContainerStyle={{ paddingHorizontal: Spacing.three, paddingBottom: Spacing.five }}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.three,
+          paddingBottom: Spacing.five,
+        }}
         ListHeaderComponent={
           errors.length ? (
-            <Body style={{ color: Colors.danger, fontSize: 12, marginBottom: Spacing.two }}>{errors.join('\n')}</Body>
+            <Body
+              style={{
+                color: Colors.danger,
+                fontSize: 12,
+                marginBottom: Spacing.two,
+              }}>
+              {errors.join('\n')}
+            </Body>
           ) : null
         }
         renderItem={({ item }) => (
           <Pressable style={styles.row} onPress={() => open(item)}>
             <View style={styles.logo}>
               {item.logo ? (
-                <Image source={{ uri: item.logo }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                <Image
+                  source={{ uri: item.logo }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="contain"
+                />
               ) : (
                 <Text style={styles.logoFallback}>{item.name.slice(0, 2).toUpperCase()}</Text>
               )}
@@ -156,7 +204,7 @@ export default function LiveScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   center: { alignItems: 'center', justifyContent: 'center' },
   chip: {
@@ -188,4 +236,4 @@ const styles = StyleSheet.create({
   name: { color: Colors.text, fontWeight: '600', fontSize: 15 },
   group: { color: Colors.textSecondary, fontSize: 12 },
   live: { color: Colors.danger, fontSize: 10, fontWeight: '800' },
-});
+}));

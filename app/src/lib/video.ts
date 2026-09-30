@@ -55,12 +55,19 @@ export async function checkTorboxStream(itemId: number, stream: Stream): Promise
   if (!item.download_finished) return { status: 'downloading', itemId, progress: item.progress };
   const file = pickFile(item, stream);
   if (!file) throw new Error('TorBox finished, but there is no video file in this torrent');
-  return { status: 'ready', uri: await torbox.requestLink('torrent', itemId, file.id) };
+  return {
+    status: 'ready',
+    uri: await torbox.requestLink('torrent', itemId, file.id),
+  };
 }
 
 export async function resolveStream(stream: Stream, name: string): Promise<StreamResult> {
   if (stream.url) {
-    return { status: 'ready', uri: stream.url, headers: stream.behaviorHints?.proxyHeaders?.request };
+    return {
+      status: 'ready',
+      uri: stream.url,
+      headers: stream.behaviorHints?.proxyHeaders?.request,
+    };
   }
   if (stream.infoHash) {
     const { id } = await torbox.addMagnet(torbox.magnetFromHash(stream.infoHash, name), name);

@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   type GestureResponderEvent,
@@ -12,18 +11,23 @@ import {
 } from 'react-native';
 
 import { Body, Cover, EmptyState, ProgressBar, Title, formatTime } from '@/components/ui';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePlayer } from '@/lib/player';
+import { usePrefs } from '@/lib/prefs';
 
 const RATES = [0.8, 1, 1.25, 1.5, 1.75, 2];
 const SLEEP_OPTIONS = [null, 15, 30, 45, 60];
 
 export default function PlayerScreen() {
+  const Colors = useColors();
+  const styles = useStyles();
   const p = usePlayer();
+  const { prefs } = usePrefs();
   const [barWidth, setBarWidth] = useState(1);
   const [sleepChoice, setSleepChoice] = useState<number | null>(null);
 
-  if (!p.book) return <EmptyState title="Nothing playing" body="Pick a book from Discover or Library." />;
+  if (!p.book)
+    return <EmptyState title="Nothing playing" body="Pick a book from Discover or Library." />;
   const chapter = p.book.chapters[p.chapterIndex];
   const hasPrev = p.chapterIndex > 0;
   const hasNext = p.chapterIndex < p.book.chapters.length - 1;
@@ -68,17 +72,36 @@ export default function PlayerScreen() {
       {p.error ? <Body style={{ color: Colors.danger }}>{p.error}</Body> : null}
 
       <View style={styles.controls}>
-        <IconButton name="play-skip-back" disabled={!hasPrev} onPress={() => p.playChapter(p.chapterIndex - 1)} />
-        <IconButton name="play-back" label="30" onPress={() => p.seekBy(-30)} />
-        <Pressable style={styles.playButton} onPress={p.toggle} accessibilityLabel={p.playing ? 'Pause' : 'Play'}>
+        <IconButton
+          name="play-skip-back"
+          disabled={!hasPrev}
+          onPress={() => p.playChapter(p.chapterIndex - 1)}
+        />
+        <IconButton
+          name="play-back"
+          label={String(prefs.skipBack)}
+          onPress={() => p.seekBy(-prefs.skipBack)}
+        />
+        <Pressable
+          style={styles.playButton}
+          onPress={p.toggle}
+          accessibilityLabel={p.playing ? 'Pause' : 'Play'}>
           {p.loading ? (
             <ActivityIndicator color={Colors.accentText} />
           ) : (
             <Ionicons name={p.playing ? 'pause' : 'play'} size={36} color={Colors.accentText} />
           )}
         </Pressable>
-        <IconButton name="play-forward" label="30" onPress={() => p.seekBy(30)} />
-        <IconButton name="play-skip-forward" disabled={!hasNext} onPress={() => p.playChapter(p.chapterIndex + 1)} />
+        <IconButton
+          name="play-forward"
+          label={String(prefs.skipForward)}
+          onPress={() => p.seekBy(prefs.skipForward)}
+        />
+        <IconButton
+          name="play-skip-forward"
+          disabled={!hasNext}
+          onPress={() => p.playChapter(p.chapterIndex + 1)}
+        />
       </View>
 
       <View style={styles.pills}>
@@ -107,20 +130,35 @@ function IconButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const Colors = useColors();
+  const styles = useStyles();
   return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={8} style={{ alignItems: 'center', opacity: disabled ? 0.3 : 1 }}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      style={{ alignItems: 'center', opacity: disabled ? 0.3 : 1 }}>
       <Ionicons name={name} size={28} color={Colors.text} />
       {label ? <Text style={styles.iconLabel}>{label}</Text> : null}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.four, gap: Spacing.four, alignItems: 'center' },
   times: { flexDirection: 'row', justifyContent: 'space-between' },
-  time: { color: Colors.textSecondary, fontSize: 12, fontVariant: ['tabular-nums'] },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch' },
+  time: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+  },
   playButton: {
     width: 76,
     height: 76,
@@ -141,4 +179,4 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceRaised,
   },
   pillText: { color: Colors.text, fontWeight: '700' },
-});
+}));

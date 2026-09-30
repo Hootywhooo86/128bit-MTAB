@@ -1,12 +1,13 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView } from 'react-native';
 
 import { StreamList } from '@/components/stream-list';
 import { Body, Title } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, makeStyles } from '@/constants/theme';
 
 /** Streams for one episode. */
 export default function StreamsScreen() {
+  const styles = useStyles();
   const p = useLocalSearchParams<{
     type: string;
     id: string;
@@ -33,7 +34,11 @@ export default function StreamsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
-});
+  content: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    paddingBottom: Spacing.five,
+  },
+}));

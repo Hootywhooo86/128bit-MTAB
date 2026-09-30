@@ -4,7 +4,7 @@ import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
 import { MiniPlayer } from '@/components/mini-player';
-import { Colors } from '@/constants/theme';
+import { useColors } from '@/constants/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -14,6 +14,7 @@ const icon = (name: IconName) =>
   };
 
 export default function TabLayout() {
+  const Colors = useColors();
   return (
     <Tabs
       tabBar={(props) => (
@@ -27,7 +28,10 @@ export default function TabLayout() {
         headerTintColor: Colors.text,
         headerShadowVisible: false,
         headerTitleStyle: { fontWeight: '800', fontSize: 22 },
-        tabBarStyle: { backgroundColor: Colors.background, borderTopColor: Colors.border },
+        tabBarStyle: {
+          backgroundColor: Colors.background,
+          borderTopColor: Colors.border,
+        },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
       }}>
@@ -38,7 +42,14 @@ export default function TabLayout() {
         name="audiobooks"
         options={{ title: 'Audiobooks', tabBarIcon: icon('headset-outline') }}
       />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings-outline') }} />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          headerShown: false,
+          tabBarIcon: icon('settings-outline'),
+        }}
+      />
     </Tabs>
   );
 }

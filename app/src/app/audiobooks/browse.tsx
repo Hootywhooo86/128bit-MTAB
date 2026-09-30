@@ -1,18 +1,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Body, Button, Cover, EmptyState, Heading, Input } from '@/components/ui';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchCatalog, supportsSearch } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
 import type { BookPreview, CatalogDef, InstalledAddon } from '@/lib/types';
 
-type Row = { key: string; addon: InstalledAddon; catalog: CatalogDef; search?: string };
+type Row = {
+  key: string;
+  addon: InstalledAddon;
+  catalog: CatalogDef;
+  search?: string;
+};
 
 /** Find audiobooks: your TorBox cloud plus every audiobook addon catalog. */
 export default function BrowseAudiobooksScreen() {
+  const Colors = useColors();
+  const styles = useStyles();
   const { addons } = useAddons();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
@@ -20,14 +27,26 @@ export default function BrowseAudiobooksScreen() {
   const rows: Row[] = addons.flatMap((addon) => {
     const catalogs = addon.manifest.catalogs.filter((c) => c.type === 'audiobook');
     return submitted
-      ? catalogs
-          .filter(supportsSearch)
-          .map((catalog) => ({ key: `${addon.manifest.id}/${catalog.id}/s`, addon, catalog, search: submitted }))
-      : catalogs.map((catalog) => ({ key: `${addon.manifest.id}/${catalog.id}`, addon, catalog }));
+      ? catalogs.filter(supportsSearch).map((catalog) => ({
+          key: `${addon.manifest.id}/${catalog.id}/s`,
+          addon,
+          catalog,
+          search: submitted,
+        }))
+      : catalogs.map((catalog) => ({
+          key: `${addon.manifest.id}/${catalog.id}`,
+          addon,
+          catalog,
+        }));
   });
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={{
+        paddingVertical: Spacing.three,
+        gap: Spacing.four,
+      }}>
       <View style={{ paddingHorizontal: Spacing.three }}>
         <Input
           placeholder="Search audiobooks"
@@ -69,6 +88,8 @@ export default function BrowseAudiobooksScreen() {
 }
 
 function CatalogRow({ addon, catalog, search }: Omit<Row, 'key'>) {
+  const Colors = useColors();
+  const styles = useStyles();
   const [books, setBooks] = useState<BookPreview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,7 +116,10 @@ function CatalogRow({ addon, catalog, search }: Omit<Row, 'key'>) {
           {error}
         </Body>
       ) : !books ? (
-        <ActivityIndicator color={Colors.accent} style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
+        <ActivityIndicator
+          color={Colors.accent}
+          style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }}
+        />
       ) : books.length === 0 ? (
         <Body muted style={{ paddingHorizontal: Spacing.three }}>
           No results
@@ -106,12 +130,18 @@ function CatalogRow({ addon, catalog, search }: Omit<Row, 'key'>) {
           data={books}
           keyExtractor={(b) => b.id}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+          contentContainerStyle={{
+            paddingHorizontal: Spacing.three,
+            gap: Spacing.three,
+          }}
           renderItem={({ item }) => (
             <Pressable
               style={styles.tile}
               onPress={() =>
-                router.push({ pathname: '/book', params: { addon: addon.manifest.id, id: item.id } })
+                router.push({
+                  pathname: '/book',
+                  params: { addon: addon.manifest.id, id: item.id },
+                })
               }>
               <Cover uri={item.cover} size={130} />
               <Text numberOfLines={2} style={styles.tileTitle}>
@@ -130,7 +160,7 @@ function CatalogRow({ addon, catalog, search }: Omit<Row, 'key'>) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   cloud: {
     flexDirection: 'row',
@@ -146,4 +176,4 @@ const styles = StyleSheet.create({
   tile: { width: 130, gap: 4 },
   tileTitle: { color: Colors.text, fontSize: 13, fontWeight: '600' },
   tileSub: { color: Colors.textSecondary, fontSize: 12 },
-});
+}));

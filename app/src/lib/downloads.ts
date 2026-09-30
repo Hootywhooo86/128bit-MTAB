@@ -21,7 +21,9 @@ function bookDir(bookKey: string) {
 
 function chapterFile(bookKey: string, chapter: Chapter) {
   const urlExt =
-    chapter.ref.type === 'url' ? chapter.ref.url.split('?')[0].match(/\.(\w{2,4})$/)?.[1] : undefined;
+    chapter.ref.type === 'url'
+      ? chapter.ref.url.split('?')[0].match(/\.(\w{2,4})$/)?.[1]
+      : undefined;
   return new File(bookDir(bookKey), `${safe(chapter.id)}.${chapter.ext ?? urlExt ?? 'mp3'}`);
 }
 
@@ -80,4 +82,13 @@ export async function deleteDownload(bookKey: string) {
 
 export function isBookDownloaded(book: PlayableBook) {
   return book.chapters.every((c) => localChapterUri(book.key, c));
+}
+
+/** Bytes this book takes up on the phone. */
+export function downloadedBytes(book: PlayableBook) {
+  if (!offlineSupported) return 0;
+  return book.chapters.reduce((sum, c) => {
+    const file = chapterFile(book.key, c);
+    return sum + (file.exists ? (file.size ?? 0) : 0);
+  }, 0);
 }

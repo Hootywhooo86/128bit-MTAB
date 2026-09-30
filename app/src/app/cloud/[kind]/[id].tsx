@@ -1,16 +1,21 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { PlayableActions } from '@/components/playable-actions';
 import { Body, Cover, EmptyState, ProgressBar, Title } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { bookFromTorboxItem, type ResolveResult } from '@/lib/resolve';
 import { getItem, type TorboxItem } from '@/lib/torbox';
 
 /** A book straight from the user's TorBox cloud (no addon involved). */
 export default function CloudItemScreen() {
-  const params = useLocalSearchParams<{ kind: TorboxItem['kind']; id: string }>();
+  const Colors = useColors();
+  const styles = useStyles();
+  const params = useLocalSearchParams<{
+    kind: TorboxItem['kind'];
+    id: string;
+  }>();
   const itemId = Number(params.id);
   const [name, setName] = useState('');
   const [result, setResult] = useState<ResolveResult | null>(null);
@@ -27,7 +32,12 @@ export default function CloudItemScreen() {
         if (item.download_finished) {
           setResult({ status: 'ready', book: bookFromTorboxItem(item) });
         } else {
-          setResult({ status: 'downloading', kind: item.kind, itemId, progress: item.progress });
+          setResult({
+            status: 'downloading',
+            kind: item.kind,
+            itemId,
+            progress: item.progress,
+          });
           timer = setTimeout(poll, 5000);
         }
       } catch (e) {
@@ -69,9 +79,18 @@ export default function CloudItemScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  content: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    paddingBottom: Spacing.five,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-});
+}));

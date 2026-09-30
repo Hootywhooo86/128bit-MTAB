@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { chapterUrl } from './downloads';
+import { usePrefs } from './prefs';
 import { addToLibrary, bookFraction, getProgress, saveProgress } from './storage';
 import type { PlayableBook } from './types';
 
@@ -53,7 +54,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [chapterIndex, setChapterIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rate, setRateState] = useState(1);
+  const { prefs } = usePrefs();
+  const [rate, setRateState] = useState(prefs.defaultRate);
   const [sleepAt, setSleepAt] = useState<number | null>(null);
 
   const pendingSeek = useRef<number | null>(null);
@@ -141,13 +143,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     onFinish.current = () => {
       if (!book) return;
       if (chapterIndex + 1 < book.chapters.length) {
+        if (!prefs.autoNextChapter) return;
         loadChapter(book, chapterIndex + 1);
       } else {
         finished.current = true;
-        saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
+        saveProgress(book.key, {
+          chapter: 0,
+          position: 0,
+          fraction: 1,
+          finished: true,
+        });
       }
     };
-  }, [book, chapterIndex, loadChapter]);
+  }, [book, chapterIndex, loadChapter, prefs.autoNextChapter]);
 
   useEffect(() => {
     const sub = player.addListener('playbackStatusUpdate', (s) => {
@@ -174,10 +182,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Sleep timer.
   useEffect(() => {
     if (!sleepAt) return;
-    const id = setTimeout(() => {
-      player.pause();
-      setSleepAt(null);
-    }, Math.max(0, sleepAt - Date.now()));
+    const id = setTimeout(
+      () => {
+        player.pause();
+        setSleepAt(null);
+      },
+      Math.max(0, sleepAt - Date.now()),
+    );
     return () => clearTimeout(id);
   }, [sleepAt, player]);
 

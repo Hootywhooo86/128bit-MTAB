@@ -27,7 +27,12 @@ export type TorboxItem = {
   kind: 'torrent' | 'webdl';
 };
 
-type Envelope<T> = { success: boolean; error?: string | null; detail?: string; data: T };
+type Envelope<T> = {
+  success: boolean;
+  error?: string | null;
+  detail?: string;
+  data: T;
+};
 
 export class TorboxError extends Error {}
 
@@ -70,7 +75,10 @@ export function isVideoFile(f: TorboxFile) {
 /** Natural sort so "Chapter 2" comes before "Chapter 10". */
 export function sortFiles(files: TorboxFile[]) {
   return [...files].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }),
+    a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    }),
   );
 }
 
