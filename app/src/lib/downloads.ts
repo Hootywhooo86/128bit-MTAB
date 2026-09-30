@@ -1,0 +1,83 @@
+/**
+ * Saves audiobooks to the phone so they play offline.
+ * Files live in <documents>/audiobooks/<book>/<chapter>.<ext>.
+ */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Directory, File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
+
+import { requestLink } from './torbox';
+import type { Chapter, PlayableBook } from './types';
+
+const INDEX_KEY = '128bit.downloads';
+
+export const offlineSupported = Platform.OS !== 'web';
+
+const safe = (s: string) => s.replace(/[^a-z0-9._-]+/gi, '_');
+
+function bookDir(bookKey: string) {
+  return new Directory(Paths.document, 'audiobooks', safe(bookKey));
+}
+
+function chapterFile(bookKey: string, chapter: Chapter) {
+  const urlExt =
+    chapter.ref.type === 'url' ? chapter.ref.url.split('?')[0].match(/\.(\w{2,4})$/)?.[1] : undefined;
+  return new File(bookDir(bookKey), `${safe(chapter.id)}.${chapter.ext ?? urlExt ?? 'mp3'}`);
+}
+
+/** Local file URI if this chapter was downloaded, otherwise null. */
+export function localChapterUri(bookKey: string, chapter: Chapter): string | null {
+  if (!offlineSupported) return null;
+  const file = chapterFile(bookKey, chapter);
+  return file.exists ? file.uri : null;
+}
+
+/** A playable URL for the chapter: the local copy, a direct URL, or a fresh TorBox link. */
+export async function chapterUrl(bookKey: string, chapter: Chapter): Promise<string> {
+  const local = localChapterUri(bookKey, chapter);
+  if (local) return local;
+  if (chapter.ref.type === 'url') return chapter.ref.url;
+  return requestLink(chapter.ref.kind, chapter.ref.itemId, chapter.ref.fileId);
+}
+
+export async function getDownloadedBooks(): Promise<PlayableBook[]> {
+  const raw = await AsyncStorage.getItem(INDEX_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+async function setIndex(books: PlayableBook[]) {
+  await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(books));
+}
+
+export async function downloadBook(
+  book: PlayableBook,
+  onProgress?: (done: number, total: number) => void,
+) {
+  if (!offlineSupported) throw new Error('Offline downloads are only available on iOS and Android');
+  bookDir(book.key).create({ intermediates: true, idempotent: true });
+  const books = await getDownloadedBooks();
+  await setIndex([book, ...books.filter((b) => b.key !== book.key)]);
+
+  for (let i = 0; i < book.chapters.length; i++) {
+    const chapter = book.chapters[i];
+    onProgress?.(i, book.chapters.length);
+    const file = chapterFile(book.key, chapter);
+    if (file.exists) continue;
+    const url = await chapterUrl(book.key, chapter);
+    await File.downloadFileAsync(url, file, { idempotent: true });
+  }
+  onProgress?.(book.chapters.length, book.chapters.length);
+}
+
+export async function deleteDownload(bookKey: string) {
+  if (offlineSupported) {
+    const dir = bookDir(bookKey);
+    if (dir.exists) dir.delete();
+  }
+  const books = await getDownloadedBooks();
+  await setIndex(books.filter((b) => b.key !== bookKey));
+}
+
+export function isBookDownloaded(book: PlayableBook) {
+  return book.chapters.every((c) => localChapterUri(book.key, c));
+}

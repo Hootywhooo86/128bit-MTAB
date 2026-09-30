@@ -1,0 +1,13 @@
+{
+  "name": "128bit-addon-librivox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example 128bit audiobook addon serving public-domain LibriVox recordings from archive.org",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
