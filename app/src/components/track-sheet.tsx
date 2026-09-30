@@ -64,6 +64,18 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** "English", "English 2", "English 3"… when an addon offers several files per language. */
+function numbered(subs: AddonSubtitle[]) {
+  const total: Record<string, number> = {};
+  for (const s of subs) total[languageName(s.lang)] = (total[languageName(s.lang)] ?? 0) + 1;
+  const seen: Record<string, number> = {};
+  return subs.map((s) => {
+    const name = languageName(s.lang);
+    seen[name] = (seen[name] ?? 0) + 1;
+    return { s, label: total[name] > 1 && seen[name] > 1 ? `${name} ${seen[name]}` : name };
+  });
+}
+
 /** Bottom sheet for picking subtitles, audio track and subtitle timing. */
 export function TrackSheet(p: Props) {
   const Colors = useColors();
@@ -102,10 +114,10 @@ export function TrackSheet(p: Props) {
                 onPress={() => p.onChoose({ kind: 'embedded', track: t })}
               />
             ))}
-            {p.addon.map((s) => (
+            {numbered(p.addon).map(({ s, label }) => (
               <Option
                 key={s.id}
-                label={languageName(s.lang)}
+                label={label}
                 detail={s.addon}
                 selected={isOn({ kind: 'addon', sub: s })}
                 onPress={() => p.onChoose({ kind: 'addon', sub: s })}
