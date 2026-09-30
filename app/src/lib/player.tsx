@@ -13,7 +13,7 @@ import {
 } from 'react';
 
 import { chapterUrl } from './downloads';
-import { getProgress, pushRecent, saveProgress } from './storage';
+import { addToLibrary, bookFraction, getProgress, saveProgress } from './storage';
 import type { PlayableBook } from './types';
 
 const SAVE_EVERY_MS = 10_000;
@@ -58,6 +58,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const pendingSeek = useRef<number | null>(null);
   const lastSave = useRef(0);
+  const finished = useRef(false);
 
   useEffect(() => {
     setAudioModeAsync({
@@ -90,7 +91,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           },
           { showSeekForward: true, showSeekBackward: true },
         );
-        saveProgress(target.key, { chapter: index, position: startAt });
+        finished.current = false;
+        saveProgress(target.key, {
+          chapter: index,
+          position: startAt,
+          fraction: bookFraction(target, index, 0, 0),
+          finished: false,
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -103,7 +110,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const playBook = useCallback(
     async (next: PlayableBook, chapter?: number) => {
       setBook(next);
-      pushRecent(next);
+      addToLibrary(next);
       if (chapter !== undefined) return loadChapter(next, chapter);
       const saved = await getProgress(next.key);
       const index = saved && saved.chapter < next.chapters.length ? saved.chapter : 0;
@@ -136,7 +143,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (chapterIndex + 1 < book.chapters.length) {
         loadChapter(book, chapterIndex + 1);
       } else {
-        saveProgress(book.key, { chapter: 0, position: 0 });
+        finished.current = true;
+        saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
       }
     };
   }, [book, chapterIndex, loadChapter]);
@@ -150,13 +158,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Save progress regularly while playing.
   useEffect(() => {
-    if (!book || !status.isLoaded) return;
+    if (!book || !status.isLoaded || finished.current) return;
     const now = Date.now();
     if (!status.playing || now - lastSave.current > SAVE_EVERY_MS) {
       lastSave.current = now;
-      saveProgress(book.key, { chapter: chapterIndex, position: status.currentTime });
+      saveProgress(book.key, {
+        chapter: chapterIndex,
+        position: status.currentTime,
+        fraction: bookFraction(book, chapterIndex, status.currentTime, status.duration),
+        finished: false,
+      });
     }
-  }, [book, chapterIndex, status.currentTime, status.playing, status.isLoaded]);
+  }, [book, chapterIndex, status.currentTime, status.duration, status.playing, status.isLoaded]);
 
   // Sleep timer.
   useEffect(() => {

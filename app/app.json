@@ -3,7 +3,7 @@
     "name": "128bit",
     "slug": "128bit-mtab",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "bit128",
     "userInterfaceStyle": "dark",
@@ -43,7 +43,8 @@
           "enableBackgroundPlayback": true
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,15 +1,15 @@
-/** 128bit is dark-first: deep navy background with a neon cyan accent. */
+/** 128bit is dark-first: near-black background with an orange accent. */
 export const Colors = {
-  background: '#07090F',
-  surface: '#111522',
-  surfaceRaised: '#1A2031',
-  border: '#232A3F',
-  text: '#F2F5FF',
-  textSecondary: '#8B93AD',
-  accent: '#3DF2E0',
-  accentText: '#04110F',
-  danger: '#FF5C7A',
-  success: '#5CFF9D',
+  background: '#0A0A0A',
+  surface: '#151515',
+  surfaceRaised: '#1E1E1E',
+  border: '#2A2A2A',
+  text: '#FFFFFF',
+  textSecondary: '#9E9E9E',
+  accent: '#FF8A2B',
+  accentText: '#FFFFFF',
+  danger: '#FF5C5C',
+  success: '#5CD68A',
 } as const;
 
 export const Spacing = {

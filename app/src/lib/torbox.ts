@@ -61,6 +61,12 @@ export function isAudioFile(f: TorboxFile) {
   return f.mimetype?.startsWith('audio/') || AUDIO_EXT.test(f.name);
 }
 
+export const VIDEO_EXT = /\.(mkv|mp4|m4v|avi|mov|webm|ts|m2ts|wmv)$/i;
+
+export function isVideoFile(f: TorboxFile) {
+  return f.mimetype?.startsWith('video/') || VIDEO_EXT.test(f.name);
+}
+
 /** Natural sort so "Chapter 2" comes before "Chapter 10". */
 export function sortFiles(files: TorboxFile[]) {
   return [...files].sort((a, b) =>
@@ -153,6 +159,16 @@ export async function addWebDownload(link: string, name?: string): Promise<{ id:
     body: body.toString(),
   });
   return { id: data.webdownload_id };
+}
+
+/** Which of these torrent hashes TorBox already has cached (they start instantly). */
+export async function checkCached(hashes: string[]): Promise<Set<string>> {
+  if (!hashes.length) return new Set();
+  const unique = [...new Set(hashes.map((h) => h.toLowerCase()))];
+  const data = await call<Record<string, unknown> | null>(
+    `/torrents/checkcached?format=object&hash=${unique.join(',')}`,
+  );
+  return new Set(Object.keys(data ?? {}).map((h) => h.toLowerCase()));
 }
 
 // --- Streaming links --------------------------------------------------------

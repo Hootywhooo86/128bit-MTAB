@@ -26,14 +26,19 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
         headerShadowVisible: false,
+        headerTitleStyle: { fontWeight: '800', fontSize: 22 },
         tabBarStyle: { backgroundColor: Colors.background, borderTopColor: Colors.border },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
       }}>
-      <Tabs.Screen name="index" options={{ title: 'Discover', tabBarIcon: icon('compass') }} />
-      <Tabs.Screen name="library" options={{ title: 'Library', tabBarIcon: icon('library') }} />
-      <Tabs.Screen name="addons" options={{ title: 'Addons', tabBarIcon: icon('extension-puzzle') }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings') }} />
+      <Tabs.Screen name="index" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
+      <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />
+      <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
+      <Tabs.Screen
+        name="audiobooks"
+        options={{ title: 'Audiobooks', tabBarIcon: icon('headset-outline') }}
+      />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings-outline') }} />
     </Tabs>
   );
 }

@@ -1,17 +1,27 @@
 # 128bit
 
-A Stremio-style audiobook app. You install **addons** (JSON endpoints) that list audiobooks. When a book comes as a torrent or a web link, 128bit sends it to your **TorBox** account and then streams the finished files from there, or saves them to your phone for offline listening.
+Shows, movies, live TV and audiobooks in one app, powered by **addons**, like Stremio/Nuvio for video and PageTurner for audiobooks. When a stream or book comes as a torrent or web link, 128bit sends it to your **TorBox** account and plays the finished files from there.
+
+| Tab | What it does |
+|---|---|
+| **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker. Continue watching. |
+| **Movies** | Same for movies. |
+| **Live TV** | Channels from M3U playlists and Stremio `tv` addons, with group filters and search. |
+| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search icon for finding new books. |
+| **Settings** | TorBox key, addons, M3U playlists. |
+
+Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
 ```
-┌──────────── 128bit app (Expo / React Native) ────────────┐
-│ Discover · Library · Addons · Settings · Player          │
-│        │                     │                           │
-│  Addon client            TorBox client                   │
-└────────┼─────────────────────┼───────────────────────────┘
+┌──────────── 128bit app (Expo / React Native) ─────────────┐
+│ Shows · Movies · Live TV · Audiobooks · Settings          │
+│        │                     │                            │
+│  Addon client            TorBox client                    │
+└────────┼─────────────────────┼────────────────────────────┘
          │ JSON                │ api.torbox.app
-   manifest.json          createtorrent / createwebdownload
-   /catalog/…json         mylist  → requestdl (direct link)
-   /book/…json
+   Stremio: /catalog /meta /stream    createtorrent → mylist → requestdl
+   128bit:  /catalog /book (audiobooks)
+   M3U playlists (live TV)
 ```
 
 ## What's in here
@@ -22,13 +32,13 @@ A Stremio-style audiobook app. You install **addons** (JSON endpoints) that list
 | [`addons/librivox/`](addons/librivox) | Example addon: free public-domain LibriVox audiobooks from archive.org |
 | [`docs/ADDON_PROTOCOL.md`](docs/ADDON_PROTOCOL.md) | The addon JSON format, if you want to write your own |
 
-## Features in this starter
+## How streams are played
 
-- **Addons:** install by manifest URL, browse catalogs, search, view book details and sources.
-- **TorBox:** API key kept in the device's secure storage. Torrents (`infoHash`/`magnet`) and web links (`webUrl`) are sent to TorBox, the app shows download progress, then turns the audio files into chapters. Stream links are requested fresh at play time because TorBox links expire.
-- **Library:** Continue listening, books saved on this phone, and everything with audio in your TorBox cloud (even items you added outside the app).
-- **Player:** runs app-wide with a mini player, background playback and lock-screen controls. Includes ±30s skip, next/previous chapter, speed 0.8–2×, a sleep timer, auto-advance, and resume from where you left off.
-- **Offline:** download every chapter to the phone and play it without a connection.
+- `url` → played directly (HLS `.m3u8` and MP4/MKV, depending on the phone).
+- `infoHash` → added to TorBox. If TorBox already has it cached (⚡ badge) it starts right away; otherwise the app shows progress and plays when it's ready.
+- `externalUrl` → opened outside the app.
+
+Movies and episodes remember where you stopped (Continue watching). Audiobooks remember chapter and position, show overall progress, can be favourited, and play in the background with lock-screen controls.
 
 ## Run it
 
@@ -54,10 +64,12 @@ Scan the QR code with **Expo Go** on your phone, or press `w` to open it in a br
 ### 3. In the app
 
 1. **Settings** → paste your TorBox API key (from torbox.app/settings) → **Save & test**.
-2. **Addons** → paste the addon's manifest URL → **Install**.
-3. **Discover** → pick a book → pick a source:
-   - **Direct stream** plays straight away.
-   - **Torrent → TorBox** sends it to TorBox, shows progress, then plays the files.
+2. **Settings → Manage addons**:
+   - Tap **Install** on the suggested **Cinemeta** for movie and show catalogs.
+   - Paste any Stremio-compatible stream addon's manifest URL.
+   - Paste the audiobook addon URL, e.g. `http://<your-computer-ip>:7000/manifest.json`.
+   - Optionally add an M3U playlist for Live TV.
+3. **Shows / Movies** → pick a title → pick a stream. **Audiobooks** → 🔍 → pick a book → pick a source.
 
 ## Building a real app
 
@@ -72,7 +84,8 @@ npx eas-cli@latest build --profile preview --platform android
 
 - Chapter markers inside single-file `.m4b` books
 - Sync progress between devices (Supabase or Firebase)
-- Movies and TV: add a video player and Stremio-compatible `meta`/`stream` addons alongside audiobooks
+- Subtitles (Stremio `subtitles` resource) and audio track picker
+- EPG (TV guide) for M3U playlists
 - Android TV layout
 
 ## A note on content

@@ -1,16 +1,19 @@
 /**
- * 128bit audiobook addon protocol.
- * See docs/ADDON_PROTOCOL.md at the repo root for the full spec.
+ * Shared types: the 128bit audiobook addon protocol (docs/ADDON_PROTOCOL.md)
+ * and the Stremio addon protocol used for movies, shows and live TV.
  */
 
-export type CatalogExtra = { name: 'search' };
+export type CatalogExtra = { name: string; options?: string[]; isRequired?: boolean };
 
 export type CatalogDef = {
-  type: 'audiobook';
+  /** "audiobook" for 128bit book addons; "movie", "series" or "tv" for Stremio-style video addons. */
+  type: string;
   id: string;
   name: string;
   extra?: CatalogExtra[];
 };
+
+export type ResourceDef = string | { name: string; types?: string[]; idPrefixes?: string[] };
 
 export type Manifest = {
   id: string;
@@ -19,8 +22,9 @@ export type Manifest = {
   description?: string;
   logo?: string;
   types: string[];
-  resources: string[];
+  resources: ResourceDef[];
   catalogs: CatalogDef[];
+  idPrefixes?: string[];
 };
 
 /** An installed addon: its manifest plus the base URL it was installed from. */
@@ -29,6 +33,56 @@ export type InstalledAddon = {
   /** Manifest URL without the trailing `/manifest.json`. */
   baseUrl: string;
 };
+
+// --- Video (Stremio protocol) -----------------------------------------------
+
+export type VideoType = 'movie' | 'series' | 'tv';
+
+export type MetaPreview = {
+  id: string;
+  type: string;
+  name: string;
+  poster?: string;
+  posterShape?: 'poster' | 'landscape' | 'square';
+  background?: string;
+  logo?: string;
+  description?: string;
+  releaseInfo?: string;
+  imdbRating?: string;
+  genres?: string[];
+};
+
+export type Episode = {
+  id: string;
+  title?: string;
+  name?: string;
+  season?: number;
+  episode?: number;
+  number?: number;
+  released?: string;
+  thumbnail?: string;
+  overview?: string;
+  description?: string;
+};
+
+export type MetaDetail = MetaPreview & { videos?: Episode[]; runtime?: string };
+
+export type Stream = {
+  name?: string;
+  title?: string;
+  description?: string;
+  url?: string;
+  infoHash?: string;
+  fileIdx?: number;
+  externalUrl?: string;
+  behaviorHints?: {
+    filename?: string;
+    notWebReady?: boolean;
+    proxyHeaders?: { request?: Record<string, string> };
+  };
+};
+
+// --- Audiobooks -------------------------------------------------------------
 
 export type BookPreview = {
   id: string;
@@ -82,6 +136,9 @@ export type PlayableBook = {
   key: string;
   title: string;
   author?: string;
+  narrator?: string;
+  /** Human readable total length from the addon, e.g. "10:17:59". */
+  duration?: string;
   cover?: string;
   chapters: Chapter[];
 };

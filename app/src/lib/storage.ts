@@ -8,7 +8,8 @@ const KEYS = {
   addons: '128bit.addons',
   torboxKey: '128bit.torboxKey',
   progress: (bookKey: string) => `128bit.progress.${bookKey}`,
-  recent: '128bit.recent',
+  library: '128bit.library',
+  favorites: '128bit.favorites',
 };
 
 async function getJSON<T>(key: string, fallback: T): Promise<T> {
@@ -47,7 +48,14 @@ export async function setTorboxKey(key: string | null) {
 
 // --- Listening progress -----------------------------------------------------
 
-export type Progress = { chapter: number; position: number; updatedAt: number };
+export type Progress = {
+  chapter: number;
+  position: number;
+  /** 0..1 through the whole book. */
+  fraction: number;
+  finished: boolean;
+  updatedAt: number;
+};
 
 export const getProgress = (bookKey: string) =>
   getJSON<Progress | null>(KEYS.progress(bookKey), null);
@@ -55,14 +63,49 @@ export const getProgress = (bookKey: string) =>
 export const saveProgress = (bookKey: string, progress: Omit<Progress, 'updatedAt'>) =>
   setJSON(KEYS.progress(bookKey), { ...progress, updatedAt: Date.now() });
 
-// --- Continue listening -----------------------------------------------------
+export async function getProgressMany(bookKeys: string[]): Promise<Record<string, Progress>> {
+  const pairs = await AsyncStorage.multiGet(bookKeys.map(KEYS.progress));
+  const out: Record<string, Progress> = {};
+  pairs.forEach(([, raw], i) => {
+    if (raw) out[bookKeys[i]] = JSON.parse(raw);
+  });
+  return out;
+}
 
-const MAX_RECENT = 20;
+/**
+ * How far through the book we are. Chapters are weighted by file size when every
+ * chapter has one, otherwise equally.
+ */
+export function bookFraction(book: PlayableBook, chapter: number, position: number, duration: number) {
+  const weights = book.chapters.every((c) => c.size)
+    ? book.chapters.map((c) => c.size!)
+    : book.chapters.map(() => 1);
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  const before = weights.slice(0, chapter).reduce((a, b) => a + b, 0);
+  const within = duration > 0 ? Math.min(1, position / duration) : 0;
+  return Math.min(1, (before + (weights[chapter] ?? 0) * within) / total);
+}
 
-export const getRecent = () => getJSON<PlayableBook[]>(KEYS.recent, []);
+// --- Audiobook library ------------------------------------------------------
 
-export async function pushRecent(book: PlayableBook) {
-  const recent = await getRecent();
-  const next = [book, ...recent.filter((b) => b.key !== book.key)].slice(0, MAX_RECENT);
-  await setJSON(KEYS.recent, next);
+/** Books you've started or added, most recently played first. */
+export const getLibrary = () => getJSON<PlayableBook[]>(KEYS.library, []);
+
+export async function addToLibrary(book: PlayableBook) {
+  const books = await getLibrary();
+  await setJSON(KEYS.library, [book, ...books.filter((b) => b.key !== book.key)]);
+}
+
+export async function removeFromLibrary(bookKey: string) {
+  const books = await getLibrary();
+  await setJSON(KEYS.library, books.filter((b) => b.key !== bookKey));
+}
+
+export const getFavorites = () => getJSON<string[]>(KEYS.favorites, []);
+
+export async function toggleFavorite(bookKey: string): Promise<string[]> {
+  const favs = await getFavorites();
+  const next = favs.includes(bookKey) ? favs.filter((k) => k !== bookKey) : [...favs, bookKey];
+  await setJSON(KEYS.favorites, next);
+  return next;
 }

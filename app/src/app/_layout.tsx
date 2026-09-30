@@ -29,14 +29,25 @@ export default function RootLayout() {
     <ThemeProvider value={theme}>
       <PlayerProvider>
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerTintColor: Colors.text, headerShadowVisible: false }}>
+        <Stack
+          screenOptions={{
+            headerTintColor: Colors.text,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: Colors.background },
+          }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="title" options={{ title: '' }} />
+          <Stack.Screen name="streams" options={{ title: '' }} />
+          <Stack.Screen
+            name="watch"
+            options={{ headerShown: false, presentation: 'fullScreenModal', orientation: 'all' }}
+          />
+          <Stack.Screen name="addons" options={{ title: 'Addons & playlists' }} />
+          <Stack.Screen name="audiobooks/browse" options={{ title: 'Find audiobooks' }} />
+          <Stack.Screen name="audiobooks/cloud" options={{ title: 'TorBox cloud' }} />
           <Stack.Screen name="book" options={{ title: '' }} />
           <Stack.Screen name="cloud/[kind]/[id]" options={{ title: '' }} />
-          <Stack.Screen
-            name="player"
-            options={{ presentation: 'modal', title: 'Now playing' }}
-          />
+          <Stack.Screen name="player" options={{ presentation: 'modal', title: 'Now playing' }} />
         </Stack>
       </PlayerProvider>
     </ThemeProvider>

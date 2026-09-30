@@ -5,7 +5,7 @@ export type ResolveResult =
   | { status: 'ready'; book: PlayableBook }
   | { status: 'downloading'; kind: torbox.TorboxItem['kind']; itemId: number; progress: number };
 
-type Meta = { title?: string; author?: string; cover?: string };
+type Meta = { title?: string; author?: string; narrator?: string; duration?: string; cover?: string };
 
 export function torboxBookKey(kind: torbox.TorboxItem['kind'], id: number) {
   return `torbox:${kind}:${id}`;
@@ -25,6 +25,8 @@ export function bookFromTorboxItem(item: torbox.TorboxItem, meta: Meta = {}): Pl
     key: torboxBookKey(item.kind, item.id),
     title: meta.title ?? item.name,
     author: meta.author,
+    narrator: meta.narrator,
+    duration: meta.duration,
     cover: meta.cover,
     chapters,
   };
@@ -36,7 +38,13 @@ export async function resolveSource(
   book: BookDetail,
   source: Source,
 ): Promise<ResolveResult> {
-  const meta = { title: book.title, author: book.author, cover: book.cover };
+  const meta = {
+    title: book.title,
+    author: book.author,
+    narrator: book.narrator,
+    duration: book.duration,
+    cover: book.cover,
+  };
 
   if (source.chapters?.length) {
     return {
@@ -45,6 +53,8 @@ export async function resolveSource(
         key: `${addonId}:${book.id}`,
         title: book.title,
         author: book.author,
+        narrator: book.narrator,
+        duration: book.duration,
         cover: book.cover,
         chapters: source.chapters.map((c, i) => ({
           id: String(i),

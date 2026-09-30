@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet } from 'react-native';
 
@@ -47,10 +48,16 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Card>
+        <Heading>Addons & playlists</Heading>
+        <Body muted>Install addons for shows, movies, live TV and audiobooks, and add M3U playlists.</Body>
+        <Button label="Manage addons" variant="secondary" onPress={() => router.push('/addons')} />
+      </Card>
+
+      <Card>
         <Heading>TorBox</Heading>
         <Body muted>
-          128bit sends torrents and links to your TorBox account, then streams or downloads the finished audio
-          files from there. Your key is stored in the device’s secure storage.
+          128bit sends torrents and links to your TorBox account, then streams the finished files from there
+          (and saves audiobooks to your phone if you want). Your key is stored in the device’s secure storage.
         </Body>
         <Input
           placeholder="TorBox API key"
