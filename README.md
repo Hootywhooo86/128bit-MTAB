@@ -4,11 +4,12 @@ Shows, movies, live TV and audiobooks in one app, powered by **addons**, like St
 
 | Tab | What it does |
 |---|---|
-| **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker. Continue watching. |
+| **Home** | Featured title, Continue watching, Continue listening and top catalogs. |
+| **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker (quality/size badges, filters). Subtitles, audio tracks, Next episode / auto-play. |
 | **Movies** | Same for movies. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv` addons, with group filters and search. |
-| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search icon for finding new books. |
-| **Settings** | Tracking (Trakt), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
+| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search for new books from addons, your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
+| **Settings** (⚙ top right) | Tracking (Trakt), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
@@ -79,20 +80,40 @@ Scan the QR code with **Expo Go** on your phone, or press `w` to open it in a br
 
 When connected, what you watch is scrobbled to Trakt, and your Trakt paused items show up in Continue Watching.
 
-## Building a real app
+## Install on your phone
 
-Expo Go is fine for development. For an installable APK/IPA with full background audio:
+Expo Go is fine for a quick look, but it can't do background video, picture-in-picture or
+reliable lock-screen audio. For the real thing, build the app with EAS (Expo's free cloud
+build service, no Android Studio needed):
 
 ```bash
 cd app
-npx eas-cli@latest build --profile preview --platform android
+npx eas-cli@latest login          # free Expo account
+npx eas-cli@latest init           # links this project to your account (once)
+npx eas-cli@latest build -p android --profile preview
 ```
+
+When the build finishes (about 10–15 minutes) EAS prints a link and QR code. Open it on your
+Android phone to download and install the APK. You may need to allow "install unknown apps"
+for your browser.
+
+Profiles in `app/eas.json`:
+
+| Profile | What you get |
+|---|---|
+| `preview` | A normal installable APK. Use this one. |
+| `development` | A dev build that loads code live from `npx expo start`, for working on the app. |
+| `production` | A Play Store bundle. |
+
+**iPhone:** installing outside the App Store needs an Apple Developer account ($99/year).
+Run `npx eas-cli@latest build -p ios --profile preview` and EAS walks you through it.
+
+**Local network:** plain `http://` addresses (a local addon, an Audiobookshelf server, M3U
+playlists) are allowed in the app, so `http://192.168.x.x:port` works.
 
 ## Ideas for next steps
 
-- Chapter markers inside single-file `.m4b` books
 - Sync progress between devices (Supabase or Firebase)
-- Subtitles (Stremio `subtitles` resource) and audio track picker
 - EPG (TV guide) for M3U playlists
 - Android TV layout
 

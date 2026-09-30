@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { absFileUrl } from './audiobookshelf';
 import { requestLink } from './torbox';
 import type { Chapter, PlayableBook } from './types';
 
@@ -39,6 +40,7 @@ export async function chapterUrl(bookKey: string, chapter: Chapter): Promise<str
   const local = localChapterUri(bookKey, chapter);
   if (local) return local;
   if (chapter.ref.type === 'url') return chapter.ref.url;
+  if (chapter.ref.type === 'abs') return absFileUrl(chapter.ref.path);
   return requestLink(chapter.ref.kind, chapter.ref.itemId, chapter.ref.fileId);
 }
 
@@ -91,4 +93,26 @@ export function downloadedBytes(book: PlayableBook) {
     const file = chapterFile(book.key, c);
     return sum + (file.exists ? (file.size ?? 0) : 0);
   }, 0);
+}
+
+/** Reads byte ranges from a downloaded chapter (for reading .m4b chapter markers offline). */
+export function localRangeReader(bookKey: string, chapter: Chapter) {
+  return async (start: number, end: number) => {
+    const handle = chapterFile(bookKey, chapter).open();
+    try {
+      handle.offset = start;
+      const size = handle.size ?? 0;
+      return handle.readBytes(Math.max(0, Math.min(end + 1, size) - start));
+    } finally {
+      handle.close();
+    }
+  };
+}
+
+/** Saves an updated copy of a downloaded book (e.g. once its chapter markers are known). */
+export async function updateDownloadedBook(book: PlayableBook) {
+  const books = await getDownloadedBooks();
+  if (books.some((b) => b.key === book.key)) {
+    await setIndex(books.map((b) => (b.key === book.key ? book : b)));
+  }
 }

@@ -4,6 +4,7 @@ import { Linking, Text, View } from 'react-native';
 import { SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { absAccount, absLogin, absLoginWithApiKey, absLogout } from '@/lib/audiobookshelf';
 import { getTorboxKey, setTorboxKey } from '@/lib/storage';
 import { testKey } from '@/lib/torbox';
 
@@ -87,7 +88,105 @@ export default function IntegrationsSettings() {
           onPress={() => Linking.openURL('https://torbox.app/settings')}
         />
       </View>
+
+      <SectionTitle>Audiobookshelf</SectionTitle>
+      <AudiobookshelfCard />
     </SettingsPage>
+  );
+}
+
+function AudiobookshelfCard() {
+  const Colors = useColors();
+  const styles = useStyles();
+  const [account, setAccount] = useState<{ server: string; username?: string } | null>(null);
+  const [server, setServer] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [useKey, setUseKey] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    absAccount().then(setAccount);
+  }, []);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (useKey) await absLoginWithApiKey(server, apiKey);
+      else await absLogin(server, username, password);
+      setPassword('');
+      setApiKey('');
+      setAccount(await absAccount());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (account) {
+    return (
+      <View style={styles.card}>
+        <Text style={{ color: Colors.success }}>
+          Connected{account.username ? ` as ${account.username}` : ''} · {account.server}
+        </Text>
+        <Text style={styles.body}>
+          Your libraries show up under Audiobooks → search → Audiobookshelf. Listening progress
+          syncs back to your server.
+        </Text>
+        <Button
+          label="Disconnect"
+          variant="danger"
+          onPress={async () => {
+            await absLogout();
+            setAccount(null);
+          }}
+        />
+      </View>
+    );
+  }
+
+  const ready = server.trim() && (useKey ? apiKey.trim() : username.trim() && password);
+  return (
+    <View style={styles.card}>
+      <Text style={styles.body}>
+        Play audiobooks from your own Audiobookshelf server, with progress synced both ways.
+      </Text>
+      <Input
+        placeholder="Server address, e.g. http://192.168.1.20:13378"
+        value={server}
+        onChangeText={setServer}
+        keyboardType="url"
+      />
+      {useKey ? (
+        <Input
+          placeholder="API key (ABS → Settings → API Keys)"
+          value={apiKey}
+          onChangeText={setApiKey}
+          secureTextEntry
+        />
+      ) : (
+        <>
+          <Input placeholder="Username" value={username} onChangeText={setUsername} />
+          <Input
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+        </>
+      )}
+      {error ? <Text style={{ color: Colors.danger }}>{error}</Text> : null}
+      <Button label="Connect" onPress={connect} loading={busy} disabled={!ready} />
+      <Button
+        label={useKey ? 'Use username & password instead' : 'Use an API key instead'}
+        variant="secondary"
+        onPress={() => setUseKey(!useKey)}
+      />
+    </View>
   );
 }
 

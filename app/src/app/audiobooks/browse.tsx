@@ -69,6 +69,18 @@ export default function BrowseAudiobooksScreen() {
           <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </Pressable>
       ) : null}
+      {!submitted ? (
+        <Pressable style={styles.cloud} onPress={() => router.push('/audiobooks/abs')}>
+          <Ionicons name="server-outline" size={24} color={Colors.accent} />
+          <View style={{ flex: 1 }}>
+            <Heading>Audiobookshelf</Heading>
+            <Body muted style={{ fontSize: 13 }}>
+              Your own audiobook server
+            </Body>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </Pressable>
+      ) : null}
       {rows.length === 0 ? (
         <EmptyState
           title={submitted ? 'Nothing to search' : 'No audiobook addons'}

@@ -44,7 +44,7 @@ export default function SettingsScreen() {
         <Row
           icon="link"
           title="Integrations"
-          subtitle="TorBox"
+          subtitle="TorBox and Audiobookshelf"
           onPress={() => router.push('/settings/integrations')}
         />
       </Group>

@@ -135,6 +135,21 @@ async function getBook(id) {
       })),
     });
   }
+  // LibriVox also publishes the whole book as one .m4b with chapter markers.
+  const m4b = meta.files.find((f) => /\.m4b$/i.test(f.name));
+  if (m4b) {
+    sources.push({
+      name: 'Single file',
+      title: 'archive.org · .m4b with chapters',
+      size: Number(m4b.size) || undefined,
+      chapters: [
+        {
+          title,
+          url: `https://archive.org/download/${encodeURIComponent(id)}/${encodeURIComponent(m4b.name)}`,
+        },
+      ],
+    });
+  }
   const torrent = await torrentSource(id, title).catch(() => null);
   if (torrent) sources.push({ ...torrent, size: Number(meta.item_size) || undefined });
 

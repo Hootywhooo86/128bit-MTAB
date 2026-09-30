@@ -134,7 +134,9 @@ export type ChapterRef =
       kind: 'torrent' | 'webdl';
       itemId: number;
       fileId: number;
-    };
+    }
+  /** A file on your Audiobookshelf server; the path gets the server address and token at play time. */
+  | { type: 'abs'; path: string };
 
 export type Chapter = {
   id: string;
@@ -143,6 +145,12 @@ export type Chapter = {
   /** File extension without the dot, used when saving for offline. */
   ext?: string;
   ref: ChapterRef;
+  /** Chapters inside this one file (e.g. an .m4b), in seconds from the file's start. */
+  marks?: { title: string; start: number }[];
+  /** True once we've looked for `marks`, so we don't look again. */
+  marksChecked?: boolean;
+  /** Length of this file in seconds (when known, e.g. from Audiobookshelf). */
+  seconds?: number;
 };
 
 /** A book that is ready to be played. `key` identifies it for progress and downloads. */

@@ -79,6 +79,8 @@ function AppNavigator() {
           <Stack.Screen name="settings/about" options={{ title: 'About' }} />
           <Stack.Screen name="audiobooks/browse" options={{ title: 'Find audiobooks' }} />
           <Stack.Screen name="audiobooks/cloud" options={{ title: 'TorBox cloud' }} />
+          <Stack.Screen name="audiobooks/abs" options={{ title: 'Audiobookshelf' }} />
+          <Stack.Screen name="audiobooks/abs-item" options={{ title: '' }} />
           <Stack.Screen name="book" options={{ title: '' }} />
           <Stack.Screen name="cloud/[kind]/[id]" options={{ title: '' }} />
           <Stack.Screen name="player" options={{ presentation: 'modal', title: 'Now playing' }} />

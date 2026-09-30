@@ -89,6 +89,12 @@ export function bookFraction(
   position: number,
   duration: number,
 ) {
+  // Exact when every file's length is known (e.g. Audiobookshelf).
+  if (book.chapters.every((c) => c.seconds)) {
+    const total = book.chapters.reduce((sum, c) => sum + c.seconds!, 0);
+    const before = book.chapters.slice(0, chapter).reduce((sum, c) => sum + c.seconds!, 0);
+    return Math.min(1, (before + position) / total);
+  }
   const weights = book.chapters.every((c) => c.size)
     ? book.chapters.map((c) => c.size!)
     : book.chapters.map(() => 1);

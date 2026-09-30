@@ -34,8 +34,6 @@ export type Prefs = {
   autoSubtitles: boolean;
   subtitleSize: 'small' | 'medium' | 'large';
   autoPlayNextEpisode: boolean;
-  /** Pause at the end of the current chapter instead of after a number of minutes. */
-  sleepEndOfChapter: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -53,7 +51,6 @@ export const DEFAULT_PREFS: Prefs = {
   autoSubtitles: false,
   subtitleSize: 'medium',
   autoPlayNextEpisode: true,
-  sleepEndOfChapter: false,
 };
 
 const KEY = '128bit.prefs';
