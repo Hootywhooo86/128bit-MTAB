@@ -85,6 +85,8 @@ export type Stream = {
   behaviorHints?: {
     filename?: string;
     notWebReady?: boolean;
+    /** Streams from the same release group share this, so the next episode can match. */
+    bingeGroup?: string;
     proxyHeaders?: { request?: Record<string, string> };
   };
 };

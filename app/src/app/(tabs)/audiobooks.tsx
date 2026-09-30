@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useLayoutEffect, useState } from 'react';
 import {
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 
 import { BookRow } from '@/components/book-row';
+import { HeaderButtons } from '@/components/header-buttons';
 import { Button, EmptyState } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { deleteDownload, getDownloadedBooks, offlineSupported } from '@/lib/downloads';
@@ -65,16 +65,18 @@ export default function AudiobooksScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable
-          onPress={() => router.push('/audiobooks/browse')}
-          hitSlop={12}
-          style={{ marginRight: Spacing.three }}
-          accessibilityLabel="Find audiobooks">
-          <Ionicons name="search" size={24} color={Colors.text} />
-        </Pressable>
+        <HeaderButtons
+          actions={[
+            {
+              icon: 'search',
+              label: 'Find audiobooks',
+              onPress: () => router.push('/audiobooks/browse'),
+            },
+          ]}
+        />
       ),
     });
-  }, [navigation, Colors.text]);
+  }, [navigation]);
 
   const load = useCallback(async () => {
     const [lib, dl, favs] = await Promise.all([getLibrary(), getDownloadedBooks(), getFavorites()]);

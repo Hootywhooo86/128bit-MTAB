@@ -9,6 +9,7 @@ import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMeta } from '@/lib/addons';
 import { getActiveAddons } from '@/lib/storage';
 import type { Episode, MetaDetail } from '@/lib/types';
+import { setSeriesContext } from '@/lib/video';
 
 const episodeNumber = (e: Episode) => e.episode ?? e.number ?? 0;
 
@@ -123,7 +124,15 @@ export default function TitleScreen() {
               <Pressable
                 key={e.id}
                 style={styles.episode}
-                onPress={() =>
+                onPress={() => {
+                  // Watch order for "Next episode": regular seasons in order, specials skipped.
+                  setSeriesContext({
+                    metaId: id,
+                    episodes: (meta.videos ?? [])
+                      .filter((v) => (v.season ?? 0) > 0)
+                      .sort((a, b) => a.season! - b.season! || episodeNumber(a) - episodeNumber(b))
+                      .map((v) => ({ id: v.id, label: episodeLabel(v) })),
+                  });
                   router.push({
                     pathname: '/streams',
                     params: {
@@ -134,8 +143,8 @@ export default function TitleScreen() {
                       poster: e.thumbnail ?? meta.background ?? meta.poster ?? '',
                       linkId: id,
                     },
-                  })
-                }>
+                  });
+                }}>
                 <View style={styles.thumb}>
                   {e.thumbnail ? (
                     <Image

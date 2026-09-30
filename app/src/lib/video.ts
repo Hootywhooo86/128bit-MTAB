@@ -4,10 +4,14 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { fetchStreams } from './addons';
+import { getActiveAddons, getTorboxKey } from './storage';
 import * as torbox from './torbox';
 import type { Stream } from './types';
 
 // --- What to play -----------------------------------------------------------
+
+export type EpisodeRef = { id: string; label: string };
 
 export type WatchItem = {
   /** Identifies the movie/episode/channel for resume. */
@@ -20,6 +24,10 @@ export type WatchItem = {
   live?: boolean;
   /** Where "continue watching" should take you back to. */
   link?: { type: string; id: string };
+  /** The show's episodes in order, so the player can offer "Next episode". */
+  series?: { metaId: string; episodes: EpisodeRef[] };
+  /** Where this stream came from, to pick the same kind of stream for the next episode. */
+  source?: { addonId: string; bingeGroup?: string };
 };
 
 let nowWatching: WatchItem | null = null;
@@ -31,6 +39,24 @@ export function setNowWatching(item: WatchItem) {
 
 export function getNowWatching() {
   return nowWatching;
+}
+
+// The title page stores the episode list here when you open an episode, so the
+// stream list can pass it on to the player without long route params.
+let seriesContext: WatchItem['series'] | null = null;
+
+export function setSeriesContext(ctx: WatchItem['series']) {
+  seriesContext = ctx;
+}
+
+export function getSeriesContext(metaId: string) {
+  return seriesContext?.metaId === metaId ? seriesContext : undefined;
+}
+
+export function nextEpisode(item: WatchItem): EpisodeRef | undefined {
+  const eps = item.series?.episodes ?? [];
+  const i = eps.findIndex((e) => e.id === item.key);
+  return i >= 0 ? eps[i + 1] : undefined;
 }
 
 // --- Resolving streams ------------------------------------------------------
@@ -75,6 +101,46 @@ export async function resolveStream(stream: Stream, name: string): Promise<Strea
   }
   if (stream.externalUrl) return { status: 'external', url: stream.externalUrl };
   throw new Error('This stream has nothing playable in it');
+}
+
+// --- Next episode ---------------------------------------------------------
+
+export type NextPick = { stream: Stream; addonId: string };
+
+/**
+ * Picks a stream for the next episode, preferring (in order): the same addon and
+ * release group as now, then the same addon, then anything that starts instantly
+ * (direct link or cached on TorBox), then any torrent.
+ */
+export async function pickNextStream(
+  episodeId: string,
+  source: WatchItem['source'],
+): Promise<NextPick | null> {
+  const groups = await fetchStreams(await getActiveAddons(), 'series', episodeId);
+  const all = groups.flatMap((g) =>
+    g.streams.map((stream) => ({ stream, addonId: g.addon.manifest.id })),
+  );
+  if (!all.length) return null;
+
+  let cached = new Set<string>();
+  const hashes = all.map((c) => c.stream.infoHash).filter(Boolean) as string[];
+  if (hashes.length && (await getTorboxKey()))
+    cached = await torbox.checkCached(hashes).catch(() => cached);
+  const instant = (s: Stream) => !!s.url || (!!s.infoHash && cached.has(s.infoHash.toLowerCase()));
+
+  const score = ({ stream, addonId }: NextPick) =>
+    (source &&
+    addonId === source.addonId &&
+    source.bingeGroup &&
+    stream.behaviorHints?.bingeGroup === source.bingeGroup
+      ? 8
+      : 0) +
+    (source && addonId === source.addonId ? 4 : 0) +
+    (instant(stream) ? 2 : 0) +
+    (stream.url || stream.infoHash ? 1 : 0);
+
+  // Stable: ties keep the addon's own order (usually best first).
+  return [...all].sort((a, b) => score(b) - score(a))[0];
 }
 
 // --- Continue watching ------------------------------------------------------

@@ -67,6 +67,7 @@ function AppNavigator() {
               orientation: 'all',
             }}
           />
+          <Stack.Screen name="settings/index" options={{ title: '' }} />
           <Stack.Screen name="addons" options={{ title: 'Addons' }} />
           <Stack.Screen name="settings/content" options={{ title: 'Content & Discovery' }} />
           <Stack.Screen name="settings/playlists" options={{ title: 'Live TV playlists' }} />

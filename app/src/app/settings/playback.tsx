@@ -1,5 +1,6 @@
 import { ChoiceRow, Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { usePrefs } from '@/lib/prefs';
+import { SUBTITLE_LANGUAGES, languageName } from '@/lib/subtitles';
 
 const seconds = (values: number[]) => values.map((v) => ({ value: v, label: `${v}s` }));
 const RATES = [0.8, 1, 1.1, 1.25, 1.5, 1.75, 2].map((v) => ({
@@ -46,6 +47,12 @@ export default function PlaybackSettings() {
       <SectionTitle>Movies & shows</SectionTitle>
       <Group>
         <ToggleRow
+          title="Auto-play next episode"
+          subtitle="Start the next episode when one ends (a Next button also shows near the end)."
+          value={prefs.autoPlayNextEpisode}
+          onChange={(v) => setPref('autoPlayNextEpisode', v)}
+        />
+        <ToggleRow
           title="Resume where you left off"
           subtitle="Jump back to your last position when you reopen something."
           value={prefs.resumeVideos}
@@ -56,6 +63,32 @@ export default function PlaybackSettings() {
           subtitle="Show ⚡ streams that start instantly at the top of each addon."
           value={prefs.cachedFirst}
           onChange={(v) => setPref('cachedFirst', v)}
+        />
+      </Group>
+      <SectionTitle>Subtitles</SectionTitle>
+      <Group>
+        <ChoiceRow
+          title="Preferred language"
+          subtitle="Listed first, and used when subtitles turn on automatically"
+          value={prefs.subtitleLanguage}
+          options={SUBTITLE_LANGUAGES.map((l) => ({ value: l, label: languageName(l) }))}
+          onChange={(v) => setPref('subtitleLanguage', v)}
+        />
+        <ToggleRow
+          title="Turn on subtitles automatically"
+          subtitle="Uses your preferred language when an addon has it."
+          value={prefs.autoSubtitles}
+          onChange={(v) => setPref('autoSubtitles', v)}
+        />
+        <ChoiceRow
+          title="Subtitle size"
+          value={prefs.subtitleSize}
+          options={[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+          ]}
+          onChange={(v) => setPref('subtitleSize', v)}
         />
       </Group>
     </SettingsPage>

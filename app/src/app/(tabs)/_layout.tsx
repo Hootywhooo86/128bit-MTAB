@@ -3,6 +3,7 @@ import { BottomTabBar, Tabs } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
+import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
 import { useColors } from '@/constants/theme';
 
@@ -34,21 +35,18 @@ export default function TabLayout() {
         },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
+        headerRight: () => <HeaderButtons />,
       }}>
-      <Tabs.Screen name="index" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
+      <Tabs.Screen
+        name="index"
+        options={{ title: 'Home', headerTitle: '128bit', tabBarIcon: icon('home-outline') }}
+      />
+      <Tabs.Screen name="shows" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
       <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />
       <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
       <Tabs.Screen
         name="audiobooks"
         options={{ title: 'Audiobooks', tabBarIcon: icon('headset-outline') }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          headerShown: false,
-          tabBarIcon: icon('settings-outline'),
-        }}
       />
     </Tabs>
   );

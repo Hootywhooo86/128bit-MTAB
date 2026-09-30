@@ -29,6 +29,13 @@ export type Prefs = {
   cachedFirst: boolean;
   traktScrobble: boolean;
   traktContinueWatching: boolean;
+  /** 3-letter code, e.g. "eng". */
+  subtitleLanguage: string;
+  autoSubtitles: boolean;
+  subtitleSize: 'small' | 'medium' | 'large';
+  autoPlayNextEpisode: boolean;
+  /** Pause at the end of the current chapter instead of after a number of minutes. */
+  sleepEndOfChapter: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -42,6 +49,11 @@ export const DEFAULT_PREFS: Prefs = {
   cachedFirst: true,
   traktScrobble: true,
   traktContinueWatching: true,
+  subtitleLanguage: 'eng',
+  autoSubtitles: false,
+  subtitleSize: 'medium',
+  autoPlayNextEpisode: true,
+  sleepEndOfChapter: false,
 };
 
 const KEY = '128bit.prefs';

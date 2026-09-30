@@ -24,34 +24,10 @@ type Props = { type: 'movie' | 'series'; noun: string };
 
 /** Home screen for Shows and Movies: search, continue watching, then every addon catalog as a row. */
 export function VideoBrowse({ type, noun }: Props) {
-  const { prefs } = usePrefs();
   const styles = useStyles();
   const { addons, loaded } = useAddons();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
-  const [continuing, setContinuing] = useState<WatchProgress[]>([]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        const local = await getWatchProgress();
-        let merged = local;
-        if (prefs.traktContinueWatching && traktConfigured && (await isConnected())) {
-          // Local entries win (they have exact positions); Trakt fills in the rest.
-          const remote = await getPlayback().catch(() => []);
-          merged = [...local, ...remote.filter((r) => !local.some((l) => l.key === r.key))].sort(
-            (a, b) => b.updatedAt - a.updatedAt,
-          );
-        }
-        if (!cancelled) setContinuing(merged.filter((p) => p.link?.type === type));
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [type, prefs.traktContinueWatching]),
-  );
-
   const rows = addons.flatMap((addon) =>
     addon.manifest.catalogs
       .filter((c) => c.type === type && (submitted ? supportsSearch(c) : isBrowsable(c)))
@@ -88,51 +64,7 @@ export function VideoBrowse({ type, noun }: Props) {
         />
       </View>
 
-      {!submitted && continuing.length ? (
-        <View style={{ gap: Spacing.two }}>
-          <Heading style={{ paddingHorizontal: Spacing.three }}>Continue watching</Heading>
-          <FlatList
-            horizontal
-            data={continuing}
-            keyExtractor={(p) => p.key}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: Spacing.three,
-              gap: Spacing.three,
-            }}
-            renderItem={({ item }) => (
-              <Pressable
-                style={{ width: 200, gap: 6 }}
-                onPress={() =>
-                  item.link &&
-                  router.push({
-                    pathname: '/title',
-                    params: { type: item.link.type, id: item.link.id },
-                  })
-                }>
-                <View style={styles.landscape}>
-                  {item.poster ? (
-                    <Image
-                      source={{ uri: item.poster }}
-                      style={StyleSheet.absoluteFill}
-                      contentFit="cover"
-                    />
-                  ) : null}
-                </View>
-                <ProgressBar value={item.duration ? item.position / item.duration : 0} />
-                <Text numberOfLines={1} style={styles.tileTitle}>
-                  {item.title}
-                </Text>
-                {item.subtitle ? (
-                  <Text numberOfLines={1} style={styles.tileSub}>
-                    {item.subtitle}
-                  </Text>
-                ) : null}
-              </Pressable>
-            )}
-          />
-        </View>
-      ) : null}
+      {!submitted ? <ContinueWatchingRow type={type} /> : null}
 
       {submitted && rows.length === 0 ? (
         <EmptyState title="Nothing to search" body={`None of your addons can search ${noun}.`} />
@@ -149,7 +81,82 @@ export function VideoBrowse({ type, noun }: Props) {
   );
 }
 
-function CatalogRow({
+/** Movies and episodes you started (plus Trakt's, when connected). All types when `type` is omitted. */
+export function ContinueWatchingRow({ type }: { type?: string }) {
+  const { prefs } = usePrefs();
+  const styles = useStyles();
+  const [continuing, setContinuing] = useState<WatchProgress[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const local = await getWatchProgress();
+        let merged = local;
+        if (prefs.traktContinueWatching && traktConfigured && (await isConnected())) {
+          // Local entries win (they have exact positions); Trakt fills in the rest.
+          const remote = await getPlayback().catch(() => []);
+          merged = [...local, ...remote.filter((r) => !local.some((l) => l.key === r.key))].sort(
+            (a, b) => b.updatedAt - a.updatedAt,
+          );
+        }
+        if (!cancelled) setContinuing(merged.filter((p) => !type || p.link?.type === type));
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [type, prefs.traktContinueWatching]),
+  );
+
+  if (!continuing.length) return null;
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <Heading style={{ paddingHorizontal: Spacing.three }}>Continue watching</Heading>
+      <FlatList
+        horizontal
+        data={continuing}
+        keyExtractor={(p) => p.key}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.three,
+          gap: Spacing.three,
+        }}
+        renderItem={({ item }) => (
+          <Pressable
+            style={{ width: 200, gap: 6 }}
+            onPress={() =>
+              item.link &&
+              router.push({
+                pathname: '/title',
+                params: { type: item.link.type, id: item.link.id },
+              })
+            }>
+            <View style={styles.landscape}>
+              {item.poster ? (
+                <Image
+                  source={{ uri: item.poster }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                />
+              ) : null}
+            </View>
+            <ProgressBar value={item.duration ? item.position / item.duration : 0} />
+            <Text numberOfLines={1} style={styles.tileTitle}>
+              {item.title}
+            </Text>
+            {item.subtitle ? (
+              <Text numberOfLines={1} style={styles.tileSub}>
+                {item.subtitle}
+              </Text>
+            ) : null}
+          </Pressable>
+        )}
+      />
+    </View>
+  );
+}
+
+export function CatalogRow({
   addon,
   catalog,
   search,

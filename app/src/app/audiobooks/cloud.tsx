@@ -42,7 +42,7 @@ export default function TorboxCloudScreen() {
         <EmptyState
           title="Connect TorBox"
           body="Add your TorBox API key to see your cloud audiobooks.">
-          <Button label="Open Settings" onPress={() => router.navigate('/settings')} />
+          <Button label="Open Settings" onPress={() => router.push('/settings/integrations')} />
         </EmptyState>
       </View>
     );

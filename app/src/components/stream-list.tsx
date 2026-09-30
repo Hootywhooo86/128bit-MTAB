@@ -1,15 +1,22 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Body, Card, Heading, ProgressBar } from '@/components/ui';
+import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchStreams, type AddonStreams } from '@/lib/addons';
-import { getActiveAddons, getTorboxKey } from '@/lib/storage';
 import { usePrefs } from '@/lib/prefs';
+import { getActiveAddons, getTorboxKey } from '@/lib/storage';
+import { parseStream, qualityRank, type Quality } from '@/lib/stream-info';
 import { checkCached } from '@/lib/torbox';
 import type { Stream } from '@/lib/types';
-import { checkTorboxStream, resolveStream, setNowWatching, type StreamResult } from '@/lib/video';
+import {
+  checkTorboxStream,
+  getSeriesContext,
+  resolveStream,
+  setNowWatching,
+  type StreamResult,
+} from '@/lib/video';
 
 type Props = {
   type: string;
@@ -21,6 +28,17 @@ type Props = {
   link: { type: string; id: string };
 };
 
+type Filter = 'all' | 'cached' | Quality;
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'cached', label: '⚡ Cached' },
+  { id: '4K', label: '4K' },
+  { id: '1080p', label: '1080p' },
+  { id: '720p', label: '720p' },
+  { id: 'SD', label: 'SD' },
+];
+
 const POLL_MS = 5000;
 
 /** Every stream your addons offer for one movie or episode. Tap one to play. */
@@ -30,6 +48,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   const styles = useStyles();
   const [groups, setGroups] = useState<AddonStreams[] | null>(null);
   const [cached, setCached] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState<{
     stream: Stream;
@@ -65,7 +84,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     [],
   );
 
-  function play(uri: string, headers?: Record<string, string>) {
+  function play(uri: string, stream: Stream, addonId: string, headers?: Record<string, string>) {
     setNowWatching({
       key: id,
       title,
@@ -75,21 +94,23 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
       headers,
       link,
       live: type === 'tv',
+      series: type === 'series' ? getSeriesContext(link.id) : undefined,
+      source: { addonId, bingeGroup: stream.behaviorHints?.bingeGroup },
     });
     router.push('/watch');
   }
 
-  async function handle(result: StreamResult, stream: Stream) {
+  async function handle(result: StreamResult, stream: Stream, addonId: string) {
     if (result.status === 'ready') {
       setWaiting(null);
-      play(result.uri, result.headers);
+      play(result.uri, stream, addonId, result.headers);
     } else if (result.status === 'external') {
       Linking.openURL(result.url);
     } else {
       setWaiting({ stream, result });
       timer.current = setTimeout(async () => {
         try {
-          await handle(await checkTorboxStream(result.itemId, stream), stream);
+          await handle(await checkTorboxStream(result.itemId, stream), stream, addonId);
         } catch (e) {
           setError(e instanceof Error ? e.message : String(e));
         }
@@ -97,13 +118,14 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     }
   }
 
-  async function pick(stream: Stream, key: string) {
+  async function pick(stream: Stream, addonId: string, key: string) {
     if (timer.current) clearTimeout(timer.current);
     setBusy(key);
     setError(null);
     setWaiting(null);
     try {
-      await handle(await resolveStream(stream, subtitle ? `${title} ${subtitle}` : title), stream);
+      const name = subtitle ? `${title} ${subtitle}` : title;
+      await handle(await resolveStream(stream, name), stream, addonId);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -114,15 +136,21 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   if (!groups)
     return <ActivityIndicator color={Colors.accent} style={{ marginTop: Spacing.four }} />;
 
-  const total = groups.reduce((n, g) => n + g.streams.length, 0);
-  const isCachedStream = (s: Stream) => !!s.infoHash && cached.has(s.infoHash.toLowerCase());
+  const isCached = (s: Stream) => !!s.infoHash && cached.has(s.infoHash.toLowerCase());
+  const matches = (s: Stream) => {
+    if (filter === 'all') return true;
+    if (filter === 'cached') return isCached(s) || !!s.url;
+    return parseStream(s).quality === filter;
+  };
   // Keep each stream's original index for its key; optionally float TorBox-cached ones up.
   const ordered = (streams: Stream[]) => {
-    const list = streams.map((s, i) => ({ s, i }));
+    const list = streams.map((s, i) => ({ s, i })).filter(({ s }) => matches(s));
     return prefs.cachedFirst
-      ? list.sort((a, b) => Number(isCachedStream(b.s)) - Number(isCachedStream(a.s)))
+      ? list.sort((a, b) => Number(isCached(b.s)) - Number(isCached(a.s)))
       : list;
   };
+  const total = groups.reduce((n, g) => n + g.streams.length, 0);
+  const shown = groups.reduce((n, g) => n + ordered(g.streams).length, 0);
 
   return (
     <View style={{ gap: Spacing.three }}>
@@ -135,16 +163,39 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
         </Card>
       ) : null}
       {error ? <Body style={{ color: Colors.danger }}>{error}</Body> : null}
+
+      {total > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: Spacing.two }}>
+          {FILTERS.map((f) => (
+            <Pressable
+              key={f.id}
+              onPress={() => setFilter(f.id)}
+              style={[styles.chip, filter === f.id && styles.chipActive]}>
+              <Text style={[styles.chipText, filter === f.id && { color: Colors.accentText }]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+
       {groups.length === 0 ? (
         <Body muted>
           None of your addons provide streams for this. Install a stream addon in Settings → Addons.
         </Body>
       ) : total === 0 ? (
         <Body muted>No streams found.</Body>
+      ) : shown === 0 ? (
+        <Body muted>No streams match this filter.</Body>
       ) : null}
 
-      {groups.map(({ addon, streams, error: groupError }) =>
-        streams.length || groupError ? (
+      {groups.map(({ addon, streams, error: groupError }) => {
+        const list = ordered(streams);
+        if (!list.length && !groupError) return null;
+        return (
           <View key={addon.manifest.id} style={{ gap: Spacing.two }}>
             <Heading style={{ fontSize: 15 }}>{addon.manifest.name}</Heading>
             {groupError ? (
@@ -152,13 +203,14 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                 {groupError}
               </Body>
             ) : null}
-            {ordered(streams).map(({ s, i }) => {
+            {list.map(({ s, i }) => {
               const key = `${addon.manifest.id}:${i}`;
-              const isCached = !!s.infoHash && cached.has(s.infoHash.toLowerCase());
+              const info = parseStream(s);
+              const cachedHere = isCached(s);
               return (
                 <Pressable
                   key={key}
-                  onPress={() => pick(s, key)}
+                  onPress={() => pick(s, addon.manifest.id, key)}
                   disabled={busy !== null}
                   style={styles.stream}>
                   <View style={{ flex: 1, gap: 2 }}>
@@ -171,11 +223,19 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                       </Text>
                     ) : null}
                     <View style={styles.badges}>
+                      {info.quality ? (
+                        <Badge label={info.quality} strong={qualityRank(info.quality) >= 3} />
+                      ) : null}
+                      {info.hdr.map((h) => (
+                        <Badge key={h} label={h} />
+                      ))}
+                      {info.sizeBytes ? <Badge label={formatBytes(info.sizeBytes)} /> : null}
+                      {info.seeders !== null ? <Badge label={`👤 ${info.seeders}`} /> : null}
                       {s.url ? <Badge label="Direct" /> : null}
                       {s.infoHash ? (
                         <Badge
-                          label={isCached ? '⚡ Cached on TorBox' : 'Torrent → TorBox'}
-                          strong={isCached}
+                          label={cachedHere ? '⚡ Cached' : 'Torrent → TorBox'}
+                          strong={cachedHere}
                         />
                       ) : null}
                       {s.externalUrl ? <Badge label="Opens outside" /> : null}
@@ -186,8 +246,8 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
               );
             })}
           </View>
-        ) : null,
-      )}
+        );
+      })}
     </View>
   );
 }
@@ -223,4 +283,12 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: Colors.surfaceRaised,
   },
   badgeText: { color: Colors.textSecondary, fontSize: 11, fontWeight: '600' },
+  chip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 6,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surfaceRaised,
+  },
+  chipActive: { backgroundColor: Colors.accent },
+  chipText: { color: Colors.text, fontWeight: '600', fontSize: 13 },
 }));

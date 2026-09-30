@@ -1,15 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useState, type ComponentProps } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 
 import { Chip, SectionTitle, SettingsPage, ThemedSwitch } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
@@ -26,13 +18,19 @@ import { useAddons } from '@/lib/hooks';
 import { isEnabled } from '@/lib/storage';
 import type { InstalledAddon } from '@/lib/types';
 
-/** Metadata-only addons that are safe to suggest (catalogs and details, no streams). */
+/** Metadata and subtitle addons that are safe to suggest (no streams). */
 const SUGGESTED = [
   {
     id: 'com.linvo.cinemeta',
     name: 'Cinemeta',
     description: 'Catalogs and details for movies and shows (the same one Stremio uses).',
     url: 'https://v3-cinemeta.strem.io/manifest.json',
+  },
+  {
+    id: 'org.stremio.opensubtitlesv3',
+    name: 'OpenSubtitles',
+    description: 'Subtitles in many languages for movies and shows.',
+    url: 'https://opensubtitles-v3.strem.io/manifest.json',
   },
 ];
 

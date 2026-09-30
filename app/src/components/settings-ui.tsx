@@ -87,9 +87,7 @@ export function ToggleRow({
       title={title}
       subtitle={subtitle}
       onPress={() => onChange(!value)}
-      right={
-        <ThemedSwitch value={value} onValueChange={onChange} />
-      }
+      right={<ThemedSwitch value={value} onValueChange={onChange} />}
     />
   );
 }
