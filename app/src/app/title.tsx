@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { StreamList } from '@/components/stream-list';
+import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMeta } from '@/lib/addons';
@@ -31,6 +32,8 @@ export default function TitleScreen() {
   const [meta, setMeta] = useState<MetaDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
+  // TMDB extras (cast, trailer, age rating, More like this) when a TMDB key is set.
+  const extra = useEnrichment(id, type);
 
   useEffect(() => {
     getActiveAddons()
@@ -71,9 +74,9 @@ export default function TitleScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: Spacing.five }}>
       <Stack.Screen options={{ title: '', headerTransparent: true }} />
       <View style={styles.hero}>
-        {meta.background || meta.poster ? (
+        {meta.background || extra?.backdrop || meta.poster ? (
           <Image
-            source={{ uri: meta.background ?? meta.poster }}
+            source={{ uri: meta.background ?? extra?.backdrop ?? meta.poster }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />
@@ -96,11 +99,13 @@ export default function TitleScreen() {
             ) : null}
           </View>
         </View>
-        {meta.description ? (
+        <RatingsRow id={id} type={type} />
+        {meta.description || extra?.overview ? (
           <Body muted numberOfLines={6}>
-            {meta.description}
+            {meta.description || extra?.overview}
           </Body>
         ) : null}
+        {extra ? <TmdbDetails data={extra} /> : null}
 
         {isSeries ? (
           <>
@@ -187,6 +192,7 @@ export default function TitleScreen() {
           </>
         )}
       </View>
+      {extra?.similar.length ? <MoreLikeThis items={extra.similar} /> : null}
     </ScrollView>
   );
 }

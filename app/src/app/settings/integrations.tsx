@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Linking, Text, View } from 'react-native';
 
+import { MdblistCard, TmdbCard } from '@/components/metadata-cards';
 import { SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -87,6 +88,12 @@ export default function IntegrationsSettings() {
           variant="secondary"
           onPress={() => Linking.openURL('https://torbox.app/settings')}
         />
+      </View>
+
+      <SectionTitle>Metadata & ratings</SectionTitle>
+      <View style={{ gap: Spacing.three }}>
+        <TmdbCard />
+        <MdblistCard />
       </View>
 
       <SectionTitle>Audiobookshelf</SectionTitle>

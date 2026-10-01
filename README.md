@@ -10,7 +10,7 @@ Comics, shows, movies, anime, live TV and audiobooks in one app, powered by **ad
 | **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
-| **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
+| **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
@@ -90,6 +90,13 @@ When connected, what you watch is scrobbled to Trakt, and your Trakt paused item
 Searching in **Find audiobooks** also searches AudiobookBay's whole catalog (the same way [audiobookbay-automated](https://github.com/JamesRy96/audiobookbay-automated) does), with **Load more**. Tapping a book from iTunes/Audible shows AudiobookBay matches too, plus **Add to Wanted**.
 
 **Audiobooks → Wanted** keeps books you want but don't have yet. Each one is checked against AudiobookBay and your download sources; when a match turns up, tap **TorBox** on it. With Hardcover connected, Wanted syncs with your **Want to Read** shelf both ways (new Want to Read books come in; books you add here go there).
+
+### Optional: TMDB and MDBList
+
+**Settings → Integrations → Metadata & ratings**:
+
+- **TMDB** (free key at themoviedb.org/settings/api): title pages get cast with photos, the trailer, age rating, runtime, seasons, network and **More like this**.
+- **MDBList** (free key at mdblist.com/preferences): ratings from IMDb, Rotten Tomatoes, audience score, Metacritic, Letterboxd, Trakt, TMDB and MAL; pick which ones to show.
 
 ### Optional: Simkl
 
