@@ -65,6 +65,15 @@ function setAudioTrack(player: VideoPlayer, track: AudioTrack) {
   player.audioTrack = track;
 }
 
+/** A released player throws on every read; treat that as "unknown". */
+function safeDuration(player: VideoPlayer) {
+  try {
+    return Number.isFinite(player.duration) ? player.duration : 0;
+  } catch {
+    return 0;
+  }
+}
+
 const isEnglish = (t: { language?: string | null; label?: string | null }) =>
   /^en(g|-|_|$)/i.test(t.language ?? '') || /\b(english|eng)\b/i.test(t.label ?? '');
 
@@ -106,12 +115,17 @@ export default function WatchScreen() {
   // Android back (button or swipe from the edge) leaves the player, back to the episodes.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      try {
+        player.pause();
+      } catch {
+        // Already released.
+      }
       if (router.canGoBack()) router.back();
       else router.replace('/');
       return true;
     });
     return () => sub.remove();
-  }, []);
+  }, [player]);
 
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   const { currentTime } = useEvent(player, 'timeUpdate', {
@@ -121,6 +135,16 @@ export default function WatchScreen() {
     bufferedPosition: 0,
   });
   const resumedFor = useRef<string | null>(null);
+  // Last known position/length. Leaving the screen releases the player before the
+  // cleanups below run, and reading a released player throws (that crashed the app on
+  // back), so the cleanups use these instead.
+  const known = useRef({ time: 0, duration: 0 });
+  useEffect(() => {
+    const sub = player.addListener('timeUpdate', ({ currentTime: t }) => {
+      known.current = { time: t, duration: safeDuration(player) || known.current.duration };
+    });
+    return () => sub.remove();
+  }, [player]);
   const lastSaved = useRef(0);
 
   // --- Tracks & subtitles ---
@@ -176,7 +200,11 @@ export default function WatchScreen() {
       const saved = all.find((p) => p.key === item.key);
       // Trakt entries store a percentage (duration 100), which isn't a real position.
       if (saved && saved.position > 30 && saved.duration !== 100)
-        player.currentTime = saved.position;
+        try {
+          player.currentTime = saved.position;
+        } catch {
+          // Left the player already.
+        }
     });
   }, [status, item, player, prefs.resumeVideos]);
 
@@ -184,19 +212,21 @@ export default function WatchScreen() {
   useEffect(() => {
     if (!item || item.live) return;
     const save = () => {
-      if (Number.isFinite(player.duration) && player.duration > 0) {
+      const { time, duration } = known.current;
+      if (duration > 0) {
         saveWatchProgress({
           key: item.key,
           title: item.title,
           subtitle: item.subtitle,
           poster: item.poster,
-          position: player.currentTime,
-          duration: player.duration,
+          position: time,
+          duration,
           link: item.link,
         });
       }
     };
     const sub = player.addListener('timeUpdate', ({ currentTime: t }) => {
+      known.current = { time: t, duration: safeDuration(player) || known.current.duration };
       if (Math.abs(t - lastSaved.current) >= SAVE_EVERY_S) {
         lastSaved.current = t;
         save();
@@ -215,13 +245,19 @@ export default function WatchScreen() {
     const entry = { key: item.key, title: item.title, subtitle: item.subtitle, kind };
     let counted = false;
     const tick = setInterval(() => {
-      if (!player.playing) return;
+      let playing = false;
+      try {
+        playing = player.playing;
+      } catch {
+        return; // released
+      }
+      if (!playing) return;
       addWatching(entry, 10);
       if (
         !counted &&
         !item.live &&
-        player.duration > 0 &&
-        player.currentTime / player.duration > 0.9
+        known.current.duration > 0 &&
+        known.current.time / known.current.duration > 0.9
       ) {
         counted = true;
         markWatched(entry);
@@ -233,7 +269,10 @@ export default function WatchScreen() {
   // Tell Trakt what's playing (start / pause / stop).
   useEffect(() => {
     if (!item || item.live || !prefs.traktScrobble) return;
-    const percent = () => (player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0);
+    const percent = () => {
+      const { time, duration } = known.current;
+      return duration > 0 ? (time / duration) * 100 : 0;
+    };
     const send = (action: 'start' | 'pause' | 'stop') =>
       scrobble(action, item.key, item.link?.type, percent()).catch(() => {});
     const sub = player.addListener('playingChange', ({ isPlaying }) =>
@@ -248,7 +287,10 @@ export default function WatchScreen() {
   // Same for Simkl (only does anything when Simkl is connected).
   useEffect(() => {
     if (!item || item.live) return;
-    const percent = () => (player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0);
+    const percent = () => {
+      const { time, duration } = known.current;
+      return duration > 0 ? (time / duration) * 100 : 0;
+    };
     const send = (action: 'start' | 'pause' | 'stop') =>
       simklScrobble(action, item.key, item.link?.type, percent()).catch(() => {});
     const sub = player.addListener('playingChange', ({ isPlaying }) =>
@@ -380,7 +422,7 @@ export default function WatchScreen() {
 
   if (!item) return <EmptyState title="Nothing to play" />;
 
-  const duration = player.duration;
+  const duration = safeDuration(player);
   const nearEnd =
     !!upNext && Number.isFinite(duration) && duration > 0 && duration - currentTime < NEXT_WINDOW_S;
   const line = subtitle.kind === 'addon' ? cueAt(cues, currentTime - delay) : null;
