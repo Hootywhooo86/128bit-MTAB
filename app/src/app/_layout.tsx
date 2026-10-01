@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
 
 import { useColors } from '@/constants/theme';
+import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
@@ -25,6 +26,11 @@ function AppNavigator() {
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync();
   }, [loaded]);
+
+  // First launch: add Cinemeta + OpenSubtitles so there's something to browse right away.
+  useEffect(() => {
+    installDefaultAddons().catch(() => {});
+  }, []);
 
   const theme = useMemo(
     () => ({

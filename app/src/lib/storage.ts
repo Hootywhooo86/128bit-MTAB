@@ -29,7 +29,21 @@ function setJSON(key: string, value: unknown) {
 
 /** Every installed addon, in the user's order. */
 export const getAddons = () => getJSON<InstalledAddon[]>(KEYS.addons, []);
-export const saveAddons = (addons: InstalledAddon[]) => setJSON(KEYS.addons, addons);
+
+const addonListeners = new Set<() => void>();
+
+/** Called whenever the addon list changes (e.g. defaults installed on first launch). */
+export function onAddonsChanged(listener: () => void) {
+  addonListeners.add(listener);
+  return () => {
+    addonListeners.delete(listener);
+  };
+}
+
+export async function saveAddons(addons: InstalledAddon[]) {
+  await setJSON(KEYS.addons, addons);
+  addonListeners.forEach((l) => l());
+}
 
 export const isEnabled = (a: InstalledAddon) => a.enabled !== false;
 

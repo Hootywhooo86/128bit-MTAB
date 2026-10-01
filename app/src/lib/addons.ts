@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { getAddons, saveAddons } from './storage';
 import type {
   BookDetail,
@@ -9,6 +11,34 @@ import type {
   MetaPreview,
   Stream,
 } from './types';
+
+/** Safe metadata/subtitle addons (no streams). Installed on first launch, and suggested in Addons. */
+export const DEFAULT_ADDONS = [
+  {
+    id: 'com.linvo.cinemeta',
+    name: 'Cinemeta',
+    description: 'Catalogs and details for movies and shows (the same one Stremio uses).',
+    url: 'https://v3-cinemeta.strem.io/manifest.json',
+  },
+  {
+    id: 'org.stremio.opensubtitlesv3',
+    name: 'OpenSubtitles',
+    description: 'Subtitles in many languages for movies and shows.',
+    url: 'https://opensubtitles-v3.strem.io/manifest.json',
+  },
+];
+
+const SEEDED_KEY = '128bit.defaultsInstalled';
+
+/**
+ * On the very first launch, install the default addons so Home isn't empty.
+ * Runs once; if the phone is offline it tries again next launch.
+ */
+export async function installDefaultAddons() {
+  if (await AsyncStorage.getItem(SEEDED_KEY)) return;
+  const results = await Promise.allSettled(DEFAULT_ADDONS.map((a) => installAddon(a.url)));
+  if (results.some((r) => r.status === 'fulfilled')) await AsyncStorage.setItem(SEEDED_KEY, '1');
+}
 
 export const SUPPORTED_TYPES = ['audiobook', 'movie', 'series', 'tv'];
 

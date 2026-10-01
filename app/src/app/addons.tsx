@@ -7,6 +7,7 @@ import { Chip, SectionTitle, SettingsPage, ThemedSwitch } from '@/components/set
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
+  DEFAULT_ADDONS,
   installAddon,
   moveAddon,
   refreshAddon,
@@ -18,21 +19,7 @@ import { useAddons } from '@/lib/hooks';
 import { isEnabled } from '@/lib/storage';
 import type { InstalledAddon } from '@/lib/types';
 
-/** Metadata and subtitle addons that are safe to suggest (no streams). */
-const SUGGESTED = [
-  {
-    id: 'com.linvo.cinemeta',
-    name: 'Cinemeta',
-    description: 'Catalogs and details for movies and shows (the same one Stremio uses).',
-    url: 'https://v3-cinemeta.strem.io/manifest.json',
-  },
-  {
-    id: 'org.stremio.opensubtitlesv3',
-    name: 'OpenSubtitles',
-    description: 'Subtitles in many languages for movies and shows.',
-    url: 'https://opensubtitles-v3.strem.io/manifest.json',
-  },
-];
+const SUGGESTED = DEFAULT_ADDONS;
 
 const TYPE_LABELS: Record<string, string> = {
   movie: 'Movie',

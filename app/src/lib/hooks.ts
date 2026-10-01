@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { getAddons, isEnabled } from './storage';
+import { getAddons, isEnabled, onAddonsChanged } from './storage';
 import type { InstalledAddon } from './types';
 
 /**
@@ -23,6 +23,7 @@ export function useAddons() {
       refresh();
     }, [refresh]),
   );
+  useEffect(() => onAddonsChanged(refresh), [refresh]);
 
   return { addons, all, loaded, refresh };
 }
