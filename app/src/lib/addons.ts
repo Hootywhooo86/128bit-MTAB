@@ -161,7 +161,9 @@ export function supports(addon: InstalledAddon, resource: string, type: string, 
   });
 }
 
-const ANIME = /\banime\b|anime|crunchyroll|hidive|funimation|kitsu|myanimelist|\bmal\b|anilist|anidb|aniwave|animeflv|gogoanime|9anime/i;
+/** Anything anime: the word itself, anime services and anime databases. */
+const ANIME =
+  /anime|crunchy\s*roll|hidive|funimation|aniplex|animax|toonami|wakanim|animelab|ani-one|muse\s*asia|bilibili|vrv|kitsu|myanimelist|\bmal\b|anilist|anidb|aniwave|animeflv|gogoanime|9anime|zoro|hianime|simkl anime|anime-planet/i;
 
 /**
  * Which tab a catalog belongs in. Addons often label anime as plain "series" or
