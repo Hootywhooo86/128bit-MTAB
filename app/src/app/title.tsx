@@ -3,6 +3,11 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { DownloadedPlay } from '@/components/downloaded-play';
+import { TraktActions, useTraktConnected } from '@/components/trakt-actions';
+import { getShowProgress, setEpisodeWatched } from '@/lib/trakt-library';
 import { StreamList } from '@/components/stream-list';
 import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
@@ -34,6 +39,31 @@ export default function TitleScreen() {
   const [season, setSeason] = useState<number | null>(null);
   // TMDB extras (cast, trailer, age rating, More like this) when a TMDB key is set.
   const extra = useEnrichment(id, type);
+  // Trakt: which episodes you've watched (hold an episode to change it).
+  const trakt = useTraktConnected();
+  const [watchedEps, setWatchedEps] = useState<Set<string>>(new Set());
+  const [epError, setEpError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!trakt || type === 'movie' || !/^tt\d+$/.test(id)) return;
+    getShowProgress(id).then((p) => setWatchedEps(new Set(p.done)), () => {});
+  }, [trakt, type, id]);
+  async function toggleEpisode(season?: number, ep?: number) {
+    if (!trakt || season === undefined || ep === undefined || !/^tt\d+$/.test(id)) return;
+    const key = `${season}:${ep}`;
+    const on = !watchedEps.has(key);
+    setWatchedEps((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    try {
+      setEpError(null);
+      await setEpisodeWatched(id, season, ep, on);
+    } catch (e) {
+      setEpError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   useEffect(() => {
     getActiveAddons()
@@ -106,6 +136,7 @@ export default function TitleScreen() {
           </Body>
         ) : null}
         {extra ? <TmdbDetails data={extra} /> : null}
+        <TraktActions type={type} imdb={id} />
 
         {isSeries ? (
           <>
@@ -125,10 +156,15 @@ export default function TitleScreen() {
                 </Pressable>
               ))}
             </ScrollView>
+            {trakt && /^tt\d+$/.test(id) ? (
+              <Text style={styles.epSub}>Hold an episode to mark it watched on Trakt.</Text>
+            ) : null}
+            {epError ? <Text style={[styles.epSub, { color: Colors.danger }]}>{epError}</Text> : null}
             {episodes.map((e) => (
               <Pressable
                 key={e.id}
                 style={styles.episode}
+                onLongPress={() => toggleEpisode(e.season, episodeNumber(e))}
                 onPress={() => {
                   // Watch order for "Next episode": regular seasons in order, specials skipped.
                   setSeriesContext({
@@ -176,11 +212,15 @@ export default function TitleScreen() {
                     </Text>
                   ) : null}
                 </View>
+                {watchedEps.has(`${e.season}:${episodeNumber(e)}`) ? (
+                  <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
+                ) : null}
               </Pressable>
             ))}
           </>
         ) : (
           <>
+            <DownloadedPlay itemKey={id} />
             <Heading>Streams</Heading>
             <StreamList
               type={type}

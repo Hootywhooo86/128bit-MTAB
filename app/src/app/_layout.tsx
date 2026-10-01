@@ -9,6 +9,7 @@ import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
 import { installDefaultSources } from '@/lib/sources';
 import { getSuwayomi } from '@/lib/suwayomi';
+import { runVideoQueue } from '@/lib/video-downloads';
 import { runAutoDownloads } from '@/lib/wanted';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
@@ -43,7 +44,11 @@ function AppNavigator() {
   // Wanted books marked "download when ready": check TorBox every minute while the app is open.
   useEffect(() => {
     runAutoDownloads().catch(() => {});
-    const timer = setInterval(() => runAutoDownloads().catch(() => {}), 60_000);
+    runVideoQueue().catch(() => {});
+    const timer = setInterval(() => {
+      runAutoDownloads().catch(() => {});
+      runVideoQueue().catch(() => {});
+    }, 60_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -93,6 +98,7 @@ function AppNavigator() {
             name="comics/read"
             options={{ headerShown: false, presentation: 'fullScreenModal', orientation: 'all' }}
           />
+          <Stack.Screen name="trakt" options={{ title: 'Trakt library' }} />
           <Stack.Screen name="settings/comics" options={{ title: 'Comics' }} />
           <Stack.Screen name="settings/stats" options={{ title: 'Statistics' }} />
           <Stack.Screen name="settings/index" options={{ title: '' }} />

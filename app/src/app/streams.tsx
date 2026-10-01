@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { ScrollView } from 'react-native';
 
+import { DownloadedPlay } from '@/components/downloaded-play';
 import { StreamList } from '@/components/stream-list';
 import { Body, Title } from '@/components/ui';
 import { Spacing, makeStyles } from '@/constants/theme';
@@ -21,6 +22,7 @@ export default function StreamsScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: p.title }} />
       <Title style={{ fontSize: 20 }}>{p.subtitle ?? p.title}</Title>
+      <DownloadedPlay itemKey={p.id} />
       <Body muted>Pick a stream</Body>
       <StreamList
         type={p.type}

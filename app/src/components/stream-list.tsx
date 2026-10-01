@@ -1,6 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 
 import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -10,6 +19,7 @@ import { getActiveAddons, getTorboxKey } from '@/lib/storage';
 import { parseStream, qualityRank, type Quality } from '@/lib/stream-info';
 import { checkCached } from '@/lib/torbox';
 import type { Stream } from '@/lib/types';
+import { downloadVideo } from '@/lib/video-downloads';
 import {
   checkTorboxStream,
   getSeriesContext,
@@ -55,6 +65,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     result: Extract<StreamResult, { status: 'downloading' }>;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -118,6 +129,41 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     }
   }
 
+  /** Hold a stream: save it to the phone (Settings → Downloads shows progress). */
+  function save(stream: Stream) {
+    const live = LIVE_TYPES.includes(type);
+    if (live) {
+      setError('Live channels can only be streamed.');
+      return;
+    }
+    const label = subtitle ? `${title} · ${subtitle}` : title;
+    const go = async () => {
+      setError(null);
+      try {
+        await downloadVideo({
+          key: id,
+          kind: type === 'movie' ? 'movie' : 'episode',
+          title,
+          subtitle,
+          poster,
+          link,
+          stream,
+        });
+        setSaved(label);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    };
+    if (Platform.OS === 'web') {
+      go();
+      return;
+    }
+    Alert.alert('Download to phone', `${label}\n${(stream.name ?? '').replace(/\n/g, ' ')}`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Download', onPress: go },
+    ]);
+  }
+
   async function pick(stream: Stream, addonId: string, key: string) {
     if (timer.current) clearTimeout(timer.current);
     setBusy(key);
@@ -163,6 +209,18 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
         </Card>
       ) : null}
       {error ? <Body style={{ color: Colors.danger }}>{error}</Body> : null}
+      {saved ? (
+        <Pressable onPress={() => router.push('/settings/downloads')}>
+          <Body style={{ color: Colors.success }}>
+            Downloading {saved}. Tap to see Downloads.
+          </Body>
+        </Pressable>
+      ) : null}
+      {total > 0 && !LIVE_TYPES.includes(type) ? (
+        <Body muted style={{ fontSize: 12 }}>
+          Tap a stream to play it · hold to download it to your phone
+        </Body>
+      ) : null}
 
       {total > 0 ? (
         <ScrollView
@@ -211,6 +269,8 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                 <Pressable
                   key={key}
                   onPress={() => pick(s, addon.manifest.id, key)}
+                  onLongPress={() => save(s)}
+                  delayLongPress={400}
                   disabled={busy !== null}
                   style={styles.stream}>
                   <View style={{ flex: 1, gap: 2 }}>

@@ -119,6 +119,42 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/**
+ * Any signed-in Trakt call. Returns the parsed body (null for empty answers).
+ * Trakt asks clients to slow down with 429; this waits and retries once.
+ */
+export async function traktApi<T>(
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const token = await accessToken();
+  if (!token) throw new Error('Connect Trakt in Settings → Tracking first');
+  const call = () =>
+    fetch(`${API}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'trakt-api-version': '2',
+        'trakt-api-key': CLIENT_ID,
+        Authorization: `Bearer ${token}`,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  let res = await call();
+  if (res.status === 429) {
+    const wait = Number(res.headers.get('Retry-After') ?? '1');
+    await new Promise((r) => setTimeout(r, Math.min(10, wait) * 1000));
+    res = await call();
+  }
+  if (!res.ok) {
+    const msg = res.status === 401 ? 'Trakt sign-in expired; reconnect in Settings → Tracking' : `Trakt ${res.status}`;
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
 // --- Signing in -------------------------------------------------------------
 
 export type DeviceCode = {

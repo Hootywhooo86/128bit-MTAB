@@ -161,6 +161,21 @@ export function supports(addon: InstalledAddon, resource: string, type: string, 
   });
 }
 
+const ANIME = /\banime\b|anime|crunchyroll|hidive|funimation|kitsu|myanimelist|\bmal\b|anilist|anidb|aniwave|animeflv|gogoanime|9anime/i;
+
+/**
+ * Which tab a catalog belongs in. Addons often label anime as plain "series" or
+ * "movie" (Kitsu rows, "Top Seeded Anime", Crunchyroll…), so names count too.
+ */
+export function catalogTab(addon: InstalledAddon, catalog: CatalogDef): string {
+  if (catalog.type === 'anime') return 'anime';
+  if (catalog.type !== 'series' && catalog.type !== 'movie') return catalog.type;
+  // An anime addon (e.g. "Anime Kitsu"): all its show/movie catalogs are anime.
+  const animeAddon = ANIME.test(`${addon.manifest.id} ${addon.manifest.name}`);
+  if (ANIME.test(`${catalog.id} ${catalog.name ?? ''}`) || animeAddon) return 'anime';
+  return catalog.type;
+}
+
 export function supportsSearch(catalog: CatalogDef) {
   return !!catalog.extra?.some((e) => e.name === 'search');
 }

@@ -13,12 +13,14 @@ import {
 
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { fetchMetas, isBrowsable, supportsSearch } from '@/lib/addons';
+import { fetchMetas, isBrowsable, supportsSearch, catalogTab } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
 import type { CatalogDef, InstalledAddon, MetaPreview } from '@/lib/types';
 import { usePrefs } from '@/lib/prefs';
 import { getPlayback, isConnected, traktConfigured } from '@/lib/trakt';
 import { getWatchProgress, type WatchProgress } from '@/lib/video';
+
+import { TraktRows } from './trakt-rows';
 
 type Props = { type: 'movie' | 'series' | 'anime'; noun: string };
 
@@ -30,11 +32,13 @@ export function VideoBrowse({ type, noun }: Props) {
   const [submitted, setSubmitted] = useState('');
   const rows = addons.flatMap((addon) =>
     addon.manifest.catalogs
-      .filter((c) => c.type === type && (submitted ? supportsSearch(c) : isBrowsable(c)))
+      .filter(
+        (c) => catalogTab(addon, c) === type && (submitted ? supportsSearch(c) : isBrowsable(c)),
+      )
       .map((catalog) => ({ addon, catalog })),
   );
 
-  if (loaded && !addons.some((a) => a.manifest.catalogs.some((c) => c.type === type))) {
+  if (loaded && !addons.some((a) => a.manifest.catalogs.some((c) => catalogTab(a, c) === type))) {
     return (
       <View style={styles.screen}>
         <EmptyState
@@ -69,6 +73,7 @@ export function VideoBrowse({ type, noun }: Props) {
       </View>
 
       {!submitted ? <ContinueWatchingRow type={type} /> : null}
+      {!submitted && type !== 'anime' ? <TraktRows type={type} /> : null}
 
       {submitted && rows.length === 0 ? (
         <EmptyState title="Nothing to search" body={`None of your addons can search ${noun}.`} />

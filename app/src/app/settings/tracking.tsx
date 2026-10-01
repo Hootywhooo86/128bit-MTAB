@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, Text, TextInput } from 'react-native';
 
@@ -121,9 +121,13 @@ export default function TrackingSettings() {
           <>
             <Text style={styles.traktStatus}>Connected{username ? ` as ${username}` : ''}</Text>
             <Text style={styles.traktBody}>
-              128bit scrobbles what you watch to Trakt and shows your Trakt progress in Continue
-              Watching.
+              Scrobbling, Continue Watching, and your whole Trakt account: watchlist, history,
+              collection, ratings, favorites, lists, up next, calendar and recommendations. Title
+              pages have Trakt buttons; hold an episode to mark it watched.
             </Text>
+            <Pressable style={styles.connectButton} onPress={() => router.push('/trakt')}>
+              <Text style={styles.connectLabel}>Open Trakt library</Text>
+            </Pressable>
             <Pressable onPress={signOut} hitSlop={8}>
               <Text style={styles.traktLink}>Disconnect</Text>
             </Pressable>

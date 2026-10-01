@@ -12,7 +12,9 @@ Comics, shows, movies, anime, live TV and audiobooks in one app, powered by **ad
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
 | **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
 
-Shows, Movies and Live TV only stream. Audiobooks can stream or download.
+Tap a stream to play it; **hold a stream to download** it to the phone (direct links download at once; torrents go to TorBox and download when ready). **Settings → Downloads** has Movies, TV (grouped by show) and Audiobooks, with progress, pause/resume, play and delete; a downloaded title shows **Play downloaded**. Live TV only streams.
+
+Anime catalogs that addons label as ordinary shows or movies (Kitsu, Crunchyroll, "… Anime") are shown in the **Anime** tab instead of Shows/Movies.
 
 ```
 ┌──────────── 128bit app (Expo / React Native) ─────────────┐
@@ -79,7 +81,13 @@ Scan the QR code with **Expo Go** on your phone, or press `w` to open it in a br
 2. In the app: **Settings → Tracking**, paste the Client ID and Client Secret, tap **Save keys**, then **Connect Trakt** and enter the code on trakt.tv/activate.
    (Or bake the keys into the build: repo secrets `TRAKT_CLIENT_ID` / `TRAKT_CLIENT_SECRET`, or `app/.env` locally.)
 
-When connected, what you watch is scrobbled to Trakt, and your Trakt paused items show up in Continue Watching.
+When connected, 128bit reads and writes your whole Trakt account:
+
+- **Scrobbling** while you watch, and Trakt's paused items in Continue Watching.
+- **Trakt library** (Settings → Tracking → Open Trakt library, or the link on the Shows/Movies rows): Up next, Watchlist, History, Collection, Ratings, Favorites, personal Lists (create, delete, open, remove items), Calendar (your shows' next 30 days), For you (recommendations, with Not interested), Paused (playback progress) and Stats.
+- **Title pages**: Watchlist, Watched (movie) / Mark all (show), Collection, Favorite, Rate 1–10, add to your Lists, Check in.
+- **Episodes**: watched marks from Trakt; hold an episode to mark it watched or unwatched.
+- **Shows / Movies tabs**: Up next on Trakt and Your Trakt watchlist rows.
 
 ### RSS feeds (new uploads)
 
