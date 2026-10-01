@@ -6,6 +6,7 @@ import { useEffect, useMemo } from 'react';
 import { useColors } from '@/constants/theme';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
+import { installDefaultFeeds } from '@/lib/feeds';
 import { installDefaultSources } from '@/lib/sources';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
@@ -32,6 +33,7 @@ function AppNavigator() {
   useEffect(() => {
     installDefaultAddons().catch(() => {});
     installDefaultSources().catch(() => {});
+    installDefaultFeeds().catch(() => {});
   }, []);
 
   const theme = useMemo(
@@ -87,6 +89,7 @@ function AppNavigator() {
           <Stack.Screen name="settings/integrations" options={{ title: 'Integrations' }} />
           <Stack.Screen name="settings/about" options={{ title: 'About' }} />
           <Stack.Screen name="audiobooks/browse" options={{ title: 'Find audiobooks' }} />
+          <Stack.Screen name="audiobooks/feed" options={{ title: 'Latest uploads' }} />
           <Stack.Screen name="audiobooks/find" options={{ title: '' }} />
           <Stack.Screen name="audiobooks/cloud" options={{ title: 'TorBox cloud' }} />
           <Stack.Screen name="audiobooks/abs" options={{ title: 'Audiobookshelf' }} />

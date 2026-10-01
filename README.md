@@ -80,6 +80,10 @@ Scan the QR code with **Expo Go** on your phone, or press `w` to open it in a br
 
 When connected, what you watch is scrobbled to Trakt, and your Trakt paused items show up in Continue Watching.
 
+### RSS feeds (new uploads)
+
+**Find audiobooks → New on AudiobookBay** lists the newest posts from an RSS feed (AudiobookBay's `/rss` is added by default; add more in **Settings → Content & Discovery → Audiobook download sources → RSS feeds**). Tap **TorBox** on a post: 128bit takes the magnet from the feed item, or reads the info hash and trackers from the post's page, builds the magnet and sends it to TorBox.
+
 ### Optional: Hardcover
 
 **Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress, and Read when you finish. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book.

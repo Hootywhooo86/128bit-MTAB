@@ -9,6 +9,7 @@ import { Body, Button, Cover, EmptyState, Heading, Input } from '@/components/ui
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchCatalog, supportsSearch } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
+import { getFeeds, type Feed } from '@/lib/feeds';
 import { getSources, isCatalog } from '@/lib/sources';
 import type { BookPreview, CatalogDef, InstalledAddon } from '@/lib/types';
 
@@ -28,6 +29,7 @@ export default function BrowseAudiobooksScreen() {
   const [submitted, setSubmitted] = useState('');
   const [sourceCount, setSourceCount] = useState(0);
   const [catalogCount, setCatalogCount] = useState(0);
+  const [feeds, setFeeds] = useState<Feed[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -36,6 +38,7 @@ export default function BrowseAudiobooksScreen() {
         setSourceCount(on.filter((x) => !isCatalog(x.config)).length);
         setCatalogCount(on.filter((x) => isCatalog(x.config)).length);
       });
+      getFeeds().then((all) => setFeeds(all.filter((f) => f.enabled !== false)));
     }, []),
   );
 
@@ -110,6 +113,25 @@ export default function BrowseAudiobooksScreen() {
           <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </Pressable>
       ) : null}
+      {!submitted
+        ? feeds.map((f) => (
+            <Pressable
+              key={f.url}
+              style={styles.cloud}
+              onPress={() =>
+                router.push({ pathname: '/audiobooks/feed', params: { url: f.url, name: f.name } })
+              }>
+              <Ionicons name="logo-rss" size={24} color={Colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Heading>New on {f.name}</Heading>
+                <Body muted style={{ fontSize: 13 }}>
+                  Latest uploads from the RSS feed. Send any to TorBox
+                </Body>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          ))
+        : null}
       <CatalogRows query={submitted || undefined} />
       {submitted ? <SourceResults key={submitted} query={submitted} /> : null}
       {rows.length === 0 && !sourceCount && !catalogCount ? (

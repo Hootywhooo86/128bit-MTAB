@@ -8,6 +8,14 @@ import { SectionTitle, SettingsPage, ThemedSwitch } from '@/components/settings-
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
+  DEFAULT_FEEDS,
+  addFeed,
+  getFeeds,
+  removeFeed,
+  setFeedEnabled,
+  type Feed,
+} from '@/lib/feeds';
+import {
   DEFAULT_SOURCES,
   getSources,
   installSource,
@@ -123,11 +131,96 @@ export default function SourcesSettings() {
           </View>
         </View>
       ))}
+      <FeedsCard />
       <Text style={styles.small}>
         Sources only search other sites; 128bit doesn’t host anything. Only download what you have
         the right to.
       </Text>
     </SettingsPage>
+  );
+}
+
+/** RSS feeds of new uploads, shown as "New on …" in Find audiobooks. */
+function FeedsCard() {
+  const Colors = useColors();
+  const styles = useStyles();
+  const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    getFeeds().then(setFeeds);
+  }, []);
+  useFocusEffect(load);
+
+  async function add(target: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await addFeed(target);
+      if (target === url) setUrl('');
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <SectionTitle>RSS feeds</SectionTitle>
+      <View style={styles.card}>
+        <Text style={styles.body}>
+          A feed of new uploads (like AudiobookBay’s /rss). 128bit finds each post’s torrent (from
+          the feed, or the post’s page) and sends it to TorBox.
+        </Text>
+        <Input
+          placeholder="http://… /rss"
+          value={url}
+          onChangeText={setUrl}
+          keyboardType="url"
+          autoCapitalize="none"
+          onSubmitEditing={() => add(url)}
+        />
+        {error ? <Text style={{ color: Colors.danger }}>{error}</Text> : null}
+        <Button label="Add feed" onPress={() => add(url)} loading={busy} disabled={!url.trim()} />
+        {DEFAULT_FEEDS.filter((d) => !feeds.some((f) => f.url === d.url)).map((d) => (
+          <View key={d.url} style={styles.header}>
+            <Text style={[styles.body, { flex: 1 }]}>Suggested: {d.name}</Text>
+            <Button label="Add" variant="secondary" onPress={() => add(d.url)} />
+          </View>
+        ))}
+      </View>
+      {feeds.map((f) => (
+        <View key={f.url} style={[styles.card, f.enabled === false && { opacity: 0.6 }]}>
+          <View style={styles.header}>
+            <View style={styles.logo}>
+              <Ionicons name="logo-rss" size={24} color={Colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{f.name}</Text>
+              <Text style={styles.small} numberOfLines={1}>
+                {f.url}
+              </Text>
+            </View>
+            <ThemedSwitch
+              value={f.enabled !== false}
+              onValueChange={(on) => setFeedEnabled(f.url, on).then(load)}
+            />
+          </View>
+          <View style={styles.actions}>
+            <Pressable
+              hitSlop={10}
+              onPress={() => removeFeed(f.url).then(load)}
+              accessibilityLabel="Remove feed">
+              <Ionicons name="trash" size={22} color={Colors.danger} />
+            </Pressable>
+          </View>
+        </View>
+      ))}
+    </>
   );
 }
 
