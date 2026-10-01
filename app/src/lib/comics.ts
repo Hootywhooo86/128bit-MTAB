@@ -7,7 +7,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getLocalSeries, localPages } from './comic-downloads';
+import { deleteReadChapters, getLocalSeries, localPages } from './comic-downloads';
+import { readPrefs } from './prefs';
 import {
   browseSource,
   getChapterPages,
@@ -301,6 +302,11 @@ export async function saveComicProgress(
   };
   await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
   if (isSw(chapter.id)) markChapter(swId(chapter.id), page, finished).catch(() => {});
+  // "Delete after reading": earlier finished chapters leave the phone (not the one on screen).
+  if (finished && (await readPrefs()).comicDeleteRead) {
+    const done = [...readIds].filter((id) => id !== chapter.id);
+    deleteReadChapters((id) => (id === comic.id ? done : [])).catch(() => {});
+  }
   // Reading something puts it in your library.
   if (!(await inComicLibrary(comic.id))) await toggleComicLibrary(comic);
 }

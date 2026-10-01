@@ -11,7 +11,7 @@ import {
 } from 'expo-video';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TrackSheet, type SubtitleChoice } from '@/components/track-sheet';
@@ -102,6 +102,16 @@ export default function WatchScreen() {
 
   // Video needs the screen: keep it on while watching. (Only audiobooks play with it off.)
   useKeepAwake();
+
+  // Android back (button or swipe from the edge) leaves the player, back to the episodes.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   const { currentTime } = useEvent(player, 'timeUpdate', {
@@ -395,6 +405,9 @@ export default function WatchScreen() {
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>Couldn’t play this stream.</Text>
           {error?.message ? <Text style={styles.errorDetail}>{error.message}</Text> : null}
+          <Pressable onPress={() => router.back()} style={styles.errorBack}>
+            <Text style={styles.errorBackText}>‹ Back to pick another stream</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -408,7 +421,7 @@ export default function WatchScreen() {
 
       <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
         <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
-          <Ionicons name="chevron-down" size={28} color="#fff" />
+          <Ionicons name="arrow-back" size={28} color="#fff" />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} numberOfLines={1}>
@@ -509,6 +522,8 @@ const useStyles = makeStyles((Colors) => ({
   },
   errorText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   errorDetail: { color: '#aaa', fontSize: 12, marginTop: 6, textAlign: 'center' },
+  errorBack: { marginTop: Spacing.three, borderWidth: 2, borderColor: '#fff', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  errorBackText: { color: '#fff', fontWeight: '700' },
   subtitleWrap: {
     position: 'absolute',
     left: Spacing.four,

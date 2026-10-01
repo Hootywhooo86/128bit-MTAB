@@ -8,6 +8,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { unzipSync } from 'fflate';
 import { Platform } from 'react-native';
 
+import { extractWithNative, sniffArchive } from './comic-archive';
 import { comicImage, getPages, type Comic, type ComicChapter } from './comics';
 
 const KEY = '128bit.comicDownloads';
@@ -156,62 +157,100 @@ const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeri
 function seriesName(fileName: string) {
   return (
     fileName
-      .replace(/\.(cbz|zip)$/i, '')
+      .replace(/\.(cbz|zip|cbr|rar|cb7|7z|cbt|tar)$/i, '')
       .replace(/[_.]+/g, ' ')
       .replace(/[([{][^)\]}]*[)\]}]/g, ' ')
       // Cut at the volume / chapter / issue number: "v01", "Vol 105", "Chapter 97", "#12", "001".
       .replace(/(\s|^)(v\s?\d|vol\b|volume\b|ch\b|chapter\b|c\d|#\s?\d|\d{1,4}\s*$).*$/i, '')
       .replace(/[\s\-–—:,]+$/, '')
       .replace(/\s+/g, ' ')
-      .trim() || fileName.replace(/\.(cbz|zip)$/i, '')
+      .trim() || fileName.replace(/\.(cbz|zip|cbr|rar|cb7|7z|cbt|tar)$/i, '')
   );
 }
 
-/** A comic archive to import: a picked file or one downloaded by the app. */
-type ArchiveFile = { name: string; bytes(): Promise<Uint8Array> };
-
 /**
- * Pick one or more .cbz files: they become one series in your library (each file
- * a chapter/volume, in name order), with pages stored in the app.
+ * Pick one or more comic files (CBZ, and on Android also CBR/CB7): they become one
+ * series in your library (each file a chapter/volume, in name order).
  */
 export async function importCbz(): Promise<LocalSeries | null> {
   if (!comicDownloadsSupported) throw new Error('Importing works in the phone app, not on the web.');
   const picked = await File.pickFileAsync({ multipleFiles: true, mimeTypes: ['*/*'] });
   if (picked.canceled) return null;
-  return importCbzFiles(picked.result);
+  return importComicFiles(picked.result);
 }
 
-/**
- * Stores CBZ/ZIP archives as one series (each file a chapter/volume, in name order).
- * `title` names the series (otherwise taken from the first file name).
- */
-export async function importCbzFiles(input: ArchiveFile[], title?: string): Promise<LocalSeries> {
-  const files = [...input].sort((a, b) => natural(a.name, b.name));
-  if (!files.length) throw new Error('Nothing to import');
-  const rar = files.find((f) => /\.cbr$/i.test(f.name));
-  if (rar) throw new Error(`${rar.name} is a CBR (RAR) file; only CBZ/ZIP can be imported.`);
-  const id = `local:${Date.now().toString(36)}`;
-  const chapters: LocalChapter[] = [];
-  for (const [n, f] of files.entries()) {
+const ARCHIVE_NAME = /\.(cbz|zip|cbr|rar|cb7|7z|cbt|tar)$/i;
+
+/** Pictures of one archive, in reading order, as files in `dir` named 0001.jpg… */
+async function unpack(f: File, dir: Directory): Promise<{ uris: string[]; bytes: number }> {
+  const handle = f.open();
+  const head = handle.readBytes(8);
+  handle.close();
+  const kind = sniffArchive(head);
+  if (kind === 'pdf') throw new Error(`${f.name} is a PDF; 128bitPlay reads CBZ and CBR comics.`);
+  if (kind === 'unknown') throw new Error(`${f.name} isn’t a comic archive.`);
+  dir.create({ intermediates: true, idempotent: true });
+  const uris: string[] = [];
+  let bytes = 0;
+  if (extractWithNative) {
+    // Picked files can be content:// links; the extractor needs a real file.
+    let source = f;
+    let temp: File | null = null;
+    if (!f.uri.startsWith('file://')) {
+      temp = new File(Paths.cache, `import-${Date.now()}`);
+      f.copy(temp);
+      source = temp;
+    }
+    try {
+      const raw = new Directory(dir, 'raw');
+      const found = await extractWithNative(source.uri, raw.uri);
+      found.sort((a, b) => natural(a.name, b.name));
+      found.forEach((e, i) => {
+        const from = new File(e.uri);
+        const to = new File(dir, `${String(i + 1).padStart(4, '0')}.${e.uri.split('.').pop()}`);
+        bytes += from.size ?? 0;
+        from.move(to);
+        uris.push(to.uri);
+      });
+      if (raw.exists) raw.delete();
+    } finally {
+      if (temp?.exists) temp.delete();
+    }
+  } else {
+    if (kind !== 'zip') throw new Error(`${f.name} is ${kind.toUpperCase()}; this version can only open CBZ.`);
     const entries = unzipSync(await f.bytes(), {
       filter: (e) => /\.(jpe?g|png|webp|gif|avif)$/i.test(e.name) && !/(^|\/)(__MACOSX|\.)/.test(e.name),
     });
-    const names = Object.keys(entries).sort(natural);
-    if (!names.length) throw new Error(`${f.name} has no pictures in it`);
+    Object.keys(entries)
+      .sort(natural)
+      .forEach((name, i) => {
+        const out = new File(dir, `${String(i + 1).padStart(4, '0')}.${name.split('.').pop()!.toLowerCase()}`);
+        out.write(entries[name]);
+        bytes += entries[name].byteLength;
+        uris.push(out.uri);
+      });
+  }
+  if (!uris.length) throw new Error(`${f.name} has no pictures in it`);
+  return { uris, bytes };
+}
+
+/**
+ * Stores comic archives (CBZ, CBR, CB7…) as one series (each file a chapter/volume,
+ * in name order). `title` names the series (otherwise taken from the first file name).
+ * `deleteSource` removes each archive once it's unpacked, to save space.
+ */
+export async function importComicFiles(input: File[], title?: string, deleteSource = false): Promise<LocalSeries> {
+  const files = [...input].sort((a, b) => natural(a.name, b.name));
+  if (!files.length) throw new Error('Nothing to import');
+  const id = `local:${Date.now().toString(36)}`;
+  const chapters: LocalChapter[] = [];
+  for (const [n, f] of files.entries()) {
     const chId = `${id}:${n + 1}`;
-    const dir = dirFor(id, chId);
-    dir.create({ intermediates: true, idempotent: true });
-    const uris: string[] = [];
-    let bytes = 0;
-    names.forEach((name, i) => {
-      const out = new File(dir, `${String(i + 1).padStart(4, '0')}.${name.split('.').pop()!.toLowerCase()}`);
-      out.write(entries[name]);
-      bytes += entries[name].byteLength;
-      uris.push(out.uri);
-    });
+    const { uris, bytes } = await unpack(f, dirFor(id, chId));
+    if (deleteSource && f.exists) f.delete();
     chapters.push({
       id: chId,
-      label: f.name.replace(/\.(cbz|zip)$/i, ''),
+      label: f.name.replace(ARCHIVE_NAME, ''),
       files: uris,
       state: 'done',
       progress: 1,
@@ -224,6 +263,24 @@ export async function importCbzFiles(input: ArchiveFile[], title?: string): Prom
   };
   await save([series, ...(await getComicDownloads())]);
   return series;
+}
+
+/**
+ * Frees space: deletes the pages of chapters you've finished (downloaded or imported).
+ * Returns how many chapters were removed.
+ */
+export async function deleteReadChapters(readIds: (comicId: string) => string[]): Promise<number> {
+  let removed = 0;
+  for (const s of await getComicDownloads()) {
+    const read = new Set(readIds(s.comic.id));
+    for (const c of s.chapters) {
+      if (c.state === 'done' && read.has(c.id)) {
+        await deleteChapter(s.comic.id, c.id);
+        removed++;
+      }
+    }
+  }
+  return removed;
 }
 
 /** Downloads a cover picture into the series' folder and uses it (works offline). */

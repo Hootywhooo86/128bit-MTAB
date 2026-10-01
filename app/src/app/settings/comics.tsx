@@ -333,6 +333,12 @@ export default function ComicsSettings() {
           onChange={(v) => setPref('comicAllLanguages', v)}
         />
         <ToggleRow
+          title="Delete chapters after reading"
+          subtitle="Saves space: a downloaded or imported chapter leaves the phone once you've finished it (when you finish the next one)."
+          value={prefs.comicDeleteRead}
+          onChange={(v) => setPref('comicDeleteRead', v)}
+        />
+        <ToggleRow
           title="Data saver (MangaDex)"
           subtitle="Smaller, compressed pages."
           value={prefs.comicDataSaver}

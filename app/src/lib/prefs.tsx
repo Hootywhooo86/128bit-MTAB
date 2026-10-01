@@ -40,6 +40,8 @@ export type Prefs = {
   comicDataSaver: boolean;
   /** Comics tab: list extension sources in every language (otherwise English + multi-language). */
   comicAllLanguages: boolean;
+  /** Delete a comic chapter's pages from the phone once you've read it (saves space). */
+  comicDeleteRead: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -60,6 +62,7 @@ export const DEFAULT_PREFS: Prefs = {
   readerMode: 'vertical',
   comicDataSaver: false,
   comicAllLanguages: false,
+  comicDeleteRead: false,
 };
 
 const KEY = '128bit.prefs';

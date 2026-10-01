@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { Body, Input, formatBytes } from '@/components/ui';
 import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { canOpenRar } from '@/lib/comic-archive';
 import {
   followSeries,
   grabComic,
@@ -49,8 +50,9 @@ export function ComicFind({ onGrabbed }: { onGrabbed: () => void }) {
         clearButtonMode="while-editing"
       />
       <Body muted style={{ fontSize: 12 }}>
-        CBZ releases come first; CBR (RAR) ones can’t be opened. GetComics downloads straight to
-        the phone; torrents go through TorBox first.
+        {canOpenRar
+          ? 'CBZ and CBR both open. GetComics downloads straight to the phone; torrents go through TorBox first. The archive is deleted once unpacked.'
+          : 'CBZ releases come first; CBR (RAR) opens in the Android app only. GetComics downloads straight to the phone; torrents go through TorBox first.'}
       </Body>
       {busy ? <ActivityIndicator color={Colors.accent} /> : null}
       {errors.map((e) => (
@@ -60,7 +62,8 @@ export function ComicFind({ onGrabbed }: { onGrabbed: () => void }) {
       ))}
       {results && !results.length && !busy ? <Body muted>No results.</Body> : null}
       {results?.map((r) => {
-        const cbr = r.format === 'CBR';
+        // CBR opens in the Android app; elsewhere it's marked and can't be got.
+        const cbr = (r.format === 'CBR' && !canOpenRar) || r.format === 'PDF';
         return (
           <View key={r.id} style={[styles.row, cbr && { opacity: 0.45 }]}>
             {r.cover ? (
@@ -75,8 +78,8 @@ export function ComicFind({ onGrabbed }: { onGrabbed: () => void }) {
                 {r.title}
               </Text>
               <View style={styles.badges}>
-                <Text style={[styles.badge, r.format === 'CBZ' && styles.badgeOn]}>
-                  {cbr ? 'CBR – can’t open' : r.format === 'Direct' ? 'CBZ · direct' : r.format}
+                <Text style={[styles.badge, (r.format === 'CBZ' || (r.format === 'CBR' && canOpenRar)) && styles.badgeOn]}>
+                  {cbr ? `${r.format} – can’t open` : r.format === 'Direct' ? 'Direct download' : r.format}
                 </Text>
                 <Text style={styles.badge}>{r.source === 'tpb' ? 'Pirate Bay' : 'GetComics'}</Text>
                 {r.size ? <Text style={styles.badge}>{formatBytes(r.size)}</Text> : null}

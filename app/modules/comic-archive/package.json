@@ -1,0 +1,6 @@
+{
+  "name": "comic-archive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Extracts the pictures from comic archives (CBZ/ZIP, CBR/RAR4/RAR5, CB7, CBT) on Android, via libarchive."
+}

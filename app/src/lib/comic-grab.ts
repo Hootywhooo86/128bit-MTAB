@@ -6,8 +6,8 @@
  *   so those download directly to the phone (no TorBox needed).
  * - Pirate Bay torrents go to TorBox; when TorBox has them, the CBZ files inside are
  *   downloaded to the phone.
- * Either way the CBZ files are imported as a series (lib/comic-downloads).
- * CBR (RAR) can't be opened, so CBZ releases are listed first and CBR ones are marked.
+ * Either way the comic files (CBZ, and CBR/CB7 in the Android app) are unpacked into a
+ * series on the phone (lib/comic-downloads) and the archive is deleted to save space.
  *
  * "Follow" a series to be told about new issues: GetComics and TPB are checked for the
  * next issue number every few hours while the app is open (optionally grabbing it).
@@ -16,7 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import { importCbzFiles, setSeriesCover } from './comic-downloads';
+import { canOpenRar } from './comic-archive';
+import { importComicFiles, setSeriesCover } from './comic-downloads';
 import { addMagnet, getItem, magnetFromHash, requestLink, type TorboxFile } from './torbox';
 
 const WANTED_KEY = '128bit.comicWanted';
@@ -183,9 +184,11 @@ export async function searchTpb(query: string): Promise<ComicRelease[]> {
     }));
 }
 
-const FORMAT_RANK: Record<ComicFormat, number> = { CBZ: 0, Direct: 1, '?': 2, Pack: 3, PDF: 4, CBR: 9 };
+const FORMAT_RANK: Record<ComicFormat, number> = canOpenRar
+  ? { CBZ: 0, CBR: 0, Direct: 1, '?': 2, Pack: 3, PDF: 9 }
+  : { CBZ: 0, Direct: 1, '?': 2, Pack: 3, PDF: 9, CBR: 9 };
 
-/** Both sites at once: CBZ first, CBR last; then newest GetComics posts / best-seeded torrents. */
+/** Both sites at once: openable formats first; then newest GetComics posts / best-seeded torrents. */
 export async function searchComicReleases(query: string) {
   const [gc, tpb] = await Promise.allSettled([searchGetComics(query), searchTpb(query)]);
   const errors = [gc, tpb]
@@ -258,7 +261,8 @@ export async function removeComicWanted(id: string) {
 
 /** Tap a result: it goes on the Wanted list and starts coming to the phone. */
 export async function grabComic(release: ComicRelease): Promise<WantedComic> {
-  if (release.format === 'CBR') throw new Error('That one is a CBR (RAR) file, which 128bit can’t open. Pick a CBZ.');
+  if (release.format === 'CBR' && !canOpenRar) throw new Error('That one is a CBR (RAR) file, which only the Android app can open. Pick a CBZ.');
+  if (release.format === 'PDF') throw new Error('That one is a PDF; 128bitPlay reads CBZ and CBR comics.');
   const list = await getComicWanted();
   const existing = list.find((w) => w.id === release.id);
   if (existing && existing.state !== 'error') return existing;
@@ -282,26 +286,58 @@ export async function retryComic(id: string) {
   runComicQueue().catch(() => {});
 }
 
-/** The direct file link behind a GetComics post's "Download Now" button. */
-async function getComicsFileLink(post: string) {
-  const res = await fetch(post, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) 128bit' } });
+const UA = 'Mozilla/5.0 (Linux; Android 14) 128bitPlay';
+
+/** Where a GetComics /dls/ button really goes (it redirects). */
+async function finalUrl(url: string) {
+  const res = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': UA } });
+  return res.url || url;
+}
+
+/**
+ * The file behind a GetComics post. PixelDrain first (its API serves the file to apps,
+ * and tells the real file name); then the "Download Now" server (it often answers 403
+ * to apps); never MEGA / TeraBox / FileQ etc., which are web pages, not files.
+ */
+export async function getComicsFile(post: string): Promise<{ url: string; name?: string }> {
+  const res = await fetch(post, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`GetComics answered ${res.status}`);
   const html = await res.text();
   const buttons = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
-  const href = (tag: string) => tag.match(/href="([^"]+)"/i)?.[1];
+  const href = (tag: string) => decodeHtml(tag.match(/href="([^"]+)"/i)?.[1] ?? '');
   const title = (tag: string) => tag.match(/title="([^"]+)"/i)?.[1] ?? '';
-  // "DOWNLOAD NOW" is GetComics' own server; then PixelDrain (also /dls/), then any direct .cbz.
-  const main =
-    buttons.find((t) => /download now/i.test(title(t))) ??
-    buttons.find((t) => /\/dls\//.test(href(t) ?? '') && !/pixeldrain/i.test(title(t))) ??
-    buttons.find((t) => /\/dls\//.test(href(t) ?? '')) ??
-    buttons.find((t) => /\.cbz(\?|$)/i.test(href(t) ?? ''));
-  const link = main && href(main);
-  if (!link) throw new Error('No download link on that GetComics page (it may only have host mirrors).');
-  return decodeHtml(link);
+  const tries: (() => Promise<{ url: string; name?: string } | null>)[] = [];
+
+  const pixel = buttons.find((t) => /pixeldrain/i.test(title(t)) || /pixeldrain\.com\/u\//.test(href(t)));
+  if (pixel)
+    tries.push(async () => {
+      const page = /pixeldrain\.com/.test(href(pixel)) ? href(pixel) : await finalUrl(href(pixel));
+      const id = page.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/)?.[1];
+      if (!id) return null;
+      const info = await fetch(`https://pixeldrain.com/api/file/${id}/info`).then((r) => r.json()).catch(() => null);
+      return { url: `https://pixeldrain.com/api/file/${id}?download`, name: info?.name };
+    });
+  const main = buttons.find((t) => /download now/i.test(title(t)));
+  if (main)
+    tries.push(async () => {
+      const url = await finalUrl(href(main));
+      const probe = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': UA } }).catch(() => null);
+      if (!probe?.ok) return null; // 403 from their file server
+      return { url, name: decodeURIComponent(url.split('?')[0].split('/').pop() ?? '') };
+    });
+  const direct = buttons.find((t) => /\.(cbz|cbr)(\?|$)/i.test(href(t)) && !/datanodes/i.test(href(t)));
+  if (direct) tries.push(async () => ({ url: href(direct), name: href(direct).split('/').pop() }));
+
+  for (const t of tries) {
+    const found = await t().catch(() => null);
+    if (found) return found;
+  }
+  throw new Error(
+    'No downloadable file on that GetComics page (only MEGA/TeraBox-type mirrors, which apps can’t download).',
+  );
 }
 
-const comicFile = (name: string) => /\.(cbz|zip|cbr|pdf)$/i.test(name);
+const comicFile = (name: string) => /\.(cbz|zip|cbr|rar|cb7|7z|pdf)$/i.test(name);
 
 async function downloadToPhone(url: string, name: string) {
   const dir = new Directory(Paths.cache, 'comic-grab');
@@ -313,11 +349,11 @@ async function downloadToPhone(url: string, name: string) {
 }
 
 function checkOpenable(names: string[]) {
-  const ok = names.filter((n) => /\.(cbz|zip)$/i.test(n));
-  if (ok.length) return;
-  if (names.some((n) => /\.cbr$/i.test(n))) throw new Error('This is CBR (RAR), which 128bit can’t open. Pick a CBZ release.');
-  if (names.some((n) => /\.pdf$/i.test(n))) throw new Error('This is a PDF comic; 128bit reads CBZ only.');
-  throw new Error('No CBZ files in it.');
+  if (names.some((n) => /\.(cbz|zip)$/i.test(n))) return;
+  if (canOpenRar && names.some((n) => /\.(cbr|rar|cb7|7z)$/i.test(n))) return;
+  if (names.some((n) => /\.(cbr|rar)$/i.test(n))) throw new Error('This is CBR (RAR); update to the Android app to open it, or pick a CBZ.');
+  if (names.some((n) => /\.pdf$/i.test(n))) throw new Error('This is a PDF comic; 128bitPlay reads CBZ and CBR.');
+  throw new Error('No comic files (CBZ/CBR) in it.');
 }
 
 let queueRunning = false;
@@ -344,20 +380,11 @@ async function step(w: WantedComic) {
   const r = w.release;
   if (r.source === 'getcomics') {
     await patchWanted(w.id, { state: 'downloading', progress: 0 });
-    const url = await getComicsFileLink(r.link!);
-    const nameFromUrl = decodeURIComponent(url.split('?')[0].split('/').pop() ?? '');
-    const file = await downloadToPhone(url, comicFile(nameFromUrl) ? nameFromUrl : `${r.title}.cbz`);
+    const { url, name } = await getComicsFile(r.link!);
+    if (name) checkOpenable([name]);
+    const file = await downloadToPhone(url, name && comicFile(name) ? name : `${r.title}.cbz`);
     try {
-      // Check what actually arrived: CBZ is a zip ("PK"); CBR is RAR; PDF is PDF.
-      const data = await file.bytes();
-      const head = String.fromCharCode(...data.subarray(0, 4));
-      if (head.startsWith('Rar!')) checkOpenable(['x.cbr']);
-      if (head.startsWith('%PDF')) checkOpenable(['x.pdf']);
-      if (!head.startsWith('PK')) throw new Error('GetComics didn’t send a comic file (try again later).');
-      const series = await importCbzFiles(
-        [{ name: file.name, bytes: async () => data }],
-        r.title.replace(/\s*\(\d{4}\)\s*$/, ''),
-      );
+      const series = await importComicFiles([file], r.title.replace(/\s*\(\d{4}\)\s*$/, ''), true);
       await addCover(series.comic.id, r);
       await patchWanted(w.id, { state: 'done', progress: 1, seriesId: series.comic.id });
     } finally {
@@ -379,7 +406,9 @@ async function step(w: WantedComic) {
   }
   const files = item.files.filter((f: TorboxFile) => comicFile(f.short_name ?? f.name));
   checkOpenable(files.map((f) => f.short_name ?? f.name));
-  const cbz = files.filter((f) => /\.(cbz|zip)$/i.test(f.short_name ?? f.name));
+  const cbz = files.filter((f) =>
+    (canOpenRar ? /\.(cbz|zip|cbr|rar|cb7|7z)$/i : /\.(cbz|zip)$/i).test(f.short_name ?? f.name),
+  );
   await patchWanted(w.id, { state: 'downloading', progress: 0 });
   const local: File[] = [];
   try {
@@ -388,7 +417,7 @@ async function step(w: WantedComic) {
       local.push(await downloadToPhone(link, f.short_name ?? f.name.split('/').pop() ?? `${i}.cbz`));
       await patchWanted(w.id, { progress: (i + 1) / cbz.length });
     }
-    const series = await importCbzFiles(local, cbz.length > 1 ? cleanPackName(r.title) : undefined);
+    const series = await importComicFiles(local, cbz.length > 1 ? cleanPackName(r.title) : undefined, true);
     await addCover(series.comic.id, r);
     await patchWanted(w.id, { state: 'done', progress: 1, seriesId: series.comic.id });
   } finally {
@@ -520,7 +549,7 @@ export async function checkFollows(force = false) {
           seriesKey(r.title) === f.key &&
           r.issue !== undefined &&
           r.issue > f.lastIssue &&
-          r.format !== 'CBR' &&
+          (canOpenRar || r.format !== 'CBR') &&
           !have.has(r.id) &&
           !f.newIssues.some((n) => n.id === r.id),
       );

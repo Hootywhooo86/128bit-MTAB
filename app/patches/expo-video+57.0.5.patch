@@ -1,0 +1,25 @@
+diff --git a/node_modules/expo-video/android/build.gradle b/node_modules/expo-video/android/build.gradle
+--- a/node_modules/expo-video/android/build.gradle
++++ b/node_modules/expo-video/android/build.gradle
+@@ -25,6 +25,8 @@
+   implementation "androidx.media3:media3-exoplayer-hls:${androidxMedia3Version}"
+   implementation "androidx.media3:media3-ui:${androidxMedia3Version}"
+   implementation "androidx.media3:media3-datasource-okhttp:${androidxMedia3Version}"
++  // 128bitPlay: FFmpeg audio decoder (EAC3/AC3/DTS/TrueHD…), used before the phone's own decoders.
++  implementation "org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1"
+ 
+   def fragment_version = "1.8.9"
+   implementation "androidx.fragment:fragment:$fragment_version"
+diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
+--- a/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
++++ b/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
+@@ -63,6 +63,9 @@
+   private var renderersFactory = DefaultRenderersFactory(context)
+     .forceEnableMediaCodecAsynchronousQueueing()
+     .setEnableDecoderFallback(true)
++    // 128bitPlay: decode audio with FFmpeg first, so Dolby/DTS tracks play even where the
++    // phone's own decoder is missing or broken (e.g. "c2.dolby.eac3.decoder" failures).
++    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+   private val listeners: MutableList<WeakReference<VideoPlayerListener>> = mutableListOf()
+   private val currentVideoViewRef = MutableWeakReference<VideoView?>(null) { new, old ->
+     sendEvent(PlayerEvent.TargetViewChanged(new, old))
