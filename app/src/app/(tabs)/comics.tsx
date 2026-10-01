@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ComicFind } from '@/components/comic-find';
@@ -10,7 +10,6 @@ import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/t
 import {
   browseSuwayomi,
   getAllComicProgress,
-  getComicLibrary,
   listComics,
   searchComics,
   type Comic,
@@ -27,19 +26,20 @@ import {
 import { getSuwayomi, listSources, type SuwaSource } from '@/lib/suwayomi';
 
 const MANGADEX = 'mangadex';
-const SECTIONS = ['Browse', 'Find', 'Wanted'] as const;
+/** Find's sources: GetComics + Pirate Bay (download to the phone), MangaDex, Suwayomi sources. */
+const WEB = 'web';
+const SECTIONS = ['Library', 'Find', 'Wanted'] as const;
 type Section = (typeof SECTIONS)[number];
 
 /** Comics tab: your comics, what you're reading, and MangaDex to browse and search. */
 export default function ComicsScreen() {
   const Colors = useColors();
   const styles = useStyles();
-  const [section, setSection] = useState<Section>('Browse');
+  const [section, setSection] = useState<Section>('Library');
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [results, setResults] = useState<Comic[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [library, setLibrary] = useState<Comic[]>([]);
   const [progress, setProgress] = useState<Record<string, ReadProgress>>({});
   const [sources, setSources] = useState<SuwaSource[]>([]);
   const [onPhone, setOnPhone] = useState<LocalSeries[]>([]);
@@ -63,11 +63,10 @@ export default function ComicsScreen() {
       setImporting(false);
     }
   }
-  const [source, setSource] = useState(MANGADEX);
+  const [source, setSource] = useState(WEB);
 
   useFocusEffect(
     useCallback(() => {
-      getComicLibrary().then(setLibrary);
       getAllComicProgress().then(setProgress);
       // Sources from your Suwayomi extensions (Keiyoushi etc.), when a server is connected.
       getSuwayomi().then((c) =>
@@ -97,10 +96,6 @@ export default function ComicsScreen() {
     };
   }, [submitted, current]);
 
-  const reading = library
-    .filter((c) => progress[c.id])
-    .sort((a, b) => progress[b.id].updatedAt - progress[a.id].updatedAt);
-
   function search() {
     const q = query.trim();
     setResults(null);
@@ -123,14 +118,90 @@ export default function ComicsScreen() {
     </View>
   );
 
-  if (section !== 'Browse') {
+  if (section === 'Wanted') {
+    return (
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
+        {tabs}
+        <ComicWanted />
+      </ScrollView>
+    );
+  }
+
+  if (section === 'Library') {
+    // Only comics that are on the phone: downloaded, grabbed or imported. Last read first.
+    const sorted = [...onPhone]
+      .filter((s) => s.chapters.some((c) => c.state === 'done'))
+      .sort((a, b) => (progress[b.comic.id]?.updatedAt ?? 0) - (progress[a.comic.id]?.updatedAt ?? 0));
+    return (
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
+        {tabs}
+        {sorted.length ? (
+          <View style={styles.grid}>
+            {sorted.map((s) => (
+              <ComicTile
+                key={s.comic.id}
+                comic={s.comic}
+                width={108}
+                note={
+                  progress[s.comic.id]?.chapterLabel ??
+                  `${s.chapters.filter((c) => c.state === 'done').length} ch. · new`
+                }
+              />
+            ))}
+          </View>
+        ) : (
+          <Body muted style={{ paddingHorizontal: Spacing.three }}>
+            Nothing downloaded yet. Use Find to get comics (GetComics, Pirate Bay, MangaDex…), or
+            import CBZ/CBR files below.
+          </Body>
+        )}
+        {comicDownloadsSupported ? (
+          <View style={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
+            <Pressable style={styles.importButton} onPress={importFiles} disabled={importing}>
+              {importing ? (
+                <ActivityIndicator color={Colors.accent} />
+              ) : (
+                <Text style={styles.importText}>＋ Import CBZ / CBR files from this phone</Text>
+              )}
+            </Pressable>
+            {importError ? <Body style={{ color: Colors.danger, fontSize: 12 }}>{importError}</Body> : null}
+          </View>
+        ) : null}
+      </ScrollView>
+    );
+  }
+
+  // Find
+  const chips = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
+      {[{ id: WEB, displayName: 'GetComics + Pirate Bay' }, { id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
+        <Pressable
+          key={s.id}
+          onPress={() => {
+            setSource(s.id);
+            setResults(null);
+          }}
+          style={[styles.chip, source === s.id && { backgroundColor: Colors.accent }]}>
+          <Text style={[styles.chipText, source === s.id && { color: Colors.accentText }]}>
+            {s.displayName}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+
+  if (source === WEB) {
     return (
       <ScrollView
         style={styles.screen}
         contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}
         keyboardShouldPersistTaps="handled">
         {tabs}
-        {section === 'Find' ? <ComicFind onGrabbed={() => {}} /> : <ComicWanted />}
+        {chips}
+        <ComicFind onGrabbed={() => {}} />
       </ScrollView>
     );
   }
@@ -138,29 +209,10 @@ export default function ComicsScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
       {tabs}
-      {shownSources.length ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
-          {[{ id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
-            <Pressable
-              key={s.id}
-              onPress={() => {
-                setSource(s.id);
-                setResults(null);
-              }}
-              style={[styles.chip, source === s.id && { backgroundColor: Colors.accent }]}>
-              <Text style={[styles.chipText, source === s.id && { color: Colors.accentText }]}>
-                {s.displayName}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
+      {chips}
       <View style={{ paddingHorizontal: Spacing.three }}>
         <Input
-          placeholder={`Search ${current ? current.name : 'comics and manga'}`}
+          placeholder={`Search ${current ? current.name : 'MangaDex'}`}
           value={query}
           onChangeText={(t) => {
             setQuery(t);
@@ -189,88 +241,33 @@ export default function ComicsScreen() {
             </View>
           )}
         </View>
+      ) : current ? (
+        <>
+          <ListRow
+            key={`${current.id}:popular`}
+            title={`Popular on ${current.name}`}
+            load={async (page) => (await browseSuwayomi(current.id, 'POPULAR', page)).comics}
+          />
+          {current.supportsLatest ? (
+            <ListRow
+              key={`${current.id}:latest`}
+              title="Latest updates"
+              load={async (page) => (await browseSuwayomi(current.id, 'LATEST', page)).comics}
+            />
+          ) : null}
+        </>
       ) : (
         <>
-          {onPhone.length ? (
-            <Row title="On this phone">
-              {onPhone.map((s) => (
-                <ComicTile
-                  key={s.comic.id}
-                  comic={s.comic}
-                  note={`${s.chapters.filter((c) => c.state === 'done').length} ch. saved`}
-                />
-              ))}
-            </Row>
-          ) : null}
-          {comicDownloadsSupported ? (
-            <View style={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
-              <Pressable style={styles.importButton} onPress={importFiles} disabled={importing}>
-                {importing ? (
-                  <ActivityIndicator color={Colors.accent} />
-                ) : (
-                  <Text style={styles.importText}>＋ Import CBZ files from this phone</Text>
-                )}
-              </Pressable>
-              {importError ? <Body style={{ color: Colors.danger, fontSize: 12 }}>{importError}</Body> : null}
-            </View>
-          ) : null}
-          {reading.length ? (
-            <Row title="Continue reading">
-              {reading.map((c) => (
-                <ComicTile key={c.id} comic={c} note={progress[c.id].chapterLabel} />
-              ))}
-            </Row>
-          ) : null}
-          {library.length ? (
-            <Row title={`Your library (${library.length})`}>
-              {library.map((c) => (
-                <ComicTile key={c.id} comic={c} note={progress[c.id] ? undefined : 'New'} />
-              ))}
-            </Row>
-          ) : null}
-          {current ? (
-            <>
-              <ListRow
-                key={`${current.id}:popular`}
-                title={`Popular on ${current.name}`}
-                load={async (page) => (await browseSuwayomi(current.id, 'POPULAR', page)).comics}
-              />
-              {current.supportsLatest ? (
-                <ListRow
-                  key={`${current.id}:latest`}
-                  title="Latest updates"
-                  load={async (page) => (await browseSuwayomi(current.id, 'LATEST', page)).comics}
-                />
-              ) : null}
-            </>
-          ) : (
-            <>
-              <ListRow key="md:popular" title="Popular" load={(page) => listComics('popular', (page - 1) * 24)} />
-              <ListRow key="md:latest" title="Latest updates" load={(page) => listComics('latest', (page - 1) * 24)} />
-              <ListRow key="md:top" title="Top rated" load={(page) => listComics('top', (page - 1) * 24)} />
-              <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
-                Comics and manga from MangaDex. Officially licensed series are often taken down
-                there. For Mihon extensions (Keiyoushi), connect Suwayomi in Settings → Comics.
-              </Body>
-            </>
-          )}
+          <ListRow key="md:popular" title="Popular" load={(page) => listComics('popular', (page - 1) * 24)} />
+          <ListRow key="md:latest" title="Latest updates" load={(page) => listComics('latest', (page - 1) * 24)} />
+          <ListRow key="md:top" title="Top rated" load={(page) => listComics('top', (page - 1) * 24)} />
+          <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
+            Comics and manga from MangaDex: open one and download chapters to put it in your
+            Library. For Mihon extensions (Keiyoushi), connect Suwayomi in Settings → Comics.
+          </Body>
         </>
       )}
     </ScrollView>
-  );
-}
-
-function Row({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View style={{ gap: Spacing.two }}>
-      <Heading style={{ paddingHorizontal: Spacing.three }}>{title}</Heading>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}>
-        {children}
-      </ScrollView>
-    </View>
   );
 }
 
