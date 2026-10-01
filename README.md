@@ -82,6 +82,9 @@ When connected, what you watch is scrobbled to Trakt, and your Trakt paused item
 
 ## Install on your phone
 
+**Easiest:** download the newest APK from the repo's [Releases page](../../releases). Every push that changes `app/` builds a new one automatically (GitHub Actions → *Android APK*).
+
+
 Expo Go is fine for a quick look, but it can't do background video, picture-in-picture or
 reliable lock-screen audio. For the real thing, build the app with EAS (Expo's free cloud
 build service, no Android Studio needed):
