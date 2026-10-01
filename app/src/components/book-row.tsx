@@ -46,7 +46,7 @@ export function BookRow({
 
   return (
     <Pressable style={styles.row} onPress={onPress} onLongPress={onLongPress}>
-      <Cover uri={book.cover} size={84} />
+      <Cover uri={book.cover} size={84} title={book.title} author={book.author} />
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={2}>
           {book.title}

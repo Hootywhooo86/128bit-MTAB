@@ -53,6 +53,12 @@ export default function PlaybackSettings() {
           onChange={(v) => setPref('autoPlayNextEpisode', v)}
         />
         <ToggleRow
+          title="Keep playing with the screen off"
+          subtitle="Shows, movies, anime and live TV keep playing (sound) when the screen turns off or you switch apps. Audiobooks always do."
+          value={prefs.backgroundVideo}
+          onChange={(v) => setPref('backgroundVideo', v)}
+        />
+        <ToggleRow
           title="Resume where you left off"
           subtitle="Jump back to your last position when you reopen something."
           value={prefs.resumeVideos}

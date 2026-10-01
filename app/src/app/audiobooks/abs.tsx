@@ -125,7 +125,7 @@ export default function AbsBrowseScreen() {
               onPress={() =>
                 router.push({ pathname: '/audiobooks/abs-item', params: { id: item.id } })
               }>
-              <Cover uri={item.cover} size={104} />
+              <Cover uri={item.cover} size={104} title={item.title} author={item.author} />
               <Text style={styles.title} numberOfLines={2}>
                 {item.title}
               </Text>

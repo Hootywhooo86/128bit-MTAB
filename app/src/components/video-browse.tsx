@@ -20,7 +20,7 @@ import { usePrefs } from '@/lib/prefs';
 import { getPlayback, isConnected, traktConfigured } from '@/lib/trakt';
 import { getWatchProgress, type WatchProgress } from '@/lib/video';
 
-type Props = { type: 'movie' | 'series'; noun: string };
+type Props = { type: 'movie' | 'series' | 'anime'; noun: string };
 
 /** Home screen for Shows and Movies: search, continue watching, then every addon catalog as a row. */
 export function VideoBrowse({ type, noun }: Props) {
@@ -39,7 +39,11 @@ export function VideoBrowse({ type, noun }: Props) {
       <View style={styles.screen}>
         <EmptyState
           title={`No ${noun} yet`}
-          body={`Install an addon with ${noun} catalogs (Cinemeta is a good start), plus one that provides streams.`}>
+          body={
+            type === 'anime'
+              ? 'Install an anime addon (Kitsu is suggested in Addons), plus one that provides streams.'
+              : `Install an addon with ${noun} catalogs (Cinemeta is a good start), plus one that provides streams.`
+          }>
           <Button label="Manage addons" onPress={() => router.push('/addons')} />
         </EmptyState>
       </View>

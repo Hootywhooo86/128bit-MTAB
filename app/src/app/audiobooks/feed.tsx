@@ -179,7 +179,7 @@ function FeedRow({ item }: { item: FeedItem }) {
       ) : null}
       {open ? (
         <View style={styles.details}>
-          {torrent?.cover ? <Cover uri={torrent.cover} size={90} /> : null}
+          <Cover uri={torrent?.cover} size={90} title={item.title} author={item.author} />
           <View style={{ flex: 1, gap: 4 }}>
             {torrent?.size ? <Text style={styles.meta}>{torrent.size}</Text> : null}
             {item.sharedBy ? <Text style={styles.meta}>Shared by {item.sharedBy}</Text> : null}

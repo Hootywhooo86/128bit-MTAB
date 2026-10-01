@@ -64,7 +64,7 @@ export default function CloudItemScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: name }} />
       <View style={styles.header}>
-        <Cover size={96} />
+        <Cover size={96} title={name} />
         <Title style={{ fontSize: 20, flex: 1 }}>{name}</Title>
       </View>
       {result.status === 'ready' ? (

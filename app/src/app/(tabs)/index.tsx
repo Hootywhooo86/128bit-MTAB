@@ -167,7 +167,12 @@ function ContinueListeningRow() {
           <Pressable
             style={{ width: 120, gap: 6 }}
             onPress={() => playBook(item.book).then(() => router.push('/player'))}>
-            <Cover uri={item.book.cover} size={120} />
+            <Cover
+              uri={item.book.cover}
+              size={120}
+              title={item.book.title}
+              author={item.book.author}
+            />
             <ProgressBar value={item.progress.fraction} />
             <Text numberOfLines={1} style={styles.tileTitle}>
               {item.book.title}

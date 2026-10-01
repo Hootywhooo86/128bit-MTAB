@@ -94,7 +94,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
       headers,
       link,
       live: LIVE_TYPES.includes(type),
-      series: type === 'series' ? getSeriesContext(link.id) : undefined,
+      series: type === 'series' || type === 'anime' ? getSeriesContext(link.id) : undefined,
       source: { addonId, bingeGroup: stream.behaviorHints?.bingeGroup },
     });
     router.push('/watch');

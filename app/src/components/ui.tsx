@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { useCover } from '@/lib/covers';
 
 export function Title({ style, ...rest }: TextProps) {
   const styles = useStyles();
@@ -96,8 +97,20 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function Cover({ uri, size = 120 }: { uri?: string; size?: number }) {
+/** Square cover. Give `title` (and `author`) to look one up when `uri` is missing. */
+export function Cover({
+  uri,
+  size = 120,
+  title,
+  author,
+}: {
+  uri?: string;
+  size?: number;
+  title?: string;
+  author?: string;
+}) {
   const styles = useStyles();
+  uri = useCover(uri, title, author);
   return (
     <View style={[styles.cover, { width: size, height: size }]}>
       {uri ? (

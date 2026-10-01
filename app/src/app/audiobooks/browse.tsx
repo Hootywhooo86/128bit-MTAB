@@ -208,7 +208,7 @@ function CatalogRow({ addon, catalog, search }: Omit<Row, 'key'>) {
                   params: { addon: addon.manifest.id, id: item.id },
                 })
               }>
-              <Cover uri={item.cover} size={130} />
+              <Cover uri={item.cover} size={130} title={item.title} author={item.author} />
               <Text numberOfLines={2} style={styles.tileTitle}>
                 {item.title}
               </Text>

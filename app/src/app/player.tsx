@@ -107,7 +107,7 @@ export default function PlayerScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Cover uri={book.cover} size={240} />
+      <Cover uri={book.cover} size={240} title={book.title} author={book.author} />
       <View style={{ alignItems: 'center', gap: 4 }}>
         <Title style={{ fontSize: 22, textAlign: 'center' }}>{book.title}</Title>
         {book.author ? <Body muted>{book.author}</Body> : null}

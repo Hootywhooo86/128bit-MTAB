@@ -17,6 +17,7 @@ import {
 } from 'react';
 
 import { absReportProgress, absResumePoint, isAbsBook } from './audiobookshelf';
+import { findCover } from './covers';
 import { hardcoverProgress } from './hardcover';
 import { addBookmark as storeBookmark } from './bookmarks';
 import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
@@ -173,6 +174,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const playBook = useCallback(
     async (next: PlayableBook, chapter?: number) => {
+      // No cover (e.g. a TorBox download)? Find one, for the app and the lock screen.
+      if (!next.cover) {
+        const cover = await Promise.race([
+          findCover(next.title, next.author),
+          new Promise<undefined>((r) => setTimeout(r, 3000)),
+        ]);
+        if (cover) next = { ...next, cover };
+      }
       setBook(next);
       addToLibrary(next);
       if (chapter !== undefined) return loadChapter(next, chapter);

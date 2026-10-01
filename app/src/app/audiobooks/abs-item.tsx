@@ -36,7 +36,7 @@ export default function AbsItemScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: book.title }} />
       <View style={styles.header}>
-        <Cover uri={book.cover} size={140} />
+        <Cover uri={book.cover} size={140} title={book.title} author={book.author} />
         <View style={{ flex: 1, gap: 4 }}>
           <Title style={{ fontSize: 22 }}>{book.title}</Title>
           {book.author ? <Body muted>{book.author}</Body> : null}

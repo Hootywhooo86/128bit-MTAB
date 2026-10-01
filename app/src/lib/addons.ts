@@ -21,6 +21,12 @@ export const DEFAULT_ADDONS = [
     url: 'https://v3-cinemeta.strem.io/manifest.json',
   },
   {
+    id: 'com.strem.kitsu',
+    name: 'Kitsu',
+    description: 'Anime catalogs, details and episodes (fills the Anime tab).',
+    url: 'https://anime-kitsu.strem.fun/manifest.json',
+  },
+  {
     id: 'org.stremio.opensubtitlesv3',
     name: 'OpenSubtitles',
     description: 'Subtitles in many languages for movies and shows.',
@@ -29,12 +35,23 @@ export const DEFAULT_ADDONS = [
 ];
 
 const SEEDED_KEY = '128bit.defaultsInstalled';
+/** Defaults added in a later version get their own flag, so existing installs pick them up once. */
+const LATER_DEFAULTS: { key: string; url: string }[] = [
+  { key: '128bit.defaultsInstalled.kitsu', url: 'https://anime-kitsu.strem.fun/manifest.json' },
+];
 
 /**
  * On the very first launch, install the default addons so Home isn't empty.
  * Runs once; if the phone is offline it tries again next launch.
  */
 export async function installDefaultAddons() {
+  for (const d of LATER_DEFAULTS) {
+    if (await AsyncStorage.getItem(d.key)) continue;
+    await installAddon(d.url).then(
+      () => AsyncStorage.setItem(d.key, '1'),
+      () => {},
+    );
+  }
   if (await AsyncStorage.getItem(SEEDED_KEY)) return;
   const results = await Promise.allSettled(DEFAULT_ADDONS.map((a) => installAddon(a.url)));
   if (results.some((r) => r.status === 'fulfilled')) await AsyncStorage.setItem(SEEDED_KEY, '1');
@@ -45,7 +62,10 @@ export const CHANNEL_TYPES = ['tv', 'channel'];
 export const SPORT_TYPES = ['sport', 'sports', 'events', 'event', 'live'];
 export const LIVE_TYPES = [...CHANNEL_TYPES, ...SPORT_TYPES];
 
-export const SUPPORTED_TYPES = ['audiobook', 'movie', 'series', ...LIVE_TYPES];
+export const SUPPORTED_TYPES = ['audiobook', 'movie', 'series', 'anime', ...LIVE_TYPES];
+
+/** Shows and anime are the same kind of thing: an addon offering one usually serves the other. */
+const EPISODIC = ['series', 'anime'];
 
 /** Accepts `https://x/manifest.json`, `https://x/`, `stremio://x/manifest.json` or `128bit://…`. */
 export function normalizeManifestUrl(input: string): string {
@@ -227,12 +247,19 @@ export async function fetchStreams(
   type: string,
   id: string,
 ): Promise<AddonStreams[]> {
-  const candidates = addons.filter((a) => supports(a, 'stream', type, id));
+  // For anime and shows, ask each addon with whichever of the two types it supports.
+  const typeFor = (a: InstalledAddon) =>
+    supports(a, 'stream', type, id)
+      ? type
+      : EPISODIC.includes(type)
+        ? EPISODIC.find((t) => supports(a, 'stream', t, id))
+        : undefined;
+  const candidates = addons.filter((a) => typeFor(a));
   return Promise.all(
     candidates.map(async (addon) => {
       try {
         const data = await getJson<{ streams?: Stream[] }>(
-          `${addon.baseUrl}/stream/${type}/${encodeURIComponent(id)}.json`,
+          `${addon.baseUrl}/stream/${typeFor(addon)}/${encodeURIComponent(id)}.json`,
         );
         return { addon, streams: data.streams ?? [] };
       } catch (e) {

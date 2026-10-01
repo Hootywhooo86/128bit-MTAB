@@ -7,6 +7,7 @@ Shows, movies, live TV and audiobooks in one app, powered by **addons**, like St
 | **Home** | Featured title, Continue watching, Continue listening and top catalogs. |
 | **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker (quality/size badges, filters). Subtitles, audio tracks, Next episode / auto-play. |
 | **Movies** | Same for movies. |
+| **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
 | **Settings** (⚙ top right) | Tracking (Trakt, Hardcover), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |

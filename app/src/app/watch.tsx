@@ -53,6 +53,10 @@ const toSource = (item: WatchItem): VideoSource => ({
 });
 
 // Track switching mutates the native player; kept outside the component for the React Compiler.
+function setStaysActiveInBackground(player: VideoPlayer, on: boolean) {
+  player.staysActiveInBackground = on;
+}
+
 function setSubtitleTrack(player: VideoPlayer, track: SubtitleTrack | null) {
   player.subtitleTrack = track;
 }
@@ -80,6 +84,11 @@ export default function WatchScreen() {
     p.showNowPlayingNotification = true;
     p.play();
   });
+
+  // Keep playing with the screen off (lock-screen controls come with it).
+  useEffect(() => {
+    setStaysActiveInBackground(player, prefs.backgroundVideo);
+  }, [player, prefs.backgroundVideo]);
 
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   const { currentTime } = useEvent(player, 'timeUpdate', {

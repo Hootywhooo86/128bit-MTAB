@@ -73,7 +73,9 @@ export default function AddonsScreen() {
 
   const active = all.filter(isEnabled).length;
   const catalogs = all.reduce((n, a) => n + a.manifest.catalogs.length, 0);
-  const suggestions = SUGGESTED.filter((s) => !all.some((a) => a.manifest.id === s.id));
+  const suggestions = SUGGESTED.filter(
+    (s) => !all.some((a) => a.manifest.id === s.id || `${a.baseUrl}/manifest.json` === s.url),
+  );
 
   return (
     <SettingsPage>

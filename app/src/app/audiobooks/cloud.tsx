@@ -83,7 +83,7 @@ export default function TorboxCloudScreen() {
               params: { kind: item.kind, id: String(item.id) },
             })
           }>
-          <Cover size={52} />
+          <Cover size={52} title={item.name} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text numberOfLines={2} style={styles.title}>
               {item.name}

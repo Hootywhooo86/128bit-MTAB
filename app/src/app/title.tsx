@@ -62,7 +62,7 @@ export default function TitleScreen() {
     );
   }
 
-  const isSeries = type === 'series' && (meta.videos?.length ?? 0) > 0;
+  const isSeries = (type === 'series' || type === 'anime') && (meta.videos?.length ?? 0) > 0;
   const facts = [meta.releaseInfo, meta.runtime, meta.imdbRating ? `★ ${meta.imdbRating}` : null]
     .filter(Boolean)
     .join('  ·  ');
@@ -129,8 +129,12 @@ export default function TitleScreen() {
                   setSeriesContext({
                     metaId: id,
                     episodes: (meta.videos ?? [])
-                      .filter((v) => (v.season ?? 0) > 0)
-                      .sort((a, b) => a.season! - b.season! || episodeNumber(a) - episodeNumber(b))
+                      // Anime often has no seasons at all: then every episode counts.
+                      .filter((v) => (v.season ?? 0) > 0 || !meta.videos?.some((x) => x.season))
+                      .sort(
+                        (a, b) =>
+                          (a.season ?? 0) - (b.season ?? 0) || episodeNumber(a) - episodeNumber(b),
+                      )
                       .map((v) => ({ id: v.id, label: episodeLabel(v) })),
                   });
                   router.push({

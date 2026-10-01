@@ -20,7 +20,7 @@ export function MiniPlayer() {
         <View style={[styles.fill, { width: `${fraction * 100}%` }]} />
       </View>
       <View style={styles.row}>
-        <Cover uri={book.cover} size={48} />
+        <Cover uri={book.cover} size={48} title={book.title} author={book.author} />
         <View style={{ flex: 1 }}>
           <Text numberOfLines={1} style={styles.title}>
             {book.title}

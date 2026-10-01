@@ -34,6 +34,8 @@ export type Prefs = {
   autoSubtitles: boolean;
   subtitleSize: 'small' | 'medium' | 'large';
   autoPlayNextEpisode: boolean;
+  /** Keep video (sound) playing when the screen turns off or you leave the app. */
+  backgroundVideo: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -51,6 +53,7 @@ export const DEFAULT_PREFS: Prefs = {
   autoSubtitles: false,
   subtitleSize: 'medium',
   autoPlayNextEpisode: true,
+  backgroundVideo: true,
 };
 
 const KEY = '128bit.prefs';

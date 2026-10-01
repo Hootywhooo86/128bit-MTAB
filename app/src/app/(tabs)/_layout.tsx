@@ -33,6 +33,8 @@ export default function TabLayout() {
           backgroundColor: Colors.background,
           borderTopColor: Colors.border,
         },
+        // Six tabs: keep the labels small enough to fit on a phone.
+        tabBarLabelStyle: { fontSize: 10 },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
         headerRight: () => <HeaderButtons />,
@@ -43,10 +45,15 @@ export default function TabLayout() {
       />
       <Tabs.Screen name="shows" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
       <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />
+      <Tabs.Screen name="anime" options={{ title: 'Anime', tabBarIcon: icon('sparkles-outline') }} />
       <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
       <Tabs.Screen
         name="audiobooks"
-        options={{ title: 'Audiobooks', tabBarIcon: icon('headset-outline') }}
+        options={{
+          title: 'Audiobooks',
+          tabBarLabel: 'Books',
+          tabBarIcon: icon('headset-outline'),
+        }}
       />
     </Tabs>
   );
