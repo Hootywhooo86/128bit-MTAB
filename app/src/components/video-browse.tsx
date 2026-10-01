@@ -24,6 +24,7 @@ import { getPlaybackRows, removePlayback } from '@/lib/trakt-library';
 import {
   getHiddenContinue,
   getWatchProgress,
+  markAnime,
   removeWatchProgress,
   type WatchProgress,
 } from '@/lib/video';
@@ -255,24 +256,40 @@ export function CatalogRow({
             paddingHorizontal: Spacing.three,
             gap: Spacing.three,
           }}
-          renderItem={({ item }) => <PosterTile meta={item} addonId={addon.manifest.id} />}
+          renderItem={({ item }) => (
+            <PosterTile
+              meta={item}
+              addonId={addon.manifest.id}
+              anime={catalogTab(addon, catalog) === 'anime'}
+            />
+          )}
         />
       )}
     </View>
   );
 }
 
-export function PosterTile({ meta, addonId }: { meta: MetaPreview; addonId?: string }) {
+export function PosterTile({
+  meta,
+  addonId,
+  anime,
+}: {
+  meta: MetaPreview;
+  addonId?: string;
+  /** From an anime catalog: plays English audio + subtitles first. */
+  anime?: boolean;
+}) {
   const styles = useStyles();
   return (
     <Pressable
       style={{ width: 112, gap: 4 }}
-      onPress={() =>
+      onPress={() => {
+        if (anime) markAnime(meta.id).catch(() => {});
         router.push({
           pathname: '/title',
           params: { type: meta.type, id: meta.id, addon: addonId ?? '' },
-        })
-      }>
+        });
+      }}>
       <View style={styles.poster}>
         {meta.poster ? (
           <Image

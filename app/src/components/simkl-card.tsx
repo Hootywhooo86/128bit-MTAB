@@ -65,21 +65,31 @@ export function SimklCard() {
       Clipboard.setStringAsync(p.user_code).catch(() => {});
       Linking.openURL(p.verification_url || 'https://simkl.com/pin/');
       const deadline = Date.now() + p.expires_in * 1000;
+      let interval = Math.max(5, p.interval);
       const poll = async () => {
         if (Date.now() > deadline) {
           setPin(null);
           setError('The code expired. Try again.');
           return;
         }
-        const r = await pollSimklPin(p.user_code).catch(() => 'pending' as const);
+        let r: 'ok' | 'pending' | 'slow';
+        try {
+          r = await pollSimklPin(p);
+        } catch (e) {
+          setPin(null);
+          setError(e instanceof Error ? e.message : String(e));
+          return;
+        }
         if (r === 'ok') {
           setPin(null);
           load();
-        } else {
-          timer.current = setTimeout(poll, Math.max(5, p.interval) * 1000);
+          return;
         }
+        // Simkl asks to back off: wait 5 s longer from now on.
+        if (r === 'slow') interval += 5;
+        timer.current = setTimeout(poll, interval * 1000);
       };
-      timer.current = setTimeout(poll, Math.max(5, p.interval) * 1000);
+      timer.current = setTimeout(poll, interval * 1000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -111,8 +121,8 @@ export function SimklCard() {
           <Text style={styles.status}>Enter this code on Simkl</Text>
           <Text style={styles.code}>{pin.user_code}</Text>
           <Text style={styles.body}>
-            It’s been copied. Go to {(pin.verification_url || 'simkl.com/pin').replace(/^https?:\/\//, '')}{' '}
-            and approve 128bit. This updates by itself.
+            It’s been copied, and Simkl opened in your browser (code filled in for new apps).
+            Approve 128bit there; this updates by itself.
           </Text>
           <ActivityIndicator color={Colors.accent} style={{ alignSelf: 'flex-start' }} />
         </>
@@ -128,9 +138,10 @@ export function SimklCard() {
         <>
           <Text style={styles.body}>
             Simkl needs your own (free) app: on simkl.com go to Settings → Developer → Create new
-            app, name it 128bit, use{' '}
-            <Text style={{ fontWeight: '800', color: Colors.text }}>urn:ietf:wg:oauth:2.0:oob</Text>{' '}
-            as the redirect URI, then paste the Client ID here.
+            app, name it 128bit, pick{' '}
+            <Text style={{ fontWeight: '800', color: Colors.text }}>TV, devices & command line</Text>{' '}
+            (new apps) or use urn:ietf:wg:oauth:2.0:oob as the redirect URI (older apps), then paste
+            the Client ID here. Your existing Client ID works too.
           </Text>
           <Pressable
             onPress={() => Linking.openURL('https://simkl.com/settings/developer/new/')}

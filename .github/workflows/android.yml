@@ -59,6 +59,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Small native tweaks to libraries (e.g. lock-screen chapter buttons), kept in app/patches.
+      - name: Apply native patches
+        run: for p in patches/*.patch; do patch -p1 --forward < "$p"; done
+
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install
 

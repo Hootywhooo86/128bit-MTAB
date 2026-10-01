@@ -1,15 +1,17 @@
-# 128bit
+# 128bitPlay
 
-Comics, shows, movies, anime, live TV and audiobooks in one app, powered by **addons**, like Stremio/Nuvio for video and PageTurner for audiobooks. When a stream or book comes as a torrent or web link, 128bit sends it to your **TorBox** account and plays the finished files from there.
+Audiobooks, shows, movies, anime, live TV and comics in one app, powered by **addons**, like Stremio/Nuvio for video and PageTurner for audiobooks. When a stream or book comes as a torrent or web link, 128bit sends it to your **TorBox** account and plays the finished files from there.
+
+The bottom row is **Books · Shows · Movies · Anime · Live TV · Comics**; the app opens on Books.
 
 | Tab | What it does |
 |---|---|
-| **Comics** | Manga and comics from MangaDex: popular, latest, top rated, search, your library and Continue reading. Reader with scroll-down (manga/webtoon) or page-turn modes (right-to-left or left-to-right), data saver, read marks and next chapter. |
 | **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker (quality/size badges, filters). Subtitles, audio tracks, Next episode / auto-play. |
 | **Movies** | Same for movies. |
 | **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
+| **Comics** | **Browse**: MangaDex (or your Suwayomi sources), your library, Continue reading, On this phone. **Find**: search GetComics and The Pirate Bay (Comics) and tap **Get**. **Wanted**: where each comic is, new issues of series you follow. Reader with scroll-down or page-turn modes, data saver, read marks and next chapter. |
 | **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
 
 Streams appear addon by addon as each answers (a slow addon is skipped after 15 s; lists are kept 10 minutes). Filter by quality, and by provider (addons and the torrent sites they found, e.g. ThePirateBay, EZTV). In Continue watching, hold an item to remove it. Tap a stream to play it; **hold a stream to download** it to the phone (direct links download at once; torrents go to TorBox and download when ready). **Settings → Downloads** has Movies, TV (grouped by show) and Audiobooks, with progress, pause/resume, play and delete; a downloaded title shows **Play downloaded**. Live TV only streams.
@@ -111,7 +113,7 @@ Mihon/Tachiyomi extensions are Android plug-ins only Mihon-style apps can run, s
 
 1. Run Suwayomi and note its address (e.g. `http://192.168.1.20:4567`).
 2. **Settings → Comics → Suwayomi server**: address (+ username/password if set) → **Connect**.
-3. **Add Keiyoushi repo** (`https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json`) or any other repo URL.
+3. **Add Keiyoushi repo** (`https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json`) or any other repo URL. A GitHub repo page (e.g. `github.com/keiyoushi/extensions`) or a bare base address works too: it's turned into the repo's index the way TachiyomiJ2K does (index.min.json → repo.json → `index_v2` protobuf store).
 4. **Update repos** fetches the newest extension list from GitHub; install, update (**Update all**) or remove extensions.
 5. The **Comics** tab gets a source switcher: MangaDex plus every source from your extensions (popular, latest, search). Read progress syncs back to Suwayomi.
 
@@ -122,6 +124,25 @@ Mihon/Tachiyomi extensions are Android plug-ins only Mihon-style apps can run, s
 - **Settings → Downloads → Comics** lists and deletes them.
 
 Mihon extensions themselves only run inside Mihon-style apps, so for those sources Suwayomi is still needed.
+
+### Comics like audiobooks: GetComics and The Pirate Bay
+
+Comics tab → **Find**: one search covers GetComics and The Pirate Bay's Comics category. **CBZ releases come first**; CBR (RAR) can't be opened and is marked "CBR – can't open".
+
+- **Get**: GetComics comics download straight to the phone (the post's "Download Now" link); Pirate Bay torrents go to **TorBox** and, when ready, the CBZ files inside are downloaded (a pack becomes one series, each file a chapter). The comic lands under **On this phone** with its cover (GetComics cover art, or the closest GetComics match for torrents).
+- **Wanted** shows each comic's progress (In TorBox / Downloading / On this phone); hold to remove, Retry on failure. TorBox is checked every minute while the app is open.
+- **Follow** a series: GetComics and TPB are checked every 6 hours for issues after the one you have; they show under **New issues** (Get or dismiss), or turn on **Get new issues automatically**.
+- If a site moves, change its address in **Settings → Comics → Find comics**.
+
+### Listening with the screen off
+
+Audiobooks keep playing with the screen off, with the app in the background **and after you swipe the app away**: the player runs outside the app's screens and the lock-screen/notification controls keep it alive. The lock screen shows the book cover (or the 128bitPlay pixel art), title, author and **current chapter** ("Ch. 3 of 12"), with play/pause, back/forward 30 s and previous/next chapter. Videos still need the screen on.
+
+(The chapter buttons and 30 s skips are a small patch to expo-audio in `app/patches/`, applied by the build; `package.json` builds expo-audio from source so the patch is used.)
+
+### Anime: English first
+
+For anime (Anime tab, Kitsu/MAL ids), the player switches to an **English audio track** (dub) when the video has one and **always turns on English subtitles** when there are any (the video's own track, otherwise an English one from your subtitle addons). Streams that look like English dubs ("Dual Audio", "English Dub", 🇬🇧) are listed first and badged **EN dub**.
 
 ### App updates
 
@@ -136,14 +157,14 @@ Mihon extensions themselves only run inside Mihon-style apps, so for those sourc
 
 ### Optional: Simkl
 
-1. On simkl.com: **Settings → Developer → Create new app** (redirect URI `urn:ietf:wg:oauth:2.0:oob`).
-2. In the app: **Settings → Tracking → Simkl**, paste the **Client ID**, tap **Connect Simkl** and enter the code at simkl.com/pin.
+1. On simkl.com: **Settings → Developer → Create new app**, type **TV, devices & command line** (new "AUTH V2" apps). Older apps with redirect URI `urn:ietf:wg:oauth:2.0:oob` work too.
+2. In the app: **Settings → Tracking → Simkl**, paste the **Client ID**, tap **Connect Simkl**; simkl.com opens with the code filled in, approve it. New-style sign-ins are refreshed automatically.
 
 Movies, episodes and anime (IMDb and Kitsu ids) are scrobbled to Simkl, next to Trakt if you use both.
 
 ### Optional: Hardcover
 
-**Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress, and Read when you finish. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book.
+**Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress (every few minutes and whenever you pause), and Read when you finish. **Each time the app opens**, progress syncs both ways: if Hardcover is further along (you listened elsewhere) your place here moves up, and if this phone is further along Hardcover is updated. **Sync now** does it on demand. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book.
 
 ### Audiobook sources (Pageturner format)
 

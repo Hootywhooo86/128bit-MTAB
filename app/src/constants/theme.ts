@@ -70,6 +70,9 @@ export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
   };
 }
 
+/** The 128bit pixel font. Use small sizes (8–16): it's big for its point size. */
+export const PixelFont = 'PressStart2P_400Regular';
+
 export const Spacing = {
   one: 4,
   two: 8,

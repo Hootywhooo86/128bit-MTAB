@@ -24,6 +24,7 @@ import {
   checkTorboxStream,
   getSeriesContext,
   resolveStream,
+  isAnime,
   setNowWatching,
   type StreamResult,
 } from '@/lib/video';
@@ -60,6 +61,14 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   const [cached, setCached] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<{ id: string; name: string }[]>([]);
   const [provider, setProvider] = useState<string>('all');
+  const [anime, setAnime] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    isAnime({ type: link.type, id: link.id }).then((yes) => !cancelled && setAnime(yes));
+    return () => {
+      cancelled = true;
+    };
+  }, [link.type, link.id]);
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState<{
@@ -212,9 +221,10 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   // Keep each stream's original index for its key; optionally float TorBox-cached ones up.
   const ordered = (streams: Stream[], addonName: string) => {
     const list = streams.map((s, i) => ({ s, i })).filter(({ s }) => matches(s, addonName));
-    return prefs.cachedFirst
-      ? list.sort((a, b) => Number(isCached(b.s)) - Number(isCached(a.s)))
-      : list;
+    if (prefs.cachedFirst) list.sort((a, b) => Number(isCached(b.s)) - Number(isCached(a.s)));
+    // Anime: English dubs first.
+    if (anime) list.sort((a, b) => Number(parseStream(b.s).dub) - Number(parseStream(a.s).dub));
+    return list;
   };
   const total = groups.reduce((n, g) => n + g.streams.length, 0);
   const shown = groups.reduce((n, g) => n + ordered(g.streams, g.addon.manifest.name).length, 0);
@@ -340,6 +350,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                       {info.quality ? (
                         <Badge label={info.quality} strong={qualityRank(info.quality) >= 3} />
                       ) : null}
+                      {info.dub ? <Badge label="EN dub" strong /> : null}
                       {info.hdr.map((h) => (
                         <Badge key={h} label={h} />
                       ))}

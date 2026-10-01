@@ -167,6 +167,9 @@ function seriesName(fileName: string) {
   );
 }
 
+/** A comic archive to import: a picked file or one downloaded by the app. */
+type ArchiveFile = { name: string; bytes(): Promise<Uint8Array> };
+
 /**
  * Pick one or more .cbz files: they become one series in your library (each file
  * a chapter/volume, in name order), with pages stored in the app.
@@ -175,11 +178,19 @@ export async function importCbz(): Promise<LocalSeries | null> {
   if (!comicDownloadsSupported) throw new Error('Importing works in the phone app, not on the web.');
   const picked = await File.pickFileAsync({ multipleFiles: true, mimeTypes: ['*/*'] });
   if (picked.canceled) return null;
-  const files = [...picked.result].sort((a, b) => natural(a.name, b.name));
+  return importCbzFiles(picked.result);
+}
+
+/**
+ * Stores CBZ/ZIP archives as one series (each file a chapter/volume, in name order).
+ * `title` names the series (otherwise taken from the first file name).
+ */
+export async function importCbzFiles(input: ArchiveFile[], title?: string): Promise<LocalSeries> {
+  const files = [...input].sort((a, b) => natural(a.name, b.name));
+  if (!files.length) throw new Error('Nothing to import');
   const rar = files.find((f) => /\.cbr$/i.test(f.name));
   if (rar) throw new Error(`${rar.name} is a CBR (RAR) file; only CBZ/ZIP can be imported.`);
   const id = `local:${Date.now().toString(36)}`;
-  const title = seriesName(files[0].name);
   const chapters: LocalChapter[] = [];
   for (const [n, f] of files.entries()) {
     const entries = unzipSync(await f.bytes(), {
@@ -207,7 +218,22 @@ export async function importCbz(): Promise<LocalSeries | null> {
       bytes,
     });
   }
-  const series: LocalSeries = { comic: { id, title, cover: chapters[0].files[0] }, chapters };
+  const series: LocalSeries = {
+    comic: { id, title: title || seriesName(files[0].name), cover: chapters[0].files[0] },
+    chapters,
+  };
   await save([series, ...(await getComicDownloads())]);
   return series;
+}
+
+/** Downloads a cover picture into the series' folder and uses it (works offline). */
+export async function setSeriesCover(comicId: string, url: string) {
+  const dir = new Directory(Paths.document, 'comics', safe(comicId));
+  dir.create({ intermediates: true, idempotent: true });
+  const ext = url.split('?')[0].match(/\.(jpe?g|png|webp)$/i)?.[1] ?? 'jpg';
+  const file = new File(dir, `cover.${ext}`);
+  if (file.exists) file.delete();
+  const saved = await File.downloadFileAsync(url, file, { idempotent: true });
+  const list = await getComicDownloads();
+  await save(list.map((s) => (s.comic.id === comicId ? { ...s, comic: { ...s.comic, cover: saved.uri } } : s)));
 }

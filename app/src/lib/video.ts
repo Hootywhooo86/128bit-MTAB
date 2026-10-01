@@ -198,3 +198,35 @@ export async function saveWatchProgress(entry: Omit<WatchProgress, 'updatedAt'>)
   const next = finished ? rest : [{ ...entry, updatedAt: Date.now() }, ...rest].slice(0, MAX_ITEMS);
   await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(next));
 }
+
+// --- Anime (English audio + subtitles first) ---------------------------------------
+
+const ANIME_KEY = '128bit.animeIds';
+const ANIME_ID = /^(kitsu|mal|anilist|anidb|ani):/i;
+let animeIds: Set<string> | null = null;
+
+async function loadAnimeIds() {
+  if (!animeIds) {
+    try {
+      animeIds = new Set(JSON.parse((await AsyncStorage.getItem(ANIME_KEY)) ?? '[]') as string[]);
+    } catch {
+      animeIds = new Set();
+    }
+  }
+  return animeIds;
+}
+
+/** Remembers that a title came from the Anime tab (an anime catalog). */
+export async function markAnime(id: string) {
+  const ids = await loadAnimeIds();
+  if (ids.has(id)) return;
+  ids.add(id);
+  await AsyncStorage.setItem(ANIME_KEY, JSON.stringify([...ids].slice(-500)));
+}
+
+/** Anime: an anime type or id (Kitsu, MAL…), or opened from the Anime tab. */
+export async function isAnime(link?: { type: string; id: string }) {
+  if (!link) return false;
+  if (link.type === 'anime' || ANIME_ID.test(link.id)) return true;
+  return (await loadAnimeIds()).has(link.id);
+}

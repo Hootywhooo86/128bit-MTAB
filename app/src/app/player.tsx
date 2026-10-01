@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 
 import { HardcoverPill } from '@/components/hardcover-match';
-import { Body, Button, Cover, EmptyState, ProgressBar, Title, formatTime } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Body, Button, Cover, EmptyState, Title, formatTime } from '@/components/ui';
+import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getBookmarks, removeBookmark, type Bookmark } from '@/lib/bookmarks';
 import { usePlayer, type Sleep } from '@/lib/player';
 import { usePrefs } from '@/lib/prefs';
@@ -107,11 +107,20 @@ export default function PlayerScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Cover uri={book.cover} size={240} title={book.title} author={book.author} />
-      <View style={{ alignItems: 'center', gap: 4 }}>
-        <Title style={{ fontSize: 22, textAlign: 'center' }}>{book.title}</Title>
+      <View style={styles.coverFrame}>
+        <View style={styles.coverShadow} />
+        <View style={styles.coverInner}>
+          <Cover uri={book.cover} size={232} title={book.title} author={book.author} />
+        </View>
+      </View>
+      <View style={{ alignItems: 'center', gap: Spacing.two }}>
+        <Text style={styles.bookTitle}>{book.title}</Text>
         {book.author ? <Body muted>{book.author}</Body> : null}
-        <Body style={{ color: Colors.accent, textAlign: 'center' }}>{heading}</Body>
+        <View style={styles.chapterTag}>
+          <Text style={styles.chapterText} numberOfLines={2}>
+            ▶ {heading}
+          </Text>
+        </View>
       </View>
 
       <View style={{ alignSelf: 'stretch', gap: Spacing.one }}>
@@ -119,7 +128,7 @@ export default function PlayerScreen() {
           onPress={onSeek}
           onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width || 1)}
           style={{ paddingVertical: Spacing.two }}>
-          <ProgressBar value={segLen ? segPos / segLen : 0} />
+          <PixelBar value={segLen ? segPos / segLen : 0} />
         </Pressable>
         <View style={styles.times}>
           <Text style={styles.time}>{formatTime(segPos)}</Text>
@@ -286,6 +295,20 @@ export default function PlayerScreen() {
   );
 }
 
+/** A chunky, block-by-block progress bar. */
+function PixelBar({ value }: { value: number }) {
+  const styles = useStyles();
+  const blocks = 24;
+  const filled = Math.round(Math.min(1, Math.max(0, value)) * blocks);
+  return (
+    <View style={styles.pixelBar}>
+      {Array.from({ length: blocks }, (_, i) => (
+        <View key={i} style={[styles.pixelBlock, i < filled && styles.pixelBlockOn]} />
+      ))}
+    </View>
+  );
+}
+
 function IconButton({
   name,
   caption,
@@ -318,7 +341,22 @@ const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.four, gap: Spacing.four, alignItems: 'center' },
   times: { flexDirection: 'row', justifyContent: 'space-between' },
-  time: { color: Colors.textSecondary, fontSize: 12, fontVariant: ['tabular-nums'] },
+  time: { color: Colors.textSecondary, fontSize: 9, fontFamily: PixelFont },
+  coverFrame: { width: 244, height: 244 },
+  coverShadow: { position: 'absolute', left: 8, top: 8, width: 236, height: 236, backgroundColor: Colors.accent, opacity: 0.35 },
+  coverInner: { width: 236, height: 236, borderWidth: 2, borderColor: Colors.accent, backgroundColor: Colors.background },
+  bookTitle: { color: Colors.text, fontFamily: PixelFont, fontSize: 14, lineHeight: 22, textAlign: 'center' },
+  chapterTag: {
+    borderWidth: 2,
+    borderColor: Colors.accent,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    maxWidth: '100%',
+  },
+  chapterText: { color: Colors.accent, fontFamily: PixelFont, fontSize: 9, lineHeight: 15, textAlign: 'center' },
+  pixelBar: { flexDirection: 'row', gap: 2, height: 12 },
+  pixelBlock: { flex: 1, backgroundColor: Colors.surfaceRaised },
+  pixelBlockOn: { backgroundColor: Colors.accent },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -328,12 +366,15 @@ const useStyles = makeStyles((Colors) => ({
   playButton: {
     width: 76,
     height: 76,
-    borderRadius: 38,
+    borderRadius: 0,
+    borderWidth: 3,
+    borderColor: Colors.text,
+    boxShadow: `6px 6px 0px ${Colors.surfaceRaised}`,
     backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconLabel: { color: Colors.textSecondary, fontSize: 10 },
+  iconLabel: { color: Colors.textSecondary, fontSize: 8, fontFamily: PixelFont, marginTop: 4 },
   pills: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap', justifyContent: 'center' },
   pill: {
     flexDirection: 'row',
@@ -341,14 +382,16 @@ const useStyles = makeStyles((Colors) => ({
     gap: 6,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: Radius.lg,
+    borderRadius: 0,
+    borderWidth: 2,
+    borderColor: Colors.border,
     backgroundColor: Colors.surfaceRaised,
   },
-  pillText: { color: Colors.text, fontWeight: '700' },
+  pillText: { color: Colors.text, fontFamily: PixelFont, fontSize: 9 },
   tabs: { flexDirection: 'row', alignSelf: 'stretch' },
   tab: { flex: 1, alignItems: 'center', gap: Spacing.two },
-  tabText: { color: Colors.textSecondary, fontWeight: '700', fontSize: 15 },
-  tabLine: { height: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: Colors.border },
+  tabText: { color: Colors.textSecondary, fontFamily: PixelFont, fontSize: 10 },
+  tabLine: { height: 4, alignSelf: 'stretch', backgroundColor: Colors.border },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -357,7 +400,7 @@ const useStyles = makeStyles((Colors) => ({
     borderBottomWidth: 1,
     borderColor: Colors.border,
   },
-  listNum: { color: Colors.textSecondary, width: 28, fontVariant: ['tabular-nums'] },
+  listNum: { color: Colors.textSecondary, width: 32, fontFamily: PixelFont, fontSize: 9 },
   listTitle: { color: Colors.text, flex: 1, fontSize: 15 },
   note: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
   modalBackdrop: {

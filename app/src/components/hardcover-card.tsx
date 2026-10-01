@@ -8,6 +8,7 @@ import {
   getHardcoverToken,
   hardcoverMe,
   lastHardcoverSync,
+  syncHardcover,
   setHardcoverToken,
 } from '@/lib/hardcover';
 
@@ -59,14 +60,26 @@ export function HardcoverCard() {
         <Text style={{ color: Colors.success }}>Connected{user ? ` as ${user}` : ''}</Text>
         <Text style={styles.body}>
           Books you listen to are marked Currently Reading on Hardcover, with your listening
-          progress, and Read when you finish. If it picks the wrong book, tap Hardcover in the
-          player to choose the right one.
+          progress, and Read when you finish. Each time you open the app, progress is synced
+          both ways (whichever is further along wins), so listening elsewhere carries over. If it
+          picks the wrong book, tap Hardcover in the player to choose the right one.
         </Text>
         {sync ? (
           <Text style={{ color: sync.ok ? Colors.textSecondary : Colors.danger }}>
             Last sync: {sync.message}
           </Text>
         ) : null}
+        <Button
+          label="Sync now"
+          variant="secondary"
+          loading={busy}
+          onPress={async () => {
+            setBusy(true);
+            await syncHardcover().catch(() => {});
+            setSync(lastHardcoverSync());
+            setBusy(false);
+          }}
+        />
         <Button
           label="Disconnect"
           variant="danger"

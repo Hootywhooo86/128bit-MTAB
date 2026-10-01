@@ -1,18 +1,31 @@
 /**
- * One app-wide audiobook player, so playback keeps going while you browse.
+ * One app-wide audiobook player, so playback keeps going while you browse — and
+ * when you close the app.
+ *
+ * Android tears the app's screens down when you swipe it away, so the player and
+ * everything that keeps a book going (next chapter, saving your place, the sleep
+ * timer, the lock-screen buttons) live here at module level, outside any screen.
+ * The lock-screen controls keep the app alive; reopening it picks the same player
+ * back up. React only reads this state (PlayerProvider / usePlayer).
  *
  * A book is a list of files ("chapters"). A single file can also hold its own
  * chapter markers (an .m4b); those are found in the background the first time
  * the file plays, and next/previous then jump between them.
  */
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  useAudioPlayerStatus,
+  type AudioMetadata,
+  type AudioPlayer,
+  type AudioStatus,
+} from 'expo-audio';
+import { Asset } from 'expo-asset';
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
 
@@ -35,6 +48,331 @@ const MP4_AUDIO = /^(m4b|m4a|mp4|aac)$/i;
 export type Sleep = { kind: 'minutes'; at: number; minutes: number } | { kind: 'chapter' } | null;
 
 export type Mark = { title: string; start: number; index: number };
+
+/** Pixel-art artwork for the lock screen when a book has no cover. */
+let fallbackArt: string | undefined;
+Asset.fromModule(require('../../assets/images/pixel-cover.png'))
+  .downloadAsync()
+  .then((a) => {
+    fallbackArt = a.localUri ?? a.uri;
+  })
+  .catch(() => {});
+
+/** What the lock screen / notification shows: the chapter, book, author and cover. */
+function lockScreenInfo(book: PlayableBook, chapterIndex: number, mark: Mark | null): AudioMetadata {
+  const chapter = book.chapters[chapterIndex];
+  const marks = chapter?.marks;
+  const count = marks?.length ? marks.length : book.chapters.length;
+  const n = marks?.length && mark ? mark.index + 1 : chapterIndex + 1;
+  const name = mark?.title ?? chapter?.title ?? `Chapter ${n}`;
+  return {
+    title: name,
+    artist: [book.author, `Ch. ${n} of ${count}`].filter(Boolean).join(' · '),
+    albumTitle: book.title,
+    artworkUrl: book.cover ?? fallbackArt,
+  };
+}
+
+function currentMark(chapter: Chapter | undefined, position: number): Mark | null {
+  const marks = chapter?.marks;
+  if (!marks?.length) return null;
+  let index = 0;
+  for (let i = 0; i < marks.length; i++) if (marks[i].start <= position + 0.25) index = i;
+  return { ...marks[index], index };
+}
+
+function looksLikeMp4(chapter: Chapter) {
+  if (chapter.ext) return MP4_AUDIO.test(chapter.ext);
+  if (chapter.ref.type === 'url') return /\.(m4b|m4a|mp4)(\?|$)/i.test(chapter.ref.url);
+  return false;
+}
+
+// --- The engine (module level: survives the app's screens closing) --------------
+
+type EngineState = {
+  book: PlayableBook | null;
+  chapterIndex: number;
+  loading: boolean;
+  error: string | null;
+  rate: number;
+  sleep: Sleep;
+};
+
+let state: EngineState = {
+  book: null,
+  chapterIndex: 0,
+  loading: false,
+  error: null,
+  rate: 1,
+  sleep: null,
+};
+const listeners = new Set<() => void>();
+
+function update(patch: Partial<EngineState>) {
+  state = { ...state, ...patch };
+  listeners.forEach((l) => l());
+}
+
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+};
+const snapshot = () => state;
+
+/** Settings the engine needs, copied in from preferences by PlayerProvider. */
+const options = { autoNextChapter: true, rateSet: false };
+
+let pendingSeek: number | null = null;
+let lastSave = 0;
+let finished = false;
+let lastTick = 0;
+let listenedSeconds = 0;
+let lastLockKey = '';
+let sleepMark: number | null = null;
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
+
+let audio: AudioPlayer | null = null;
+
+function getAudio(): AudioPlayer {
+  if (audio) return audio;
+  audio = createAudioPlayer(null, { updateInterval: 500 });
+  setAudioModeAsync({
+    playsInSilentMode: true,
+    shouldPlayInBackground: true,
+    interruptionMode: 'doNotMix',
+  }).catch(() => {});
+  audio.addListener('playbackStatusUpdate', onStatus);
+  // Previous / next chapter buttons on the lock screen and notification.
+  type Remote = { addListener(e: 'remoteChapter', fn: (dir: string) => void): { remove(): void } };
+  (audio as unknown as Remote).addListener('remoteChapter', (dir) =>
+    dir === 'next' ? next() : previous(),
+  );
+  return audio;
+}
+
+/** Everything that has to keep happening while a book plays, screen or no screen. */
+function onStatus(s: AudioStatus) {
+  const p = getAudio();
+  const { book, chapterIndex } = state;
+  // Resume where we left off once the new chapter has loaded.
+  if (s.isLoaded && pendingSeek !== null) {
+    const to = pendingSeek;
+    pendingSeek = null;
+    p.seekTo(to);
+  }
+  if (!book) return;
+  if (s.didJustFinish) {
+    onFinish();
+    return;
+  }
+  const chapter = book.chapters[chapterIndex];
+  const mark = currentMark(chapter, s.currentTime);
+
+  // Keep the lock screen on the current chapter (in-file chapters included).
+  const lockKey = `${book.key}|${chapterIndex}|${mark?.index ?? -1}|${book.cover ?? ''}`;
+  if (lockKey !== lastLockKey) {
+    lastLockKey = lockKey;
+    p.updateLockScreenMetadata(lockScreenInfo(book, chapterIndex, mark));
+  }
+
+  // Sleep at the end of an in-file chapter: pause as soon as the next marker starts.
+  if (state.sleep?.kind === 'chapter' && mark) {
+    if (sleepMark === null) sleepMark = mark.index;
+    else if (mark.index !== sleepMark) {
+      p.pause();
+      setSleep(null);
+    }
+  }
+
+  // Save progress regularly while playing, and when paused.
+  const now = Date.now();
+  if (s.isLoaded && !finished && (!s.playing || now - lastSave > SAVE_EVERY_MS)) {
+    lastSave = now;
+    const fraction = bookFraction(book, chapterIndex, s.currentTime, s.duration);
+    saveProgress(book.key, {
+      chapter: chapterIndex,
+      position: s.currentTime,
+      fraction,
+      finished: false,
+    });
+    if (isAbsBook(book)) absReportProgress(book, chapterIndex, s.currentTime, false);
+    // Every few minutes while listening, and right away when you pause.
+    hardcoverProgress(book, fraction, false, !s.playing);
+  }
+
+  // Statistics: listening time, counted while playing.
+  if (s.playing) {
+    if (lastTick) listenedSeconds += Math.min(5, (now - lastTick) / 1000);
+    lastTick = now;
+    if (listenedSeconds >= 10) {
+      addListening(book, Math.round(listenedSeconds));
+      listenedSeconds = 0;
+    }
+  } else {
+    lastTick = 0;
+  }
+}
+
+/** A file ended: stop for the sleep timer, go to the next one, or finish the book. */
+function onFinish() {
+  const { book, chapterIndex } = state;
+  if (!book) return;
+  if (state.sleep?.kind === 'chapter') {
+    setSleep(null);
+    return;
+  }
+  if (chapterIndex + 1 < book.chapters.length) {
+    if (options.autoNextChapter) loadChapter(book, chapterIndex + 1);
+    return;
+  }
+  finished = true;
+  saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
+  if (isAbsBook(book)) absReportProgress(book, chapterIndex, getAudio().duration, true);
+  hardcoverProgress(book, 1, true);
+  markBookFinished(book);
+}
+
+/** Looks for chapter markers inside an .m4b-style file once, and remembers them. */
+async function detectMarks(target: PlayableBook, index: number, uri: string) {
+  const chapter = target.chapters[index];
+  if (!chapter || chapter.marksChecked || !looksLikeMp4(chapter)) return;
+  let marks: Chapter['marks'] = [];
+  try {
+    const reader = localChapterUri(target.key, chapter)
+      ? localRangeReader(target.key, chapter)
+      : httpRangeReader(uri);
+    marks = await readMp4Chapters(reader);
+  } catch {
+    // No markers (or the server can't do ranges): carry on without them.
+  }
+  const updated: PlayableBook = {
+    ...target,
+    chapters: target.chapters.map((c, i) =>
+      i === index ? { ...c, marks: marks.length > 1 ? marks : undefined, marksChecked: true } : c,
+    ),
+  };
+  if (state.book?.key === updated.key) update({ book: updated });
+  addToLibrary(updated);
+  updateDownloadedBook(updated);
+}
+
+async function loadChapter(target: PlayableBook, index: number, startAt = 0) {
+  const chapter = target.chapters[index];
+  if (!chapter) return;
+  const p = getAudio();
+  update({ loading: true, error: null, chapterIndex: index });
+  try {
+    const uri = await chapterUrl(target.key, chapter);
+    pendingSeek = startAt > 0 ? startAt : null;
+    p.replace({ uri });
+    p.setPlaybackRate(state.rate);
+    p.play();
+    lastLockKey = '';
+    p.setActiveForLockScreen(true, lockScreenInfo(target, index, null), {
+      showSeekForward: true,
+      showSeekBackward: true,
+    });
+    finished = false;
+    saveProgress(target.key, {
+      chapter: index,
+      position: startAt,
+      fraction: bookFraction(target, index, startAt, 0),
+      finished: false,
+    });
+    detectMarks(target, index, uri);
+  } catch (e) {
+    update({ error: e instanceof Error ? e.message : String(e) });
+  } finally {
+    update({ loading: false });
+  }
+}
+
+async function playBook(nextBook: PlayableBook, chapter?: number) {
+  // No cover (e.g. a TorBox download)? Find one, for the app and the lock screen.
+  if (!nextBook.cover) {
+    const cover = await Promise.race([
+      findCover(nextBook.title, nextBook.author),
+      new Promise<undefined>((r) => setTimeout(r, 3000)),
+    ]);
+    if (cover) nextBook = { ...nextBook, cover };
+  }
+  update({ book: nextBook });
+  addToLibrary(nextBook);
+  if (chapter !== undefined) return loadChapter(nextBook, chapter);
+  const saved = await getProgress(nextBook.key);
+  let index = saved && saved.chapter < nextBook.chapters.length ? saved.chapter : 0;
+  let position = saved?.position ?? 0;
+  // Audiobookshelf keeps its own position (e.g. from its web player); use it if newer.
+  if (isAbsBook(nextBook)) {
+    const remote = await absResumePoint(nextBook).catch(() => null);
+    if (remote && (!saved || remote.updatedAt > saved.updatedAt)) {
+      index = remote.chapter;
+      position = remote.position;
+    }
+  }
+  return loadChapter(nextBook, index, position);
+}
+
+async function jumpTo(index: number, position: number) {
+  const { book, chapterIndex } = state;
+  if (!book) return;
+  const p = getAudio();
+  if (index === chapterIndex && p.isLoaded) {
+    p.seekTo(position);
+    if (!p.playing) p.play();
+  } else {
+    await loadChapter(book, index, position);
+  }
+}
+
+function next() {
+  const { book, chapterIndex } = state;
+  if (!book) return;
+  const p = getAudio();
+  const marks = book.chapters[chapterIndex]?.marks ?? [];
+  const mark = currentMark(book.chapters[chapterIndex], p.currentTime);
+  if (mark && mark.index + 1 < marks.length) p.seekTo(marks[mark.index + 1].start);
+  else if (chapterIndex + 1 < book.chapters.length) loadChapter(book, chapterIndex + 1);
+}
+
+// Like a CD player: restart the current chapter, or go back one if you're at its start.
+function previous() {
+  const { book, chapterIndex } = state;
+  if (!book) return;
+  const p = getAudio();
+  const marks = book.chapters[chapterIndex]?.marks ?? [];
+  const mark = currentMark(book.chapters[chapterIndex], p.currentTime);
+  const chapterStart = mark?.start ?? 0;
+  if (p.currentTime - chapterStart > RESTART_THRESHOLD_S) p.seekTo(chapterStart);
+  else if (mark && mark.index > 0) p.seekTo(marks[mark.index - 1].start);
+  else if (chapterIndex > 0) loadChapter(book, chapterIndex - 1);
+  else p.seekTo(0);
+}
+
+function setSleep(sleep: Sleep) {
+  if (sleepTimer) clearTimeout(sleepTimer);
+  sleepTimer = null;
+  sleepMark = null;
+  if (sleep?.kind === 'minutes') {
+    sleepTimer = setTimeout(
+      () => {
+        getAudio().pause();
+        setSleep(null);
+      },
+      Math.max(0, sleep.at - Date.now()),
+    );
+  }
+  update({ sleep });
+}
+
+function setRate(rate: number) {
+  update({ rate });
+  getAudio().setPlaybackRate(rate);
+}
+
+// --- React ----------------------------------------------------------------------
 
 type PlayerContextValue = {
   book: PlayableBook | null;
@@ -71,319 +409,60 @@ export function usePlayer() {
   return ctx;
 }
 
-function currentMark(chapter: Chapter | undefined, position: number): Mark | null {
-  const marks = chapter?.marks;
-  if (!marks?.length) return null;
-  let index = 0;
-  for (let i = 0; i < marks.length; i++) if (marks[i].start <= position + 0.25) index = i;
-  return { ...marks[index], index };
-}
-
-function looksLikeMp4(chapter: Chapter) {
-  if (chapter.ext) return MP4_AUDIO.test(chapter.ext);
-  if (chapter.ref.type === 'url') return /\.(m4b|m4a|mp4)(\?|$)/i.test(chapter.ref.url);
-  return false;
-}
-
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const player = useAudioPlayer(null, { updateInterval: 500 });
+  const player = getAudio();
   const status = useAudioPlayerStatus(player);
-
-  const [book, setBook] = useState<PlayableBook | null>(null);
-  const [chapterIndex, setChapterIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const engine = useSyncExternalStore(subscribe, snapshot, snapshot);
   const { prefs } = usePrefs();
-  const [rate, setRateState] = useState(prefs.defaultRate);
-  const [sleep, setSleep] = useState<Sleep>(null);
 
-  const pendingSeek = useRef<number | null>(null);
-  const lastSave = useRef(0);
-  const finished = useRef(false);
-
+  // Preferences the engine uses while no screen is open.
   useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: 'doNotMix',
-    }).catch(() => {});
-  }, []);
-
-  /** Looks for chapter markers inside an .m4b-style file once, and remembers them. */
-  const detectMarks = useCallback(async (target: PlayableBook, index: number, uri: string) => {
-    const chapter = target.chapters[index];
-    if (!chapter || chapter.marksChecked || !looksLikeMp4(chapter)) return;
-    let marks: Chapter['marks'] = [];
-    try {
-      const reader = localChapterUri(target.key, chapter)
-        ? localRangeReader(target.key, chapter)
-        : httpRangeReader(uri);
-      marks = await readMp4Chapters(reader);
-    } catch {
-      // No markers (or the server can't do ranges): carry on without them.
+    options.autoNextChapter = prefs.autoNextChapter;
+    if (!options.rateSet) {
+      options.rateSet = true;
+      if (!state.book) update({ rate: prefs.defaultRate });
     }
-    const updated: PlayableBook = {
-      ...target,
-      chapters: target.chapters.map((c, i) =>
-        i === index ? { ...c, marks: marks.length > 1 ? marks : undefined, marksChecked: true } : c,
-      ),
-    };
-    setBook((current) => (current?.key === updated.key ? updated : current));
-    addToLibrary(updated);
-    updateDownloadedBook(updated);
-  }, []);
+  }, [prefs.autoNextChapter, prefs.defaultRate]);
 
-  const loadChapter = useCallback(
-    async (target: PlayableBook, index: number, startAt = 0) => {
-      const chapter = target.chapters[index];
-      if (!chapter) return;
-      setLoading(true);
-      setError(null);
-      setChapterIndex(index);
-      try {
-        const uri = await chapterUrl(target.key, chapter);
-        pendingSeek.current = startAt > 0 ? startAt : null;
-        player.replace({ uri });
-        player.setPlaybackRate(rate);
-        player.play();
-        player.setActiveForLockScreen(
-          true,
-          {
-            title: chapter.title,
-            artist: target.author,
-            albumTitle: target.title,
-            artworkUrl: target.cover,
-          },
-          { showSeekForward: true, showSeekBackward: true },
-        );
-        finished.current = false;
-        saveProgress(target.key, {
-          chapter: index,
-          position: startAt,
-          fraction: bookFraction(target, index, startAt, 0),
-          finished: false,
-        });
-        detectMarks(target, index, uri);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [player, rate, detectMarks],
-  );
-
-  const playBook = useCallback(
-    async (next: PlayableBook, chapter?: number) => {
-      // No cover (e.g. a TorBox download)? Find one, for the app and the lock screen.
-      if (!next.cover) {
-        const cover = await Promise.race([
-          findCover(next.title, next.author),
-          new Promise<undefined>((r) => setTimeout(r, 3000)),
-        ]);
-        if (cover) next = { ...next, cover };
-      }
-      setBook(next);
-      addToLibrary(next);
-      if (chapter !== undefined) return loadChapter(next, chapter);
-      const saved = await getProgress(next.key);
-      let index = saved && saved.chapter < next.chapters.length ? saved.chapter : 0;
-      let position = saved?.position ?? 0;
-      // Audiobookshelf keeps its own position (e.g. from its web player); use it if newer.
-      if (isAbsBook(next)) {
-        const remote = await absResumePoint(next).catch(() => null);
-        if (remote && (!saved || remote.updatedAt > saved.updatedAt)) {
-          index = remote.chapter;
-          position = remote.position;
-        }
-      }
-      return loadChapter(next, index, position);
-    },
-    [loadChapter],
-  );
-
-  const playChapter = useCallback(
-    async (index: number) => {
-      if (book) await loadChapter(book, index);
-    },
-    [book, loadChapter],
-  );
-
-  const jumpTo = useCallback(
-    async (index: number, position: number) => {
-      if (!book) return;
-      if (index === chapterIndex && status.isLoaded) {
-        player.seekTo(position);
-        if (!status.playing) player.play();
-      } else {
-        await loadChapter(book, index, position);
-      }
-    },
-    [book, chapterIndex, loadChapter, player, status.isLoaded, status.playing],
-  );
-
-  // Resume where we left off once the new chapter has loaded.
-  useEffect(() => {
-    if (status.isLoaded && pendingSeek.current !== null) {
-      const to = pendingSeek.current;
-      pendingSeek.current = null;
-      player.seekTo(to);
-    }
-  }, [status.isLoaded, player]);
-
+  const { book, chapterIndex } = engine;
   const chapter = book?.chapters[chapterIndex];
   const mark = currentMark(chapter, status.currentTime);
-
-  // Keep the lock screen title on the in-file chapter.
-  const markTitle = mark?.title;
-  useEffect(() => {
-    if (!book || !markTitle) return;
-    player.updateLockScreenMetadata({
-      title: markTitle,
-      artist: book.author,
-      albumTitle: book.title,
-      artworkUrl: book.cover,
-    });
-  }, [markTitle, book, player]);
-
-  // Sleep at the end of an in-file chapter: pause as soon as the next marker starts.
-  const markIndex = mark?.index;
-  const sleepMarkRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (sleep?.kind !== 'chapter') {
-      sleepMarkRef.current = null;
-      return;
-    }
-    if (markIndex === undefined) return;
-    if (sleepMarkRef.current === null) sleepMarkRef.current = markIndex;
-    else if (markIndex !== sleepMarkRef.current) {
-      player.pause();
-      setSleep(null);
-    }
-  }, [sleep, markIndex, player]);
-
-  // A file ended: stop for the sleep timer, go to the next one, or finish the book.
-  const onFinish = useRef(() => {});
-  useEffect(() => {
-    onFinish.current = () => {
-      if (!book) return;
-      if (sleep?.kind === 'chapter') {
-        setSleep(null);
-        return;
-      }
-      if (chapterIndex + 1 < book.chapters.length) {
-        if (!prefs.autoNextChapter) return;
-        loadChapter(book, chapterIndex + 1);
-      } else {
-        finished.current = true;
-        saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
-        if (isAbsBook(book)) absReportProgress(book, chapterIndex, status.duration, true);
-        hardcoverProgress(book, 1, true);
-        markBookFinished(book);
-      }
-    };
-  }, [book, chapterIndex, loadChapter, prefs.autoNextChapter, sleep, status.duration]);
-
-  useEffect(() => {
-    const sub = player.addListener('playbackStatusUpdate', (s) => {
-      if (s.didJustFinish) onFinish.current();
-    });
-    return () => sub.remove();
-  }, [player]);
-
-  // Save progress regularly while playing.
-  useEffect(() => {
-    if (!book || !status.isLoaded || finished.current) return;
-    const now = Date.now();
-    if (!status.playing || now - lastSave.current > SAVE_EVERY_MS) {
-      lastSave.current = now;
-      const fraction = bookFraction(book, chapterIndex, status.currentTime, status.duration);
-      saveProgress(book.key, {
-        chapter: chapterIndex,
-        position: status.currentTime,
-        fraction,
-        finished: false,
-      });
-      if (isAbsBook(book)) absReportProgress(book, chapterIndex, status.currentTime, false);
-      hardcoverProgress(book, fraction, false);
-    }
-  }, [book, chapterIndex, status.currentTime, status.duration, status.playing, status.isLoaded]);
-
-  // Statistics: listening time, counted while playing.
-  const playing = status.playing;
-  useEffect(() => {
-    if (!book || !playing) return;
-    const tick = setInterval(() => addListening(book, 10), 10_000);
-    return () => clearInterval(tick);
-  }, [book, playing]);
-
-  // Sleep after N minutes.
-  useEffect(() => {
-    if (sleep?.kind !== 'minutes') return;
-    const id = setTimeout(
-      () => {
-        player.pause();
-        setSleep(null);
-      },
-      Math.max(0, sleep.at - Date.now()),
-    );
-    return () => clearTimeout(id);
-  }, [sleep, player]);
-
   const marks = chapter?.marks ?? [];
   const hasNext =
     !!book &&
     ((!!mark && mark.index + 1 < marks.length) || chapterIndex + 1 < book.chapters.length);
-  const hasPrevious = !!book;
-
-  const next = () => {
-    if (!book) return;
-    if (mark && mark.index + 1 < marks.length) player.seekTo(marks[mark.index + 1].start);
-    else if (chapterIndex + 1 < book.chapters.length) loadChapter(book, chapterIndex + 1);
-  };
-
-  // Like a CD player: restart the current chapter, or go back one if you're at its start.
-  const previous = () => {
-    if (!book) return;
-    const chapterStart = mark?.start ?? 0;
-    if (status.currentTime - chapterStart > RESTART_THRESHOLD_S) player.seekTo(chapterStart);
-    else if (mark && mark.index > 0) player.seekTo(marks[mark.index - 1].start);
-    else if (chapterIndex > 0) loadChapter(book, chapterIndex - 1);
-    else player.seekTo(0);
-  };
 
   const value: PlayerContextValue = {
     book,
     chapterIndex,
     mark,
     playing: status.playing,
-    loading: loading || (status.isBuffering && !status.playing),
-    error: error ?? status.error ?? null,
+    loading: engine.loading || (status.isBuffering && !status.playing),
+    error: engine.error ?? status.error ?? null,
     position: status.currentTime,
     duration: status.duration,
-    rate,
-    sleep,
+    rate: engine.rate,
+    sleep: engine.sleep,
     playBook,
-    playChapter,
+    playChapter: async (index: number) => {
+      if (state.book) await loadChapter(state.book, index);
+    },
     jumpTo,
     next,
     previous,
     hasNext,
-    hasPrevious,
-    toggle: () => (status.playing ? player.pause() : player.play()),
+    hasPrevious: !!book,
+    toggle: () => (player.playing ? player.pause() : player.play()),
     seekTo: (s) => player.seekTo(Math.max(0, s)),
     seekBy: (s) =>
-      player.seekTo(Math.min(Math.max(0, status.currentTime + s), status.duration || Infinity)),
-    setRate: (r) => {
-      setRateState(r);
-      player.setPlaybackRate(r);
-    },
+      player.seekTo(Math.min(Math.max(0, player.currentTime + s), player.duration || Infinity)),
+    setRate,
     setSleep,
     addBookmark: async (note?: string) => {
       if (!book) return;
       await storeBookmark(book.key, {
         chapter: chapterIndex,
-        position: status.currentTime,
+        position: player.currentTime,
         label: mark?.title ?? chapter?.title ?? `Chapter ${chapterIndex + 1}`,
         note: note?.trim() || undefined,
       });

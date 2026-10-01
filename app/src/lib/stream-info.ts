@@ -13,7 +13,12 @@ export type StreamInfo = {
   hdr: string[];
   sizeBytes: number | null;
   seeders: number | null;
+  /** English audio: "Dual Audio", "English Dub", 🇬🇧/🇺🇸 audio flags… */
+  dub: boolean;
 };
+
+const DUB =
+  /dual[\s._-]?audio|multi[\s._-]?audio|\beng(lish)?[\s._-]?dub(bed)?\b|\bdub(bed)?\b|\[eng?\+jpn?\]|\bjpn?[\s._+-]eng?\b|\beng?[\s._+-]jpn?\b|🇬🇧|🇺🇸/i;
 
 const QUALITY_RANK: Record<Quality, number> = { '4K': 4, '1080p': 3, '720p': 2, SD: 1 };
 
@@ -48,5 +53,12 @@ export function parseStream(s: Stream): StreamInfo {
   const seeds = text.match(/👤\s*(\d+)/) ?? text.match(/\bseed(?:ers|s)?:?\s*(\d+)/i);
   // The site a torrent came from: Torrentio "⚙️ ThePirateBay", MediaFusion "🔗 1337x", Comet "🔎 …".
   const site = text.match(/(?:⚙️|⚙|🔗|🔎|🌐)\s*([A-Za-z0-9][\w .+-]{1,30}?)(?=\s*(?:$|\n|👤|💾|📦|⚙|🔗|🇬|\||…|\.\.\.))/m)?.[1]?.trim();
-  return { quality, hdr, sizeBytes, seeders: seeds ? Number(seeds[1]) : null, site: site || null };
+  return {
+    quality,
+    hdr,
+    sizeBytes,
+    seeders: seeds ? Number(seeds[1]) : null,
+    site: site || null,
+    dub: DUB.test(text),
+  };
 }

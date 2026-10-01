@@ -7,7 +7,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { secureGet, secureSet } from './storage';
+import { getLibrary, getProgressMany, saveProgress, secureGet, secureSet } from './storage';
 import type { PlayableBook } from './types';
 
 const API = 'https://api.hardcover.app/v1/graphql';
@@ -198,8 +198,15 @@ export const lastHardcoverSync = () => lastResult;
  * Updates Hardcover with how far through `book` you are (0..1). Throttled, safe to
  * call often; does nothing when Hardcover isn't connected.
  */
-export async function hardcoverProgress(book: PlayableBook, fraction: number, finished: boolean) {
-  if (!finished && Date.now() - (lastSync.get(book.key) ?? 0) < SYNC_EVERY_MS) return;
+export async function hardcoverProgress(
+  book: PlayableBook,
+  fraction: number,
+  finished: boolean,
+  /** Sync sooner than every 5 minutes (e.g. when you pause): at most every 30 s. */
+  now = false,
+) {
+  const since = Date.now() - (lastSync.get(book.key) ?? 0);
+  if (!finished && since < (now ? 30_000 : SYNC_EVERY_MS)) return;
   if (!(await getHardcoverToken())) return;
   lastSync.set(book.key, Date.now());
   try {
@@ -229,6 +236,109 @@ export async function hardcoverProgress(book: PlayableBook, fraction: number, fi
     };
   } catch (e) {
     lastResult = { at: Date.now(), ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// --- Two-way sync when the app opens -----------------------------------------
+
+type RemoteRead = {
+  book_id: number;
+  status_id: number;
+  user_book_reads: { progress_seconds?: number | null; finished_at?: string | null }[];
+};
+
+/** Where `seconds` into the book lands: chapter and position (when chapter lengths are known). */
+function placeAt(book: PlayableBook, fraction: number) {
+  if (book.chapters.every((c) => c.seconds)) {
+    let left = fraction * book.chapters.reduce((s, c) => s + c.seconds!, 0);
+    for (let i = 0; i < book.chapters.length; i++) {
+      if (left < book.chapters[i].seconds! || i === book.chapters.length - 1) {
+        return { chapter: i, position: Math.max(0, left) };
+      }
+      left -= book.chapters[i].seconds!;
+    }
+  }
+  // Lengths unknown: start of the chapter that point falls in.
+  const weights = book.chapters.every((c) => c.size)
+    ? book.chapters.map((c) => c.size!)
+    : book.chapters.map(() => 1);
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  let acc = 0;
+  for (let i = 0; i < weights.length; i++) {
+    if ((acc + weights[i]) / total > fraction) return { chapter: i, position: 0 };
+    acc += weights[i];
+  }
+  return { chapter: Math.max(0, book.chapters.length - 1), position: 0 };
+}
+
+let syncing = false;
+
+/**
+ * Every time the app opens: compares your audiobooks with Hardcover. If Hardcover is
+ * further along (you listened elsewhere), your place here moves up to it; if this phone
+ * is further along (or finished), Hardcover is updated. Furthest wins, both ways.
+ */
+export async function syncHardcover(): Promise<string | null> {
+  if (syncing || !(await getHardcoverToken())) return null;
+  syncing = true;
+  try {
+    const library = (await getLibrary()).slice(0, 40);
+    const local = await getProgressMany(library.map((b) => b.key));
+    // Books you've started; match the ones not matched yet (a few per launch).
+    const started = library.filter((b) => local[b.key] && (local[b.key].fraction > 0 || local[b.key].finished));
+    const matches = new Map<string, HardcoverBook>();
+    let newMatches = 0;
+    for (const b of started) {
+      const saved = await getMatch(b.key);
+      if (saved) matches.set(b.key, saved);
+      else if (saved === undefined && newMatches < 5) {
+        newMatches++;
+        const m = await matchFor(b).catch(() => null);
+        if (m) matches.set(b.key, m);
+      }
+    }
+    if (!matches.size) return null;
+    const ids = [...new Set([...matches.values()].map((m) => m.id))];
+    const data = await gql<{ me: { user_books: RemoteRead[] }[] | { user_books: RemoteRead[] } }>(
+      `query Sync($ids: [Int!]!) { me { user_books(where: { book_id: { _in: $ids } }) {
+        book_id status_id
+        user_book_reads(order_by: { id: desc }, limit: 1) { progress_seconds finished_at }
+      } } }`,
+      { ids },
+    );
+    const me = Array.isArray(data.me) ? data.me[0] : data.me;
+    const remote = new Map((me?.user_books ?? []).map((u) => [u.book_id, u]));
+    let pulled = 0;
+    let pushed = 0;
+    for (const b of started) {
+      const m = matches.get(b.key);
+      if (!m) continue;
+      const mine = local[b.key];
+      const r = remote.get(m.id);
+      const total = totalSeconds(b, m);
+      const read = r?.user_book_reads[0];
+      const theirsDone = r?.status_id === STATUS.read || !!read?.finished_at;
+      const theirs = theirsDone ? 1 : total && read?.progress_seconds ? read.progress_seconds / total : 0;
+      if (theirsDone && !mine.finished) {
+        await saveProgress(b.key, { chapter: 0, position: 0, fraction: 1, finished: true });
+        pulled++;
+      } else if (!mine.finished && theirs > mine.fraction + 0.005) {
+        const at = placeAt(b, theirs);
+        await saveProgress(b.key, { ...at, fraction: theirs, finished: false });
+        pulled++;
+      } else if ((mine.finished && !theirsDone) || mine.fraction > theirs + 0.005) {
+        await hardcoverProgress(b, mine.finished ? 1 : mine.fraction, mine.finished, true);
+        pushed++;
+      }
+    }
+    const message = `Synced ${matches.size} book${matches.size === 1 ? '' : 's'}: ${pulled} updated from Hardcover, ${pushed} sent to Hardcover`;
+    lastResult = { at: Date.now(), ok: true, message };
+    return message;
+  } catch (e) {
+    lastResult = { at: Date.now(), ok: false, message: e instanceof Error ? e.message : String(e) };
+    return null;
+  } finally {
+    syncing = false;
   }
 }
 

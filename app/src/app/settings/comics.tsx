@@ -6,6 +6,7 @@ import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
 import { ChoiceRow, Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { getComicSites, setComicSites } from '@/lib/comic-grab';
 import { comicImage } from '@/lib/comics';
 import { usePrefs } from '@/lib/prefs';
 import {
@@ -26,6 +27,44 @@ import {
 
 type Filter = 'installed' | 'available' | 'updates';
 const SHOW_MAX = 80;
+
+/** The sites behind Comics → Find; change them if one moves to a new address. */
+function SitesCard() {
+  const styles = useStyles();
+  const Colors = useColors();
+  const [gc, setGc] = useState('');
+  const [tpb, setTpb] = useState('');
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    getComicSites().then((s) => {
+      setGc(s.getcomics);
+      setTpb(s.tpb);
+    });
+  }, []);
+  return (
+    <View style={styles.card}>
+      <Text style={styles.body}>
+        GetComics downloads straight to the phone. Pirate Bay torrents (Comics category) go to
+        TorBox first, then to the phone. Change an address here if a site moves (TPB needs its
+        apibay-style API address).
+      </Text>
+      <Input value={gc} onChangeText={setGc} placeholder="https://getcomics.org" autoCapitalize="none" />
+      <Input value={tpb} onChangeText={setTpb} placeholder="https://apibay.org" autoCapitalize="none" />
+      <Button
+        label="Save addresses"
+        variant="secondary"
+        onPress={async () => {
+          await setComicSites({ getcomics: gc, tpb });
+          const s = await getComicSites();
+          setGc(s.getcomics);
+          setTpb(s.tpb);
+          setSaved(true);
+        }}
+      />
+      {saved ? <Text style={{ color: Colors.success }}>Saved</Text> : null}
+    </View>
+  );
+}
 
 export default function ComicsSettings() {
   const Colors = useColors();
@@ -300,6 +339,9 @@ export default function ComicsSettings() {
           onChange={(v) => setPref('comicDataSaver', v)}
         />
       </Group>
+
+      <SectionTitle>Find comics (GetComics · Pirate Bay)</SectionTitle>
+      <SitesCard />
     </SettingsPage>
   );
 }

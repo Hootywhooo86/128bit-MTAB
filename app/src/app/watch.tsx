@@ -35,6 +35,7 @@ import {
   checkTorboxStream,
   getNowWatching,
   getWatchProgress,
+  isAnime,
   nextEpisode,
   pickNextStream,
   resolveStream,
@@ -62,6 +63,15 @@ function setSubtitleTrack(player: VideoPlayer, track: SubtitleTrack | null) {
 
 function setAudioTrack(player: VideoPlayer, track: AudioTrack) {
   player.audioTrack = track;
+}
+
+const isEnglish = (t: { language?: string | null; label?: string | null }) =>
+  /^en(g|-|_|$)/i.test(t.language ?? '') || /\b(english|eng)\b/i.test(t.label ?? '');
+
+/** Best English subtitle track: full dialogue before "signs & songs" / forced tracks. */
+function englishSubtitle(tracks: SubtitleTrack[]) {
+  const en = tracks.filter(isEnglish);
+  return en.find((t) => !/sign|song|forced/i.test(t.label ?? '')) ?? en[0];
 }
 
 type NextState =
@@ -116,6 +126,23 @@ export default function WatchScreen() {
   const { availableAudioTracks } = useEvent(player, 'availableAudioTracksChange', {
     availableAudioTracks: [],
   });
+
+  // Anime: English dub when there is one, and English subtitles always on.
+  const [anime, setAnime] = useState(false);
+  const userPickedSubs = useRef(false);
+  const animeAudioFor = useRef<string | null>(null);
+  const animeSubsFor = useRef<string | null>(null);
+  const linkId = item?.link?.id;
+  const linkType = item?.link?.type;
+  useEffect(() => {
+    let cancelled = false;
+    isAnime(linkId && linkType ? { id: linkId, type: linkType } : undefined).then(
+      (yes) => !cancelled && setAnime(yes),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [linkId, linkType]);
 
   // --- Next episode ---
   const [next, setNext] = useState<NextState>({ status: 'idle' });
@@ -223,6 +250,16 @@ export default function WatchScreen() {
     };
   }, [item, player]);
 
+  // Anime: switch to the English audio track (dub) once tracks are known.
+  const playingKey = item?.key;
+  useEffect(() => {
+    if (!anime || !playingKey || animeAudioFor.current === playingKey) return;
+    const english = availableAudioTracks.find(isEnglish);
+    if (!availableAudioTracks.length) return;
+    animeAudioFor.current = playingKey;
+    if (english) setAudioTrack(player, english);
+  }, [anime, playingKey, availableAudioTracks, player]);
+
   const chooseSubtitle = useCallback(
     async (choice: SubtitleChoice) => {
       setSubError(null);
@@ -240,6 +277,17 @@ export default function WatchScreen() {
     [player],
   );
 
+  // Anime: English subtitles always on, even with English audio. The video's own English
+  // track first; otherwise an English one from your subtitle addons (below).
+  useEffect(() => {
+    if (!anime || !playingKey || userPickedSubs.current || animeSubsFor.current === playingKey) return;
+    const track = englishSubtitle(availableSubtitleTracks);
+    if (!track) return;
+    animeSubsFor.current = playingKey;
+    // After this render (the tracks just arrived).
+    Promise.resolve().then(() => chooseSubtitle({ kind: 'embedded', track }));
+  }, [anime, playingKey, availableSubtitleTracks, chooseSubtitle]);
+
   // Load addon subtitles for this movie/episode, and turn on the preferred language if wanted.
   const itemKey = item?.key;
   const itemType = item?.live ? undefined : item?.link?.type;
@@ -250,15 +298,19 @@ export default function WatchScreen() {
       if (cancelled) return;
       const sorted = sortSubtitles(subs, prefs.subtitleLanguage);
       setAddonSubs(sorted);
-      const preferred = prefs.autoSubtitles
-        ? findPreferred(sorted, prefs.subtitleLanguage)
-        : undefined;
+      const preferred = anime
+        ? findPreferred(sorted, 'en')
+        : prefs.autoSubtitles
+          ? findPreferred(sorted, prefs.subtitleLanguage)
+          : undefined;
+      // Anime: an addon subtitle only if the video has no English track of its own.
+      if (anime && (userPickedSubs.current || animeSubsFor.current === itemKey)) return;
       if (preferred) chooseSubtitle({ kind: 'addon', sub: preferred });
     });
     return () => {
       cancelled = true;
     };
-  }, [itemKey, itemType, prefs.subtitleLanguage, prefs.autoSubtitles, chooseSubtitle]);
+  }, [itemKey, itemType, prefs.subtitleLanguage, prefs.autoSubtitles, chooseSubtitle, anime]);
 
   // --- Next episode ---
   const playNext = useCallback(async () => {
@@ -417,7 +469,10 @@ export default function WatchScreen() {
         embedded={availableSubtitleTracks}
         addon={addonSubs}
         current={subtitle}
-        onChoose={chooseSubtitle}
+        onChoose={(c) => {
+          userPickedSubs.current = true;
+          chooseSubtitle(c);
+        }}
         audioTracks={availableAudioTracks}
         currentAudio={player.audioTrack}
         onChooseAudio={(t) => setAudioTrack(player, t)}

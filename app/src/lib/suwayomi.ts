@@ -155,8 +155,28 @@ export async function getRepos(): Promise<string[]> {
 /** The server doesn't have the newer "extension store" API (older Suwayomi versions). */
 const oldServer = (e: unknown) => /FieldUndefined|is undefined|Unknown field/i.test(String(e));
 
+/**
+ * Turns whatever you paste into a repo index URL, the way TachiyomiJ2K / Mihon read
+ * repos: a GitHub repo page ("github.com/keiyoushi/extensions") becomes its "repo"
+ * branch index; a bare base URL gets "/index.min.json" (servers then follow its
+ * repo.json → index_v2 protobuf store, same as J2K). Direct index / repo.json /
+ * index.pb links are kept as they are.
+ */
+export function normalizeRepoUrl(url: string) {
+  let u = url.trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  const gh = u.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/#?]+)(?:\/(?:tree|blob)\/([^/]+))?/i);
+  if (gh) {
+    const [, owner, repo, branch] = gh;
+    if (/\.(json|pb)$/i.test(u)) return u.replace('/blob/', '/raw/');
+    return `https://raw.githubusercontent.com/${owner}/${repo.replace(/\.git$/, '')}/${branch ?? 'repo'}/index.min.json`;
+  }
+  const last = u.split('/').pop() ?? '';
+  return last.includes('.') ? u : `${u}/index.min.json`;
+}
+
 export async function addRepo(url: string) {
-  const u = url.trim();
+  const u = normalizeRepoUrl(url);
   try {
     await gql('mutation A($u: String!) { addExtensionStore(input: { indexUrl: $u }) { clientMutationId } }', {
       u,

@@ -40,14 +40,6 @@ export default function TabLayout() {
         headerRight: () => <HeaderButtons />,
       }}>
       <Tabs.Screen
-        name="index"
-        options={{ title: 'Comics', tabBarIcon: icon('book-outline') }}
-      />
-      <Tabs.Screen name="shows" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
-      <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />
-      <Tabs.Screen name="anime" options={{ title: 'Anime', tabBarIcon: icon('sparkles-outline') }} />
-      <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
-      <Tabs.Screen
         name="audiobooks"
         options={{
           title: 'Audiobooks',
@@ -55,6 +47,13 @@ export default function TabLayout() {
           tabBarIcon: icon('headset-outline'),
         }}
       />
+      {/* "/" just sends you to Audiobooks; it has no tab of its own. */}
+      <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="shows" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
+      <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />
+      <Tabs.Screen name="anime" options={{ title: 'Anime', tabBarIcon: icon('sparkles-outline') }} />
+      <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
+      <Tabs.Screen name="comics" options={{ title: 'Comics', tabBarIcon: icon('book-outline') }} />
     </Tabs>
   );
 }

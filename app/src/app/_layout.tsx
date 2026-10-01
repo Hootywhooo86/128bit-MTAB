@@ -1,13 +1,17 @@
+import { PressStart2P_400Regular, useFonts } from '@expo-google-fonts/press-start-2p';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
+import { AppState } from 'react-native';
 
 import { useColors } from '@/constants/theme';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
 import { installDefaultSources } from '@/lib/sources';
+import { checkFollows, runComicQueue } from '@/lib/comic-grab';
+import { syncHardcover } from '@/lib/hardcover';
 import { getSuwayomi } from '@/lib/suwayomi';
 import { runVideoQueue } from '@/lib/video-downloads';
 import { runAutoDownloads } from '@/lib/wanted';
@@ -25,7 +29,10 @@ export default function RootLayout() {
 
 function AppNavigator() {
   const Colors = useColors();
-  const { loaded } = usePrefs();
+  const { loaded: prefsLoaded } = usePrefs();
+  // The 128bit pixel font (headings, player); if it fails to load, the normal font is used.
+  const [fontLoaded, fontError] = useFonts({ PressStart2P_400Regular });
+  const loaded = prefsLoaded && (fontLoaded || !!fontError);
 
   // Keep the splash screen up until the saved theme is known, so it doesn't flash.
   useEffect(() => {
@@ -41,14 +48,26 @@ function AppNavigator() {
     getSuwayomi().catch(() => {});
   }, []);
 
+  // Hardcover: bring audiobook progress in line both ways each time the app is opened.
+  useEffect(() => {
+    syncHardcover().catch(() => {});
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncHardcover().catch(() => {});
+    });
+    return () => sub.remove();
+  }, []);
+
   // Wanted books marked "download when ready": check TorBox every minute while the app is open.
   useEffect(() => {
-    runAutoDownloads().catch(() => {});
-    runVideoQueue().catch(() => {});
-    const timer = setInterval(() => {
+    const tick = () => {
       runAutoDownloads().catch(() => {});
       runVideoQueue().catch(() => {});
-    }, 60_000);
+      // Comics: TorBox → phone, and new issues of followed series (every 6 h).
+      runComicQueue().catch(() => {});
+      checkFollows().catch(() => {});
+    };
+    tick();
+    const timer = setInterval(tick, 60_000);
     return () => clearInterval(timer);
   }, []);
 

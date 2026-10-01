@@ -1,10 +1,11 @@
 import Constants from 'expo-constants';
-import { Linking, Text } from 'react-native';
+import { Image } from 'expo-image';
+import { Linking, Text, View } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { UpdateCard } from '@/components/update-card';
 import { BUILD } from '@/lib/app-update';
-import { makeStyles } from '@/constants/theme';
+import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
 
 const SOURCES = [
   {
@@ -46,13 +47,22 @@ const SOURCES = [
 
 export default function AboutSettings() {
   const styles = useStyles();
+  const Colors = useColors();
   return (
     <SettingsPage>
+      <View style={{ alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.three }}>
+        <Image
+          source={require('../../../assets/images/icon.png')}
+          style={{ width: 112, height: 112 }}
+          contentFit="contain"
+        />
+        <Text style={{ color: Colors.accent, fontFamily: PixelFont, fontSize: 16 }}>128BITPLAY</Text>
+      </View>
       <SectionTitle>App</SectionTitle>
       <Group>
         <Row
           icon="information-circle"
-          title="128bit"
+          title="128bitPlay"
           value={`v${Constants.expoConfig?.version ?? '1.0.0'}${BUILD ? ` · build ${BUILD}` : ''}`}
         />
       </Group>

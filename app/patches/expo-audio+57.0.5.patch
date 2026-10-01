@@ -1,0 +1,117 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+@@ -240,10 +240,21 @@
+     val session = mediaSession ?: return
+     val mediaButtons = mutableListOf<CommandButton>()
+ 
++    if (currentOptions?.showSeekBackward == true) {
++      mediaButtons.add(
++        CommandButton.Builder(CommandButton.ICON_PREVIOUS)
++          .setDisplayName("Previous chapter")
++          .setEnabled(true)
++          .setSessionCommand(SessionCommand(ACTION_PREVIOUS_CHAPTER, Bundle.EMPTY))
++          .setSlots(CommandButton.SLOT_BACK_SECONDARY)
++          .build()
++      )
++    }
++
+     // Add seek backward button if enabled
+     if (currentOptions?.showSeekBackward == true) {
+       mediaButtons.add(
+-        CommandButton.Builder(CommandButton.ICON_SKIP_BACK_10)
++        CommandButton.Builder(CommandButton.ICON_SKIP_BACK_30)
+           .setDisplayName("Seek Backward")
+           .setEnabled(true)
+           .setSessionCommand(SessionCommand(ACTION_SEEK_BACKWARD, Bundle.EMPTY))
+@@ -265,7 +276,7 @@
+     // Add seek forward button if enabled
+     if (currentOptions?.showSeekForward == true) {
+       mediaButtons.add(
+-        CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_10)
++        CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_30)
+           .setDisplayName("Seek Forward")
+           .setEnabled(true)
+           .setSessionCommand(SessionCommand(ACTION_SEEK_FORWARD, Bundle.EMPTY))
+@@ -274,6 +285,17 @@
+       )
+     }
+ 
++    if (currentOptions?.showSeekForward == true) {
++      mediaButtons.add(
++        CommandButton.Builder(CommandButton.ICON_NEXT)
++          .setDisplayName("Next chapter")
++          .setEnabled(true)
++          .setSessionCommand(SessionCommand(ACTION_NEXT_CHAPTER, Bundle.EMPTY))
++          .setSlots(CommandButton.SLOT_FORWARD_SECONDARY)
++          .build()
++      )
++    }
++
+     session.setCustomLayout(mediaButtons)
+     session.setMediaButtonPreferences(mediaButtons)
+   }
+@@ -350,6 +372,7 @@
+     hideNotification()
+ 
+     currentPlayer = player
++    activePlayer = player
+     currentMetadata = metadata
+     currentOptions = options
+ 
+@@ -414,6 +437,7 @@
+     currentPlayer?.isActiveForLockScreen = false
+     removePlayerListener()
+     currentPlayer = null
++    activePlayer = null
+     currentMetadata = null
+     mediaSession?.release()
+     mediaSession = null
+@@ -520,6 +544,7 @@
+     mediaSession = null
+     sessionMetadataPlayer = null
+     currentPlayer = null
++    activePlayer = null
+     currentMetadata = null
+     currentOptions = null
+     currentArtwork = null
+@@ -559,6 +584,13 @@
+     const val ACTION_SEEK_FORWARD = "expo.modules.audio.action.SEEK_FORWARD"
+     const val ACTION_SEEK_BACKWARD = "expo.modules.audio.action.SEEK_BACKWARD"
+ 
+-    const val SEEK_INTERVAL_MS = 10000L
++    const val SEEK_INTERVAL_MS = 30000L
++
++    // 128bit: previous / next chapter buttons, sent to JS as a "remoteChapter" event.
++    const val ACTION_PREVIOUS_CHAPTER = "expo.modules.audio.action.PREVIOUS_CHAPTER"
++    const val ACTION_NEXT_CHAPTER = "expo.modules.audio.action.NEXT_CHAPTER"
++
++    @Volatile
++    var activePlayer: AudioPlayer? = null
+   }
+ }
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+@@ -35,6 +35,8 @@
+           MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+             .add(SessionCommand(AudioControlsService.ACTION_SEEK_BACKWARD, Bundle.EMPTY))
+             .add(SessionCommand(AudioControlsService.ACTION_SEEK_FORWARD, Bundle.EMPTY))
++            .add(SessionCommand(AudioControlsService.ACTION_PREVIOUS_CHAPTER, Bundle.EMPTY))
++            .add(SessionCommand(AudioControlsService.ACTION_NEXT_CHAPTER, Bundle.EMPTY))
+             .build()
+         )
+         .build()
+@@ -56,6 +58,12 @@
+       AudioControlsService.ACTION_SEEK_BACKWARD -> {
+         session.player.seekTo(session.player.currentPosition - AudioControlsService.SEEK_INTERVAL_MS)
+       }
++      AudioControlsService.ACTION_PREVIOUS_CHAPTER -> {
++        AudioControlsService.activePlayer?.emit("remoteChapter", "previous")
++      }
++      AudioControlsService.ACTION_NEXT_CHAPTER -> {
++        AudioControlsService.activePlayer?.emit("remoteChapter", "next")
++      }
+     }
+     return super.onCustomCommand(session, controller, command, args)
+   }
