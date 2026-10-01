@@ -1,10 +1,10 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ComicTile } from '@/components/comic-tile';
 import { Body, Heading, Input } from '@/components/ui';
-import { Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   browseSuwayomi,
   getAllComicProgress,
@@ -15,6 +15,13 @@ import {
   type ReadProgress,
 } from '@/lib/comics';
 import { usePrefs } from '@/lib/prefs';
+import {
+  comicDownloadsSupported,
+  getComicDownloads,
+  importCbz,
+  onComicDownloads,
+  type LocalSeries,
+} from '@/lib/comic-downloads';
 import { getSuwayomi, listSources, type SuwaSource } from '@/lib/suwayomi';
 
 const MANGADEX = 'mangadex';
@@ -30,6 +37,27 @@ export default function ComicsScreen() {
   const [library, setLibrary] = useState<Comic[]>([]);
   const [progress, setProgress] = useState<Record<string, ReadProgress>>({});
   const [sources, setSources] = useState<SuwaSource[]>([]);
+  const [onPhone, setOnPhone] = useState<LocalSeries[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getComicDownloads().then((l) => setOnPhone([...l]));
+    return onComicDownloads((l) => setOnPhone([...l]));
+  }, []);
+
+  async function importFiles() {
+    setImporting(true);
+    setImportError(null);
+    try {
+      const series = await importCbz();
+      if (series) router.push({ pathname: '/comics/[id]', params: { id: series.comic.id } });
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  }
   const [source, setSource] = useState(MANGADEX);
 
   useFocusEffect(
@@ -130,6 +158,29 @@ export default function ComicsScreen() {
         </View>
       ) : (
         <>
+          {onPhone.length ? (
+            <Row title="On this phone">
+              {onPhone.map((s) => (
+                <ComicTile
+                  key={s.comic.id}
+                  comic={s.comic}
+                  note={`${s.chapters.filter((c) => c.state === 'done').length} ch. saved`}
+                />
+              ))}
+            </Row>
+          ) : null}
+          {comicDownloadsSupported ? (
+            <View style={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
+              <Pressable style={styles.importButton} onPress={importFiles} disabled={importing}>
+                {importing ? (
+                  <ActivityIndicator color={Colors.accent} />
+                ) : (
+                  <Text style={styles.importText}>＋ Import CBZ files from this phone</Text>
+                )}
+              </Pressable>
+              {importError ? <Body style={{ color: Colors.danger, fontSize: 12 }}>{importError}</Body> : null}
+            </View>
+          ) : null}
           {reading.length ? (
             <Row title="Continue reading">
               {reading.map((c) => (
@@ -250,6 +301,15 @@ function ListRow({ title, load }: { title: string; load: (page: number) => Promi
 
 const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
+  importButton: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+    borderRadius: Radius.lg,
+    padding: Spacing.three,
+    alignItems: 'center',
+  },
+  importText: { color: Colors.accent, fontWeight: '700' },
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,

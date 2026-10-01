@@ -81,6 +81,12 @@ export default function WatchScreen() {
   const player = useVideoPlayer(item ? toSource(item) : null, (p) => {
     p.timeUpdateEventInterval = 0.25;
     p.showNowPlayingNotification = true;
+    // Start as soon as a couple of seconds are buffered instead of waiting for more.
+    p.bufferOptions = {
+      minBufferForPlayback: 2,
+      preferredForwardBufferDuration: 30,
+      waitsToMinimizeStalling: false,
+    };
     p.play();
   });
 

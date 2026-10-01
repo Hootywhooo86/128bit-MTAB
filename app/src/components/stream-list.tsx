@@ -13,7 +13,7 @@ import {
 
 import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { LIVE_TYPES, fetchStreams, type AddonStreams } from '@/lib/addons';
+import { LIVE_TYPES, fetchStreamsEach, streamAddons, type AddonStreams } from '@/lib/addons';
 import { usePrefs } from '@/lib/prefs';
 import { getActiveAddons, getTorboxKey } from '@/lib/storage';
 import { parseStream, qualityRank, type Quality } from '@/lib/stream-info';
@@ -58,6 +58,8 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   const styles = useStyles();
   const [groups, setGroups] = useState<AddonStreams[] | null>(null);
   const [cached, setCached] = useState<Set<string>>(new Set());
+  const [pending, setPending] = useState<{ id: string; name: string }[]>([]);
+  const [provider, setProvider] = useState<string>('all');
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState<{
@@ -68,20 +70,37 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   const [saved, setSaved] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Each addon's streams show up as soon as that addon answers.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await fetchStreams(await getActiveAddons(), type, id);
+      const addons = await getActiveAddons();
+      const hasTorbox = !!(await getTorboxKey());
       if (cancelled) return;
-      setGroups(result);
-      const hashes = result.flatMap((g) =>
-        g.streams.map((s) => s.infoHash).filter(Boolean),
-      ) as string[];
-      if (hashes.length && (await getTorboxKey())) {
-        checkCached(hashes)
-          .then((set) => !cancelled && setCached(set))
-          .catch(() => {});
-      }
+      const asking = streamAddons(addons, type, id).map((a) => ({
+        id: a.addon.manifest.id,
+        name: a.addon.manifest.name,
+      }));
+      const order = asking.map((a) => a.id);
+      setPending(asking);
+      setGroups([]);
+      await fetchStreamsEach(addons, type, id, (r) => {
+        if (cancelled) return;
+        setPending((p) => p.filter((x) => x.id !== r.addon.manifest.id));
+        // Keep the addon order from Settings, whatever order they answer in.
+        setGroups((g) =>
+          [...(g ?? []).filter((x) => x.addon.manifest.id !== r.addon.manifest.id), r].sort(
+            (a, b) => order.indexOf(a.addon.manifest.id) - order.indexOf(b.addon.manifest.id),
+          ),
+        );
+        const hashes = r.streams.map((s) => s.infoHash).filter(Boolean) as string[];
+        if (hashes.length && hasTorbox) {
+          checkCached(hashes)
+            .then((set) => !cancelled && setCached((c) => new Set([...c, ...set])))
+            .catch(() => {});
+        }
+      });
+      if (!cancelled) setPending([]);
     })();
     return () => {
       cancelled = true;
@@ -183,20 +202,28 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     return <ActivityIndicator color={Colors.accent} style={{ marginTop: Spacing.four }} />;
 
   const isCached = (s: Stream) => !!s.infoHash && cached.has(s.infoHash.toLowerCase());
-  const matches = (s: Stream) => {
+  const siteOf = (s: Stream) => parseStream(s).site;
+  const matches = (s: Stream, addonName: string) => {
+    if (provider !== 'all' && provider !== addonName && provider !== siteOf(s)) return false;
     if (filter === 'all') return true;
     if (filter === 'cached') return isCached(s) || !!s.url;
     return parseStream(s).quality === filter;
   };
   // Keep each stream's original index for its key; optionally float TorBox-cached ones up.
-  const ordered = (streams: Stream[]) => {
-    const list = streams.map((s, i) => ({ s, i })).filter(({ s }) => matches(s));
+  const ordered = (streams: Stream[], addonName: string) => {
+    const list = streams.map((s, i) => ({ s, i })).filter(({ s }) => matches(s, addonName));
     return prefs.cachedFirst
       ? list.sort((a, b) => Number(isCached(b.s)) - Number(isCached(a.s)))
       : list;
   };
   const total = groups.reduce((n, g) => n + g.streams.length, 0);
-  const shown = groups.reduce((n, g) => n + ordered(g.streams).length, 0);
+  const shown = groups.reduce((n, g) => n + ordered(g.streams, g.addon.manifest.name).length, 0);
+  // Providers: the addons, then the torrent sites they found things on.
+  const addonNames = groups.filter((g) => g.streams.length).map((g) => g.addon.manifest.name);
+  const sites = [
+    ...new Set(groups.flatMap((g) => g.streams.map(siteOf).filter(Boolean) as string[])),
+  ].sort();
+  const providers = [...addonNames, ...sites.filter((x) => !addonNames.includes(x))];
 
   return (
     <View style={{ gap: Spacing.three }}>
@@ -239,8 +266,35 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
           ))}
         </ScrollView>
       ) : null}
+      {providers.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: Spacing.two }}>
+          {['all', ...providers].map((p) => (
+            <Pressable
+              key={p}
+              onPress={() => setProvider(p)}
+              style={[styles.chip, styles.providerChip, provider === p && styles.chipActive]}>
+              <Text style={[styles.chipText, provider === p && { color: Colors.accentText }]}>
+                {p === 'all' ? 'All providers' : p}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+      {pending.length ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+          <ActivityIndicator size="small" color={Colors.accent} />
+          <Body muted style={{ fontSize: 12 }}>
+            Still asking{' '}
+            {pending.map((p) => p.name).join(', ')}
+            …
+          </Body>
+        </View>
+      ) : null}
 
-      {groups.length === 0 ? (
+      {pending.length ? null : groups.length === 0 ? (
         <Body muted>
           None of your addons provide streams for this. Install a stream addon in Settings → Addons.
         </Body>
@@ -251,7 +305,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
       ) : null}
 
       {groups.map(({ addon, streams, error: groupError }) => {
-        const list = ordered(streams);
+        const list = ordered(streams, addon.manifest.name);
         if (!list.length && !groupError) return null;
         return (
           <View key={addon.manifest.id} style={{ gap: Spacing.two }}>
@@ -350,5 +404,6 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: Colors.surfaceRaised,
   },
   chipActive: { backgroundColor: Colors.accent },
+  providerChip: { paddingVertical: 6, backgroundColor: Colors.surface },
   chipText: { color: Colors.text, fontWeight: '600', fontSize: 13 },
 }));

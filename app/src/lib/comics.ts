@@ -7,6 +7,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { getLocalSeries, localPages } from './comic-downloads';
 import {
   browseSource,
   getChapterPages,
@@ -129,6 +130,8 @@ export async function searchComics(query: string): Promise<Comic[]> {
 // Comics from Suwayomi have ids starting with "sw:"; everything else is MangaDex.
 
 const isSw = (id: string) => id.startsWith('sw:');
+/** Imported from the phone (CBZ). */
+const isLocal = (id: string) => id.startsWith('local:');
 const swId = (id: string) => Number(id.slice(3));
 
 export function comicFromSuwayomi(m: SuwaManga): Comic {
@@ -163,6 +166,11 @@ export function comicImage(uri?: string) {
 }
 
 export async function getComic(id: string): Promise<Comic> {
+  if (isLocal(id)) {
+    const s = await getLocalSeries(id);
+    if (!s) throw new Error('This comic is no longer on the phone');
+    return s.comic;
+  }
   if (isSw(id)) return comicFromSuwayomi(await getManga(swId(id)));
   const data = await get<{ data: RawManga }>(
     `/manga/${id}?includes[]=cover_art&includes[]=author`,
@@ -174,6 +182,10 @@ type RawChapter = { id: string; attributes: Record<string, any>; relationships: 
 
 /** English chapters in reading order, one upload per chapter number. */
 export async function getChapters(id: string): Promise<ComicChapter[]> {
+  if (isLocal(id)) {
+    const s = await getLocalSeries(id);
+    return (s?.chapters ?? []).map((c) => ({ id: c.id, label: c.label, pages: c.files.length }));
+  }
   if (isSw(id)) {
     return (await getMangaChapters(swId(id))).map((c) => ({
       id: `sw:${c.id}`,
@@ -218,7 +230,12 @@ export const chapterLabel = (c: Pick<ComicChapter, 'number' | 'volume' | 'title'
   c.label ?? [c.number ? `Ch. ${c.number}` : 'Oneshot', c.title].filter(Boolean).join(' · ');
 
 /** Image URLs for a chapter's pages. `saver` uses MangaDex's smaller, compressed images. */
-export async function getPages(chapterId: string, saver: boolean): Promise<string[]> {
+export async function getPages(chapterId: string, saver: boolean, remoteOnly = false): Promise<string[]> {
+  // Downloaded or imported: read from the phone.
+  if (!remoteOnly) {
+    const local = await localPages(chapterId);
+    if (local) return local;
+  }
   if (isSw(chapterId)) return getChapterPages(swId(chapterId));
   const d = await get<{
     baseUrl: string;

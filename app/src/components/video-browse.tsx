@@ -3,7 +3,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +20,13 @@ import { useAddons } from '@/lib/hooks';
 import type { CatalogDef, InstalledAddon, MetaPreview } from '@/lib/types';
 import { usePrefs } from '@/lib/prefs';
 import { getPlayback, isConnected, traktConfigured } from '@/lib/trakt';
-import { getWatchProgress, type WatchProgress } from '@/lib/video';
+import { getPlaybackRows, removePlayback } from '@/lib/trakt-library';
+import {
+  getHiddenContinue,
+  getWatchProgress,
+  removeWatchProgress,
+  type WatchProgress,
+} from '@/lib/video';
 
 import { TraktRows } from './trakt-rows';
 
@@ -109,7 +117,9 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
             (a, b) => b.updatedAt - a.updatedAt,
           );
         }
-        if (!cancelled) setContinuing(merged.filter((p) => !type || p.link?.type === type));
+        const hidden = await getHiddenContinue();
+        if (!cancelled)
+          setContinuing(merged.filter((p) => (!type || p.link?.type === type) && !hidden.has(p.key)));
       })();
       return () => {
         cancelled = true;
@@ -117,10 +127,39 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
     }, [type, prefs.traktContinueWatching]),
   );
 
+  /** Hold an item: remove it here and from Trakt's paused list. */
+  function remove(item: WatchProgress) {
+    const go = async () => {
+      setContinuing((c) => c.filter((p) => p.key !== item.key));
+      await removeWatchProgress(item.key);
+      if ((await traktConfigured()) && (await isConnected())) {
+        const rows = await getPlaybackRows().catch(() => []);
+        const match = rows.find(
+          (r) =>
+            (r.item.kind === 'movie' ? r.item.imdb : `${r.item.imdb}:${r.item.season}:${r.item.episode}`) ===
+            item.key,
+        );
+        if (match) removePlayback(match.id).catch(() => {});
+      }
+    };
+    const label = item.subtitle ? `${item.title} · ${item.subtitle}` : item.title;
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Remove ${label} from Continue watching?`)) go();
+      return;
+    }
+    Alert.alert('Remove from Continue watching', label, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: go },
+    ]);
+  }
+
   if (!continuing.length) return null;
   return (
     <View style={{ gap: Spacing.two }}>
       <Heading style={{ paddingHorizontal: Spacing.three }}>Continue watching</Heading>
+      <Text style={[styles.tileSub, { paddingHorizontal: Spacing.three, marginTop: -4 }]}>
+        Hold one to remove it
+      </Text>
       <FlatList
         horizontal
         data={continuing}
@@ -133,6 +172,7 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
         renderItem={({ item }) => (
           <Pressable
             style={{ width: 200, gap: 6 }}
+            onLongPress={() => remove(item)}
             onPress={() =>
               item.link &&
               router.push({

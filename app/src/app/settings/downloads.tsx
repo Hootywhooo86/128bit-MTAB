@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
 
+import { ComicDownloadsList } from '@/components/comic-downloads-list';
 import { VideoDownloads } from '@/components/video-downloads';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 
@@ -94,7 +95,7 @@ function AudiobookDownloads() {
   );
 }
 
-type Tab = 'movies' | 'tv' | 'audiobooks';
+type Tab = 'movies' | 'tv' | 'audiobooks' | 'comics';
 
 /** Settings → Downloads: everything saved on the phone, by kind. */
 export default function DownloadsSettings() {
@@ -104,18 +105,24 @@ export default function DownloadsSettings() {
   return (
     <SettingsPage>
       <View style={styles.segments}>
-        {(['movies', 'tv', 'audiobooks'] as const).map((t) => (
+        {(['movies', 'tv', 'audiobooks', 'comics'] as const).map((t) => (
           <Pressable
             key={t}
             onPress={() => setTab(t)}
             style={[styles.segment, tab === t && { backgroundColor: Colors.accent }]}>
             <Text style={[styles.segmentText, tab === t && { color: Colors.accentText }]}>
-              {t === 'movies' ? 'Movies' : t === 'tv' ? 'TV' : 'Audiobooks'}
+              {t === 'movies' ? 'Movies' : t === 'tv' ? 'TV' : t === 'audiobooks' ? 'Books' : 'Comics'}
             </Text>
           </Pressable>
         ))}
       </View>
-      {tab === 'audiobooks' ? <AudiobookDownloads /> : <VideoDownloads kind={tab === 'movies' ? 'movie' : 'episode'} />}
+      {tab === 'audiobooks' ? (
+        <AudiobookDownloads />
+      ) : tab === 'comics' ? (
+        <ComicDownloadsList />
+      ) : (
+        <VideoDownloads kind={tab === 'movies' ? 'movie' : 'episode'} />
+      )}
     </SettingsPage>
   );
 }

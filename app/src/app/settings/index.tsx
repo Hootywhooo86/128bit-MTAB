@@ -38,7 +38,7 @@ export default function SettingsScreen() {
         <Row
           icon="cloud-download"
           title="Downloads"
-          subtitle="Movies, TV and audiobooks saved on this phone."
+          subtitle="Movies, TV, audiobooks and comics saved on this phone."
           onPress={() => router.push('/settings/downloads')}
         />
         <Row

@@ -168,7 +168,30 @@ export async function getWatchProgress(): Promise<WatchProgress[]> {
   }
 }
 
+const HIDDEN_KEY = '128bit.continueHidden';
+
+/** Items you removed from Continue watching (so Trakt's copy stays hidden too). */
+export async function getHiddenContinue(): Promise<Set<string>> {
+  try {
+    return new Set(JSON.parse((await AsyncStorage.getItem(HIDDEN_KEY)) ?? '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Hold an item in Continue watching → remove it (until you watch it again). */
+export async function removeWatchProgress(key: string) {
+  const all = await getWatchProgress();
+  await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(all.filter((p) => p.key !== key)));
+  const hidden = await getHiddenContinue();
+  hidden.add(key);
+  await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden].slice(-500)));
+}
+
 export async function saveWatchProgress(entry: Omit<WatchProgress, 'updatedAt'>) {
+  // Watching it again brings it back.
+  const hidden = await getHiddenContinue();
+  if (hidden.delete(entry.key)) await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
   const all = await getWatchProgress();
   const finished = entry.duration > 0 && entry.position / entry.duration > 0.95;
   const rest = all.filter((p) => p.key !== entry.key);

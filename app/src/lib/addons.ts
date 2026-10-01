@@ -259,11 +259,12 @@ export type AddonStreams = {
 };
 
 /** Streams from every addon that offers them for this item, fetched in parallel. */
-export async function fetchStreams(
-  addons: InstalledAddon[],
-  type: string,
-  id: string,
-): Promise<AddonStreams[]> {
+const STREAM_TIMEOUT_MS = 15_000;
+const STREAM_CACHE_MS = 10 * 60_000;
+const streamCache = new Map<string, { at: number; groups: AddonStreams[] }>();
+
+/** Addons that can give streams for this item, each with the type to ask it for. */
+export function streamAddons(addons: InstalledAddon[], type: string, id: string) {
   // For anime and shows, ask each addon with whichever of the two types it supports.
   const typeFor = (a: InstalledAddon) =>
     supports(a, 'stream', type, id)
@@ -271,21 +272,69 @@ export async function fetchStreams(
       : EPISODIC.includes(type)
         ? EPISODIC.find((t) => supports(a, 'stream', t, id))
         : undefined;
-  const candidates = addons.filter((a) => typeFor(a));
+  return addons.flatMap((addon) => {
+    const t = typeFor(addon);
+    return t ? [{ addon, type: t }] : [];
+  });
+}
+
+async function fetchOne(addon: InstalledAddon, type: string, id: string): Promise<AddonStreams> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${addon.baseUrl}/stream/${type}/${encodeURIComponent(id)}.json`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const data = (await res.json()) as { streams?: Stream[] };
+    return { addon, streams: data.streams ?? [] };
+  } catch (e) {
+    return {
+      addon,
+      streams: [],
+      error: controller.signal.aborted ? 'Took too long to answer (skipped)' : e instanceof Error ? e.message : String(e),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Streams from every addon, delivered one addon at a time as each answers (a slow
+ * addon no longer holds up the others; it gives up after 15 s). Results are kept
+ * for 10 minutes, so going back to the same episode is instant.
+ */
+export function fetchStreamsEach(
+  addons: InstalledAddon[],
+  type: string,
+  id: string,
+  onAddon: (result: AddonStreams) => void,
+  fresh = false,
+): Promise<AddonStreams[]> {
+  const key = `${type}:${id}:${addons.map((a) => a.manifest.id).join(',')}`;
+  const hit = streamCache.get(key);
+  if (hit && !fresh && Date.now() - hit.at < STREAM_CACHE_MS) {
+    hit.groups.forEach(onAddon);
+    return Promise.resolve(hit.groups);
+  }
   return Promise.all(
-    candidates.map(async (addon) => {
-      try {
-        const data = await getJson<{ streams?: Stream[] }>(
-          `${addon.baseUrl}/stream/${typeFor(addon)}/${encodeURIComponent(id)}.json`,
-        );
-        return { addon, streams: data.streams ?? [] };
-      } catch (e) {
-        return {
-          addon,
-          streams: [],
-          error: e instanceof Error ? e.message : String(e),
-        };
-      }
-    }),
-  );
+    streamAddons(addons, type, id).map(({ addon, type: t }) =>
+      fetchOne(addon, t, id).then((r) => {
+        onAddon(r);
+        return r;
+      }),
+    ),
+  ).then((groups) => {
+    if (groups.some((g) => g.streams.length)) streamCache.set(key, { at: Date.now(), groups });
+    return groups;
+  });
+}
+
+export async function fetchStreams(
+  addons: InstalledAddon[],
+  type: string,
+  id: string,
+): Promise<AddonStreams[]> {
+  return fetchStreamsEach(addons, type, id, () => {});
 }

@@ -7,6 +7,8 @@ import type { Stream } from './types';
 export type Quality = '4K' | '1080p' | '720p' | 'SD';
 
 export type StreamInfo = {
+  /** Torrent site, e.g. "ThePirateBay" (when the addon says). */
+  site: string | null;
   quality: Quality | null;
   hdr: string[];
   sizeBytes: number | null;
@@ -44,5 +46,7 @@ export function parseStream(s: Stream): StreamInfo {
     : null;
 
   const seeds = text.match(/👤\s*(\d+)/) ?? text.match(/\bseed(?:ers|s)?:?\s*(\d+)/i);
-  return { quality, hdr, sizeBytes, seeders: seeds ? Number(seeds[1]) : null };
+  // The site a torrent came from: Torrentio "⚙️ ThePirateBay", MediaFusion "🔗 1337x", Comet "🔎 …".
+  const site = text.match(/(?:⚙️|⚙|🔗|🔎|🌐)\s*([A-Za-z0-9][\w .+-]{1,30}?)(?=\s*(?:$|\n|👤|💾|📦|⚙|🔗|🇬|\||…|\.\.\.))/m)?.[1]?.trim();
+  return { quality, hdr, sizeBytes, seeders: seeds ? Number(seeds[1]) : null, site: site || null };
 }

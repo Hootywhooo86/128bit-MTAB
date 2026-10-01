@@ -12,7 +12,7 @@ Comics, shows, movies, anime, live TV and audiobooks in one app, powered by **ad
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
 | **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
 
-Tap a stream to play it; **hold a stream to download** it to the phone (direct links download at once; torrents go to TorBox and download when ready). **Settings → Downloads** has Movies, TV (grouped by show) and Audiobooks, with progress, pause/resume, play and delete; a downloaded title shows **Play downloaded**. Live TV only streams.
+Streams appear addon by addon as each answers (a slow addon is skipped after 15 s; lists are kept 10 minutes). Filter by quality, and by provider (addons and the torrent sites they found, e.g. ThePirateBay, EZTV). In Continue watching, hold an item to remove it. Tap a stream to play it; **hold a stream to download** it to the phone (direct links download at once; torrents go to TorBox and download when ready). **Settings → Downloads** has Movies, TV (grouped by show) and Audiobooks, with progress, pause/resume, play and delete; a downloaded title shows **Play downloaded**. Live TV only streams.
 
 Anime catalogs that addons label as ordinary shows or movies (Kitsu, Crunchyroll, "… Anime") are shown in the **Anime** tab instead of Shows/Movies.
 
@@ -114,6 +114,14 @@ Mihon/Tachiyomi extensions are Android plug-ins only Mihon-style apps can run, s
 3. **Add Keiyoushi repo** (`https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json`) or any other repo URL.
 4. **Update repos** fetches the newest extension list from GitHub; install, update (**Update all**) or remove extensions.
 5. The **Comics** tab gets a source switcher: MangaDex plus every source from your extensions (popular, latest, search). Read progress syncs back to Suwayomi.
+
+### Comics on the phone (no server)
+
+- On a comic: **Download unread chapters to phone**, or hold a chapter → Download / Delete; downloaded chapters read offline.
+- Comics tab → **Import CBZ files from this phone**: pick one or more `.cbz`/`.zip` files; they become one series (each file a chapter/volume) under **On this phone**.
+- **Settings → Downloads → Comics** lists and deletes them.
+
+Mihon extensions themselves only run inside Mihon-style apps, so for those sources Suwayomi is still needed.
 
 ### App updates
 

@@ -2,7 +2,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { Body, Button, EmptyState, Title } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -19,6 +29,16 @@ import {
   type ComicChapter,
   type ReadProgress,
 } from '@/lib/comics';
+import {
+  comicDownloadsSupported,
+  deleteChapter,
+  deleteSeries,
+  downloadChapters,
+  getComicDownloads,
+  onComicDownloads,
+  type LocalChapter,
+  type LocalSeries,
+} from '@/lib/comic-downloads';
 import { rememberChapters } from '@/lib/comic-session';
 
 /** A comic: details, add to library, and its chapters. */
@@ -53,6 +73,15 @@ export default function ComicScreen() {
     };
   }, [id]);
 
+  // Chapters saved on the phone (live, while downloads run).
+  const [local, setLocal] = useState<Map<string, LocalChapter>>(new Map());
+  useEffect(() => {
+    const pick = (list: LocalSeries[]) =>
+      setLocal(new Map((list.find((x) => x.comic.id === id)?.chapters ?? []).map((c) => [c.id, c])));
+    getComicDownloads().then(pick);
+    return onComicDownloads(pick);
+  }, [id]);
+
   useFocusEffect(
     useCallback(() => {
       inComicLibrary(id).then(setSaved);
@@ -70,6 +99,35 @@ export default function ComicScreen() {
   }
 
   const read = new Set(progress?.read ?? []);
+  const isLocalComic = comic.id.startsWith('local:');
+  const readable = (c: ComicChapter) => c.pages > 0 && !(c.externalUrl && !c.pages);
+  const toDownload = (chapters ?? []).filter((c) => readable(c) && !read.has(c.id) && !local.has(c.id));
+
+  /** Hold a chapter: read / unread, download / delete from the phone. */
+  function chapterMenu(item: ComicChapter, done: boolean) {
+    const onPhone = local.get(item.id)?.state === 'done';
+    const options = [
+      {
+        text: done ? 'Mark unread' : 'Mark read',
+        onPress: async () => {
+          await setChapterRead(comic!.id, item.id, !done);
+          setProgress(await getComicProgress(comic!.id));
+        },
+      },
+      ...(isLocalComic
+        ? []
+        : [
+            onPhone
+              ? { text: 'Delete from phone', onPress: () => deleteChapter(comic!.id, item.id) }
+              : { text: 'Download to phone', onPress: () => downloadChapters(comic!, [item], chapterLabel) },
+          ]),
+    ];
+    if (Platform.OS === 'web') {
+      options[0].onPress();
+      return;
+    }
+    Alert.alert(chapterLabel(item), undefined, [...options, { text: 'Cancel', onPress: async () => {} }]);
+  }
   const list = chapters ? (newestFirst ? [...chapters].reverse() : chapters) : [];
   // Continue: where you stopped, or the first chapter you haven't finished.
   const resume =
@@ -129,6 +187,31 @@ export default function ComicScreen() {
               variant="secondary"
               onPress={async () => setSaved(await toggleComicLibrary(comic))}
             />
+            {!isLocalComic && comicDownloadsSupported && toDownload.length ? (
+              <Button
+                label={`Download ${toDownload.length} unread chapter${toDownload.length === 1 ? '' : 's'} to phone`}
+                variant="secondary"
+                onPress={() => downloadChapters(comic, toDownload, chapterLabel)}
+              />
+            ) : null}
+            {isLocalComic ? (
+              <Button
+                label="Delete from phone"
+                variant="danger"
+                onPress={async () => {
+                  await deleteSeries(comic.id);
+                  if (saved) await toggleComicLibrary(comic);
+                  router.back();
+                }}
+              />
+            ) : null}
+            {local.size ? (
+              <Text style={styles.meta}>
+                Hold a chapter for read / download options · {[...local.values()].filter((c) => c.state === 'done').length} on this phone
+              </Text>
+            ) : (
+              <Text style={styles.meta}>Hold a chapter for read / download options</Text>
+            )}
             {comic.description ? (
               <Text
                 style={styles.description}
@@ -163,11 +246,7 @@ export default function ComicScreen() {
             <Pressable
               style={styles.chapter}
               onPress={() => open(item)}
-              onLongPress={async () => {
-                if (!progress) return;
-                await setChapterRead(comic.id, item.id, !done);
-                setProgress(await getComicProgress(comic.id));
-              }}>
+              onLongPress={() => chapterMenu(item, done)}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text
                   style={[styles.chapterTitle, done && { color: Colors.textSecondary }, current && { color: Colors.accent }]}
@@ -185,6 +264,11 @@ export default function ComicScreen() {
                     .join(' · ')}
                 </Text>
               </View>
+              {local.get(item.id)?.state === 'downloading' ? (
+                <Text style={styles.meta}>{Math.round((local.get(item.id)!.progress ?? 0) * 100)}%</Text>
+              ) : local.get(item.id)?.state === 'done' ? (
+                <Ionicons name="phone-portrait-outline" size={18} color={Colors.accent} />
+              ) : null}
               {done ? <Ionicons name="checkmark-circle" size={20} color={Colors.success} /> : null}
               {current ? <Text style={styles.meta}>p. {progress!.page + 1}</Text> : null}
               {item.externalUrl && !item.pages ? (

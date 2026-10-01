@@ -143,20 +143,34 @@ function hashFromMagnet(magnet: string) {
 }
 
 /** Adds a torrent to TorBox, or returns the existing one if it is already in the account. */
+// Torrents already sent to TorBox from this phone (hash → TorBox id), so replaying
+// one doesn't re-list the whole account first.
+const sent = new Map<string, number>();
+
 export async function addMagnet(magnet: string, name?: string): Promise<{ id: number }> {
   const hash = hashFromMagnet(magnet);
-  if (hash) {
-    const existing = (await listTorrents()).find((t) => t.hash?.toLowerCase() === hash);
-    if (existing) return { id: existing.id };
-  }
+  if (hash && sent.has(hash)) return { id: sent.get(hash)! };
   const form = new FormData();
   form.append('magnet', magnet);
   if (name) form.append('name', name);
-  const data = await call<{ torrent_id: number }>('/torrents/createtorrent', {
-    method: 'POST',
-    body: form,
-  });
-  return { id: data.torrent_id };
+  try {
+    const data = await call<{ torrent_id: number }>('/torrents/createtorrent', {
+      method: 'POST',
+      body: form,
+    });
+    if (hash) sent.set(hash, data.torrent_id);
+    return { id: data.torrent_id };
+  } catch (e) {
+    // Already in the account (TorBox refuses duplicates): find the existing one.
+    if (hash) {
+      const existing = (await listTorrents()).find((t) => t.hash?.toLowerCase() === hash);
+      if (existing) {
+        sent.set(hash, existing.id);
+        return { id: existing.id };
+      }
+    }
+    throw e;
+  }
 }
 
 export async function addWebDownload(link: string, name?: string): Promise<{ id: number }> {
