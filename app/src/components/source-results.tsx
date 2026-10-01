@@ -7,6 +7,7 @@ import { Body, Heading, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   getSources,
+  isCatalog,
   resultHash,
   searchSource,
   type InstalledSource,
@@ -18,7 +19,15 @@ import { addMagnet, checkCached, magnetFromHash } from '@/lib/torbox';
 type Sent = 'sending' | 'sent' | { error: string };
 
 /** Torrent results for `query` from every enabled download source, each with a Send to TorBox button. */
-export function SourceResults({ query }: { query: string }) {
+export function SourceResults({
+  query,
+  author,
+  title = 'Download sources',
+}: {
+  query: string;
+  author?: string;
+  title?: string;
+}) {
   const Colors = useColors();
   const styles = useStyles();
   const [sources, setSources] = useState<InstalledSource[] | null>(null);
@@ -31,14 +40,14 @@ export function SourceResults({ query }: { query: string }) {
   useEffect(() => {
     let cancelled = false;
     getSources().then((all) => {
-      const active = all.filter((s) => s.enabled !== false);
+      const active = all.filter((s) => s.enabled !== false && !isCatalog(s.config));
       if (cancelled) return;
       setSources(active);
       setResults([]);
       setErrors([]);
       setPending(active.length);
       active.forEach((s) => {
-        searchSource(s.config, { title: query })
+        searchSource(s.config, { title: query, author })
           .then((found) => {
             if (cancelled) return;
             setResults((prev) => [...prev, ...found]);
@@ -58,7 +67,7 @@ export function SourceResults({ query }: { query: string }) {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, author]);
 
   if (!sources?.length) return null;
 
@@ -91,7 +100,7 @@ export function SourceResults({ query }: { query: string }) {
   return (
     <View style={{ gap: Spacing.two, paddingHorizontal: Spacing.three }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-        <Heading style={{ flex: 1 }}>Download sources</Heading>
+        <Heading style={{ flex: 1 }}>{title}</Heading>
         {pending > 0 ? <ActivityIndicator color={Colors.accent} /> : null}
       </View>
       {errors.map((e) => (

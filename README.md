@@ -84,9 +84,12 @@ When connected, what you watch is scrobbled to Trakt, and your Trakt paused item
 
 **Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress, and Read when you finish. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book.
 
-### Audiobook download sources (Pageturner format)
+### Audiobook sources (Pageturner format)
 
-**Settings → Content & Discovery → Audiobook download sources**: paste a source URL from <https://pageturner-dsc.elfhosted.com/> (pick a source, tap Copy). Torrent sources are searched when you search in Audiobooks; tap **TorBox** on a result to add it to your TorBox account, then play or download it from **Your TorBox cloud**. Direct-download (HLS) sources aren't supported yet, and some sources only answer the Pageturner app itself.
+Two kinds, both added in **Settings → Content & Discovery → Audiobook download sources**:
+
+- **Book catalogs** (iTunes, Audible…) fill **Find audiobooks** with Bestsellers, New Releases and genre rows, plus search results. Tap a book to look for it in your download sources.
+- **Download sources** (torrent indexes): paste a source URL from <https://pageturner-dsc.elfhosted.com/> (pick a source, tap Copy). Torrent sources are searched when you search in Audiobooks; tap **TorBox** on a result to add it to your TorBox account, then play or download it from **Your TorBox cloud**. Direct-download (HLS) sources aren't supported yet, and some sources only answer the Pageturner app itself.
 
 ## Install on your phone
 

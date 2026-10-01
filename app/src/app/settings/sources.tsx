@@ -8,8 +8,10 @@ import { SectionTitle, SettingsPage, ThemedSwitch } from '@/components/settings-
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
+  DEFAULT_SOURCES,
   getSources,
   installSource,
+  isCatalog,
   removeSource,
   setSourceEnabled,
   type InstalledSource,
@@ -30,12 +32,12 @@ export default function SourcesSettings() {
   }, []);
   useFocusEffect(load);
 
-  async function add() {
+  async function add(target = url) {
     setBusy(true);
     setError(null);
     try {
-      await installSource(url);
-      setUrl('');
+      await installSource(target);
+      if (target === url) setUrl('');
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -49,20 +51,27 @@ export default function SourcesSettings() {
       <SectionTitle>Add a source</SectionTitle>
       <View style={styles.card}>
         <Text style={styles.body}>
-          Paste a download source URL in Pageturner’s format. Pick a source on the config site,
-          tap Copy next to its Source URL, and paste it here. When you search in Audiobooks, these
-          sources are searched too; tap TorBox on a result to send it to your TorBox account.
+          Paste a source URL in Pageturner’s format (a JSON link). Book catalogs (iTunes, Audible…)
+          fill Find audiobooks with bestsellers and search results. Download sources (torrent
+          indexes) find the files: tap a book, then TorBox on a result to send it to your TorBox
+          account.
         </Text>
         <Input
-          placeholder="https://…/meta/addons/….json"
+          placeholder="https://… (source JSON link)"
           value={url}
           onChangeText={setUrl}
           keyboardType="url"
           autoCapitalize="none"
-          onSubmitEditing={add}
+          onSubmitEditing={() => add()}
         />
         {error ? <Text style={{ color: Colors.danger }}>{error}</Text> : null}
-        <Button label="Add source" onPress={add} loading={busy} disabled={!url.trim()} />
+        <Button label="Add source" onPress={() => add()} loading={busy} disabled={!url.trim()} />
+        {DEFAULT_SOURCES.filter((d) => !sources.some((s) => s.url === d.url)).map((d) => (
+          <View key={d.url} style={styles.header}>
+            <Text style={[styles.body, { flex: 1 }]}>Suggested: {d.name}</Text>
+            <Button label="Add" variant="secondary" onPress={() => add(d.url)} />
+          </View>
+        ))}
         <Button
           label="Open the Pageturner source config site"
           variant="secondary"
@@ -76,7 +85,7 @@ export default function SourcesSettings() {
         <View key={s.config.id} style={[styles.card, s.enabled === false && { opacity: 0.6 }]}>
           <View style={styles.header}>
             <View style={styles.logo}>
-              {s.config.icon ? (
+              {s.config.icon?.startsWith('http') ? (
                 <Image source={{ uri: s.config.icon }} style={{ width: 28, height: 28 }} />
               ) : (
                 <Ionicons name="cloud-download" size={24} color={Colors.accent} />
@@ -85,7 +94,8 @@ export default function SourcesSettings() {
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{s.config.name}</Text>
               <Text style={styles.body}>
-                {s.config.type} · v{s.config.version ?? '1'}
+                {isCatalog(s.config) ? 'Book catalog' : `${s.config.type} download source`} · v
+                {s.config.version ?? '1'}
               </Text>
             </View>
             <ThemedSwitch

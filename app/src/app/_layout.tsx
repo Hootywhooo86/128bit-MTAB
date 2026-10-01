@@ -6,6 +6,7 @@ import { useEffect, useMemo } from 'react';
 import { useColors } from '@/constants/theme';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
+import { installDefaultSources } from '@/lib/sources';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
 SplashScreen.preventAutoHideAsync();
@@ -30,6 +31,7 @@ function AppNavigator() {
   // First launch: add Cinemeta + OpenSubtitles so there's something to browse right away.
   useEffect(() => {
     installDefaultAddons().catch(() => {});
+    installDefaultSources().catch(() => {});
   }, []);
 
   const theme = useMemo(
@@ -85,6 +87,7 @@ function AppNavigator() {
           <Stack.Screen name="settings/integrations" options={{ title: 'Integrations' }} />
           <Stack.Screen name="settings/about" options={{ title: 'About' }} />
           <Stack.Screen name="audiobooks/browse" options={{ title: 'Find audiobooks' }} />
+          <Stack.Screen name="audiobooks/find" options={{ title: '' }} />
           <Stack.Screen name="audiobooks/cloud" options={{ title: 'TorBox cloud' }} />
           <Stack.Screen name="audiobooks/abs" options={{ title: 'Audiobookshelf' }} />
           <Stack.Screen name="audiobooks/abs-item" options={{ title: '' }} />

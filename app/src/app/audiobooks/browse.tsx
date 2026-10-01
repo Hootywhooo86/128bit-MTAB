@@ -3,12 +3,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { CatalogRows } from '@/components/catalog-rows';
 import { SourceResults } from '@/components/source-results';
 import { Body, Button, Cover, EmptyState, Heading, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchCatalog, supportsSearch } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
-import { getSources } from '@/lib/sources';
+import { getSources, isCatalog } from '@/lib/sources';
 import type { BookPreview, CatalogDef, InstalledAddon } from '@/lib/types';
 
 type Row = {
@@ -26,10 +27,15 @@ export default function BrowseAudiobooksScreen() {
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [sourceCount, setSourceCount] = useState(0);
+  const [catalogCount, setCatalogCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
-      getSources().then((all) => setSourceCount(all.filter((x) => x.enabled !== false).length));
+      getSources().then((all) => {
+        const on = all.filter((x) => x.enabled !== false);
+        setSourceCount(on.filter((x) => !isCatalog(x.config)).length);
+        setCatalogCount(on.filter((x) => isCatalog(x.config)).length);
+      });
     }, []),
   );
 
@@ -94,18 +100,19 @@ export default function BrowseAudiobooksScreen() {
         <Pressable style={styles.cloud} onPress={() => router.push('/settings/sources')}>
           <Ionicons name="cloud-download-outline" size={24} color={Colors.accent} />
           <View style={{ flex: 1 }}>
-            <Heading>Download sources</Heading>
+            <Heading>Sources</Heading>
             <Body muted style={{ fontSize: 13 }}>
-              {sourceCount
-                ? `${sourceCount} active. Search above, then send a result to TorBox`
-                : 'Add Pageturner sources to search for books to send to TorBox'}
+              {sourceCount || catalogCount
+                ? `${catalogCount} catalogs, ${sourceCount} download sources. Tap a book to send it to TorBox`
+                : 'Add Pageturner catalogs and download sources'}
             </Body>
           </View>
           <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </Pressable>
       ) : null}
+      <CatalogRows query={submitted || undefined} />
       {submitted ? <SourceResults key={submitted} query={submitted} /> : null}
-      {rows.length === 0 && !(submitted && sourceCount) ? (
+      {rows.length === 0 && !sourceCount && !catalogCount ? (
         <EmptyState
           title={submitted ? 'Nothing to search' : 'No audiobook addons'}
           body={
