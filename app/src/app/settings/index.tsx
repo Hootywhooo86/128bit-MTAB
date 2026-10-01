@@ -10,8 +10,14 @@ export default function SettingsScreen() {
         <Row
           icon="sync"
           title="Tracking"
-          subtitle="Connect Trakt to scrobble what you watch and power Continue Watching."
+          subtitle="Trakt for what you watch, Hardcover for books."
           onPress={() => router.push('/settings/tracking')}
+        />
+        <Row
+          icon="stats-chart"
+          title="Statistics"
+          subtitle="Listening, watching and reading time"
+          onPress={() => router.push('/settings/stats')}
         />
       </Group>
 

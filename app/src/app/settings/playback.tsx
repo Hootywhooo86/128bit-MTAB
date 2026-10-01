@@ -65,6 +65,27 @@ export default function PlaybackSettings() {
           onChange={(v) => setPref('cachedFirst', v)}
         />
       </Group>
+      <SectionTitle>Comics</SectionTitle>
+      <Group>
+        <ChoiceRow
+          title="Reading mode"
+          subtitle="You can also switch it while reading."
+          value={prefs.readerMode}
+          options={[
+            { value: 'vertical', label: 'Scroll down' },
+            { value: 'rtl', label: 'Pages, right to left' },
+            { value: 'ltr', label: 'Pages, left to right' },
+          ]}
+          onChange={(v) => setPref('readerMode', v)}
+        />
+        <ToggleRow
+          title="Data saver"
+          subtitle="Smaller, compressed pages. Loads faster on mobile data."
+          value={prefs.comicDataSaver}
+          onChange={(v) => setPref('comicDataSaver', v)}
+        />
+      </Group>
+
       <SectionTitle>Subtitles</SectionTitle>
       <Group>
         <ChoiceRow

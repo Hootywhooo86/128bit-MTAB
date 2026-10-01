@@ -28,6 +28,7 @@ import {
   type AddonSubtitle,
   type Cue,
 } from '@/lib/subtitles';
+import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
 import { scrobble } from '@/lib/trakt';
 import {
   checkTorboxStream,
@@ -161,6 +162,28 @@ export default function WatchScreen() {
       sub.remove();
       save();
     };
+  }, [item, player]);
+
+  // Statistics: count watch time while playing; "watched" once you're near the end.
+  useEffect(() => {
+    if (!item) return;
+    const kind: WatchKind = item.live ? 'live' : item.link?.type === 'movie' ? 'movie' : 'episode';
+    const entry = { key: item.key, title: item.title, subtitle: item.subtitle, kind };
+    let counted = false;
+    const tick = setInterval(() => {
+      if (!player.playing) return;
+      addWatching(entry, 10);
+      if (
+        !counted &&
+        !item.live &&
+        player.duration > 0 &&
+        player.currentTime / player.duration > 0.9
+      ) {
+        counted = true;
+        markWatched(entry);
+      }
+    }, 10_000);
+    return () => clearInterval(tick);
   }, [item, player]);
 
   // Tell Trakt what's playing (start / pause / stop).

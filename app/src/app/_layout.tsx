@@ -77,6 +77,12 @@ function AppNavigator() {
               orientation: 'all',
             }}
           />
+          <Stack.Screen name="comics/[id]" options={{ title: '' }} />
+          <Stack.Screen
+            name="comics/read"
+            options={{ headerShown: false, presentation: 'fullScreenModal', orientation: 'all' }}
+          />
+          <Stack.Screen name="settings/stats" options={{ title: 'Statistics' }} />
           <Stack.Screen name="settings/index" options={{ title: '' }} />
           <Stack.Screen name="addons" options={{ title: 'Addons' }} />
           <Stack.Screen name="settings/content" options={{ title: 'Content & Discovery' }} />

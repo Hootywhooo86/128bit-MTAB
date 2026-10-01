@@ -34,6 +34,10 @@ export type Prefs = {
   autoSubtitles: boolean;
   subtitleSize: 'small' | 'medium' | 'large';
   autoPlayNextEpisode: boolean;
+  /** Comics reader: scroll down (webtoon/manga), or page left-to-right / right-to-left. */
+  readerMode: 'vertical' | 'ltr' | 'rtl';
+  /** Smaller, compressed comic pages (saves data). */
+  comicDataSaver: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -51,6 +55,8 @@ export const DEFAULT_PREFS: Prefs = {
   autoSubtitles: false,
   subtitleSize: 'medium',
   autoPlayNextEpisode: true,
+  readerMode: 'vertical',
+  comicDataSaver: false,
 };
 
 const KEY = '128bit.prefs';

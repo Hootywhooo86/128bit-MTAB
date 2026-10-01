@@ -41,7 +41,7 @@ export default function TabLayout() {
       }}>
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', headerTitle: '128bit', tabBarIcon: icon('home-outline') }}
+        options={{ title: 'Comics', tabBarIcon: icon('book-outline') }}
       />
       <Tabs.Screen name="shows" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
       <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />

@@ -1,16 +1,16 @@
 # 128bit
 
-Shows, movies, live TV and audiobooks in one app, powered by **addons**, like Stremio/Nuvio for video and PageTurner for audiobooks. When a stream or book comes as a torrent or web link, 128bit sends it to your **TorBox** account and plays the finished files from there.
+Comics, shows, movies, anime, live TV and audiobooks in one app, powered by **addons**, like Stremio/Nuvio for video and PageTurner for audiobooks. When a stream or book comes as a torrent or web link, 128bit sends it to your **TorBox** account and plays the finished files from there.
 
 | Tab | What it does |
 |---|---|
-| **Home** | Featured title, Continue watching, Continue listening and top catalogs. |
+| **Comics** | Manga and comics from MangaDex: popular, latest, top rated, search, your library and Continue reading. Reader with scroll-down (manga/webtoon) or page-turn modes (right-to-left or left-to-right), data saver, read marks and next chapter. |
 | **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker (quality/size badges, filters). Subtitles, audio tracks, Next episode / auto-play. |
 | **Movies** | Same for movies. |
 | **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
-| **Settings** (⚙ top right) | Tracking (Trakt, Hardcover), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
+| **Settings** (⚙ top right) | Tracking (Trakt, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
