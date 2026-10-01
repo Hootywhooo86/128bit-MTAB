@@ -29,6 +29,7 @@ import {
   type Cue,
 } from '@/lib/subtitles';
 import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
+import { simklScrobble } from '@/lib/simkl';
 import { scrobble } from '@/lib/trakt';
 import {
   checkTorboxStream,
@@ -200,6 +201,21 @@ export default function WatchScreen() {
       send('stop');
     };
   }, [item, player, prefs.traktScrobble]);
+
+  // Same for Simkl (only does anything when Simkl is connected).
+  useEffect(() => {
+    if (!item || item.live) return;
+    const percent = () => (player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0);
+    const send = (action: 'start' | 'pause' | 'stop') =>
+      simklScrobble(action, item.key, item.link?.type, percent()).catch(() => {});
+    const sub = player.addListener('playingChange', ({ isPlaying }) =>
+      send(isPlaying ? 'start' : 'pause'),
+    );
+    return () => {
+      sub.remove();
+      send('stop');
+    };
+  }, [item, player]);
 
   const chooseSubtitle = useCallback(
     async (choice: SubtitleChoice) => {

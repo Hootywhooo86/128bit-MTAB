@@ -10,7 +10,7 @@ export default function SettingsScreen() {
         <Row
           icon="sync"
           title="Tracking"
-          subtitle="Trakt for what you watch, Hardcover for books."
+          subtitle="Trakt and Simkl for what you watch, Hardcover for books."
           onPress={() => router.push('/settings/tracking')}
         />
         <Row

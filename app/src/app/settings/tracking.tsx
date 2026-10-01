@@ -7,6 +7,7 @@ import { ActivityIndicator, Linking, Pressable, Text, TextInput } from 'react-na
 import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
 import { HardcoverCard } from '@/components/hardcover-card';
+import { SimklCard } from '@/components/simkl-card';
 import { usePrefs } from '@/lib/prefs';
 import {
   disconnect,
@@ -213,6 +214,9 @@ export default function TrackingSettings() {
           onChange={(v) => setPref('traktContinueWatching', v)}
         />
       </Group>
+
+      <SectionTitle>Simkl</SectionTitle>
+      <SimklCard />
 
       <SectionTitle>Books</SectionTitle>
       <HardcoverCard />

@@ -10,7 +10,7 @@ Comics, shows, movies, anime, live TV and audiobooks in one app, powered by **ad
 | **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
-| **Settings** (⚙ top right) | Tracking (Trakt, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
+| **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
@@ -90,6 +90,13 @@ When connected, what you watch is scrobbled to Trakt, and your Trakt paused item
 Searching in **Find audiobooks** also searches AudiobookBay's whole catalog (the same way [audiobookbay-automated](https://github.com/JamesRy96/audiobookbay-automated) does), with **Load more**. Tapping a book from iTunes/Audible shows AudiobookBay matches too, plus **Add to Wanted**.
 
 **Audiobooks → Wanted** keeps books you want but don't have yet. Each one is checked against AudiobookBay and your download sources; when a match turns up, tap **TorBox** on it. With Hardcover connected, Wanted syncs with your **Want to Read** shelf both ways (new Want to Read books come in; books you add here go there).
+
+### Optional: Simkl
+
+1. On simkl.com: **Settings → Developer → Create new app** (redirect URI `urn:ietf:wg:oauth:2.0:oob`).
+2. In the app: **Settings → Tracking → Simkl**, paste the **Client ID**, tap **Connect Simkl** and enter the code at simkl.com/pin.
+
+Movies, episodes and anime (IMDb and Kitsu ids) are scrobbled to Simkl, next to Trakt if you use both.
 
 ### Optional: Hardcover
 
