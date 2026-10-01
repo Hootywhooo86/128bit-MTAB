@@ -8,7 +8,13 @@ import { searchAbb, type AbbResult } from '@/lib/abb';
 import { resolveTorrent } from '@/lib/feeds';
 
 /** AudiobookBay search results for `query`, best matches first, with Load more. */
-export function AbbResults({ query, onSent }: { query: string; onSent?: () => void }) {
+export function AbbResults({
+  query,
+  onSent,
+}: {
+  query: string;
+  onSent?: (torboxId: number, name: string) => void;
+}) {
   const Colors = useColors();
   const styles = useStyles();
   const [results, setResults] = useState<AbbResult[]>([]);

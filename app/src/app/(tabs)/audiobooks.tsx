@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { AudiobookSearch } from '@/components/audiobook-search';
 import { BookRow } from '@/components/book-row';
 import { HeaderButtons } from '@/components/header-buttons';
 import { WantedList } from '@/components/wanted-list';
@@ -64,6 +65,7 @@ export default function AudiobooksScreen() {
   const [progress, setProgress] = useState<Record<string, Progress>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wantedCount, setWantedCount] = useState(0);
+  const [searching, setSearching] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -71,8 +73,8 @@ export default function AudiobooksScreen() {
         <HeaderButtons
           actions={[
             {
-              icon: 'search',
-              label: 'Find audiobooks',
+              icon: 'compass-outline',
+              label: 'Browse sources',
               onPress: () => router.push('/audiobooks/browse'),
             },
           ]}
@@ -131,6 +133,9 @@ export default function AudiobooksScreen() {
 
   return (
     <View style={styles.screen}>
+      <AudiobookSearch onActive={setSearching} />
+      {searching ? null : (
+        <>
       <View style={styles.segments}>
         {(['library', 'downloads', 'wanted'] as const).map((t) => (
           <Pressable key={t} style={styles.segment} onPress={() => setTab(t)}>
@@ -210,6 +215,8 @@ export default function AudiobooksScreen() {
           />
         )}
       />
+        </>
+      )}
     </View>
   );
 }

@@ -33,9 +33,9 @@ export default function FindBookScreen() {
     isWanted(p.title ?? '', p.author || undefined).then(setWanted);
   }, [p.title, p.author]);
 
-  // Sending something for a wanted book ticks it off the list.
-  const onSent = () => {
-    if (wanted) markSent(wantedId(p.title ?? '', p.author || undefined), p.title ?? '');
+  // Sending something for a wanted book records it, so the Wanted tab can follow TorBox.
+  const onSent = (torboxId: number, name: string) => {
+    if (wanted) markSent(wantedId(p.title ?? '', p.author || undefined), name, torboxId);
   };
 
   useEffect(() => {

@@ -85,6 +85,12 @@ When connected, what you watch is scrobbled to Trakt, and your Trakt paused item
 
 **Find audiobooks → New on AudiobookBay** lists the newest posts from an RSS feed (AudiobookBay's `/rss` is added by default; add more in **Settings → Content & Discovery → Audiobook download sources → RSS feeds**). Tap **TorBox** on a post: 128bit takes the magnet from the feed item, or reads the info hash and trackers from the post's page, builds the magnet and sends it to TorBox.
 
+### Getting a book (Pageturner style)
+
+1. **Audiobooks tab → search bar**: search Audible's catalog by **Title / Author / Narrator / All** (recent searches are kept). Results show cover, narrators, rating, length and series.
+2. Tap a book → **Book Details** → **Download**: it goes on your **Wanted** list (and Hardcover **Want to Read**), the best release is found on AudiobookBay / your download sources (series number aware, so Book 1 doesn't grab Book 7) and sent to TorBox. **Choose a release myself** lists them all instead.
+3. **Wanted** shows each book's TorBox progress. In the book: **Download when ready** saves it to the phone as soon as TorBox finishes (checked every minute while the app is open); once ready: **Play** or **Download to phone** (it also lands in your Library).
+
 ### AudiobookBay search and the Wanted list
 
 Searching in **Find audiobooks** also searches AudiobookBay's whole catalog (the same way [audiobookbay-automated](https://github.com/JamesRy96/audiobookbay-automated) does), with **Load more**. Tapping a book from iTunes/Audible shows AudiobookBay matches too, plus **Add to Wanted**.

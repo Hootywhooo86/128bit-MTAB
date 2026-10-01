@@ -14,7 +14,9 @@ import {
   importHardcoverWanted,
   markSent,
   removeWanted,
+  torboxState,
   type Match,
+  type TorboxState,
   type WantedBook,
 } from '@/lib/wanted';
 
@@ -156,6 +158,17 @@ function WantedRow({
   const styles = useStyles();
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tb, setTb] = useState<TorboxState | null>(null);
+
+  // Sent to TorBox: show how far along it is.
+  useEffect(() => {
+    if (!book.torbox) return;
+    let cancelled = false;
+    torboxState(book).then((s) => !cancelled && setTb(s));
+    return () => {
+      cancelled = true;
+    };
+  }, [book, fresh]);
 
   useEffect(() => {
     if (book.sentAt) return;
@@ -172,7 +185,7 @@ function WantedRow({
   const best = matches?.[0];
   const openSearch = () =>
     router.push({
-      pathname: '/audiobooks/find',
+      pathname: '/audiobooks/details',
       params: { title: book.title, author: book.author ?? '', cover: book.cover ?? '' },
     });
 
@@ -192,7 +205,20 @@ function WantedRow({
           {book.title}
         </Text>
         {book.author ? <Text style={styles.meta}>{book.author}</Text> : null}
-        {book.sentAt ? (
+        {book.downloaded ? (
+          <Text style={[styles.meta, { color: Colors.success }]}>✓ On your phone · in Library</Text>
+        ) : book.torbox && tb?.state === 'downloading' ? (
+          <Text style={[styles.meta, { color: Colors.accent }]}>
+            TorBox {Math.round(tb.progress * 100)}%
+            {book.autoDownload ? ' · downloads to phone when ready' : ''}
+          </Text>
+        ) : book.torbox && tb?.state === 'ready' ? (
+          <Text style={[styles.meta, { color: Colors.success }]}>
+            Ready in TorBox · tap to play or download
+          </Text>
+        ) : book.torbox && tb?.state === 'gone' ? (
+          <Text style={[styles.meta, { color: Colors.danger }]}>TorBox item gone · tap to send again</Text>
+        ) : book.sentAt ? (
           <Text style={[styles.meta, { color: Colors.success }]} numberOfLines={2}>
             ✓ Sent to TorBox{book.sentName ? `: ${book.sentName}` : ''}
           </Text>
@@ -214,8 +240,8 @@ function WantedRow({
         <TorboxButton
           name={best.name}
           getMagnet={best.magnet}
-          onSent={async () => {
-            await markSent(book.id, best.name);
+          onSent={async (torboxId) => {
+            await markSent(book.id, best.name, torboxId);
             onChanged();
           }}
         />

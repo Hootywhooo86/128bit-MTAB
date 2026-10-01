@@ -17,7 +17,8 @@ export function TorboxButton({
 }: {
   name: string;
   getMagnet: () => Promise<string>;
-  onSent?: () => void;
+  /** Called with the TorBox torrent id and the release name. */
+  onSent?: (torboxId: number, name: string) => void;
 }) {
   const Colors = useColors();
   const styles = useStyles();
@@ -30,9 +31,9 @@ export function TorboxButton({
     }
     setState('sending');
     try {
-      await addMagnet(await getMagnet(), name);
+      const { id } = await addMagnet(await getMagnet(), name);
       setState('sent');
-      onSent?.();
+      onSent?.(id, name);
     } catch (e) {
       setState({ error: e instanceof Error ? e.message : String(e) });
     }

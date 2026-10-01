@@ -8,6 +8,7 @@ import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
 import { installDefaultSources } from '@/lib/sources';
+import { runAutoDownloads } from '@/lib/wanted';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
 SplashScreen.preventAutoHideAsync();
@@ -34,6 +35,13 @@ function AppNavigator() {
     installDefaultAddons().catch(() => {});
     installDefaultSources().catch(() => {});
     installDefaultFeeds().catch(() => {});
+  }, []);
+
+  // Wanted books marked "download when ready": check TorBox every minute while the app is open.
+  useEffect(() => {
+    runAutoDownloads().catch(() => {});
+    const timer = setInterval(() => runAutoDownloads().catch(() => {}), 60_000);
+    return () => clearInterval(timer);
   }, []);
 
   const theme = useMemo(
@@ -95,6 +103,7 @@ function AppNavigator() {
           <Stack.Screen name="settings/integrations" options={{ title: 'Integrations' }} />
           <Stack.Screen name="settings/about" options={{ title: 'About' }} />
           <Stack.Screen name="audiobooks/browse" options={{ title: 'Find audiobooks' }} />
+          <Stack.Screen name="audiobooks/details" options={{ title: 'Book Details' }} />
           <Stack.Screen name="audiobooks/feed" options={{ title: 'Latest uploads' }} />
           <Stack.Screen name="audiobooks/find" options={{ title: '' }} />
           <Stack.Screen name="audiobooks/cloud" options={{ title: 'TorBox cloud' }} />
