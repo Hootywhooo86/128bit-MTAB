@@ -93,7 +93,7 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
       (async () => {
         const local = await getWatchProgress();
         let merged = local;
-        if (prefs.traktContinueWatching && traktConfigured && (await isConnected())) {
+        if (prefs.traktContinueWatching && (await traktConfigured()) && (await isConnected())) {
           // Local entries win (they have exact positions); Trakt fills in the rest.
           const remote = await getPlayback().catch(() => []);
           merged = [...local, ...remote.filter((r) => !local.some((l) => l.key === r.key))].sort(

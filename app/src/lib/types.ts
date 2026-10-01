@@ -43,7 +43,7 @@ export type InstalledAddon = {
 
 // --- Video (Stremio protocol) -----------------------------------------------
 
-export type VideoType = 'movie' | 'series' | 'tv';
+export type VideoType = 'movie' | 'series' | 'tv' | 'sport';
 
 export type MetaPreview = {
   id: string;

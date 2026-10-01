@@ -24,7 +24,10 @@ const SUGGESTED = DEFAULT_ADDONS;
 const TYPE_LABELS: Record<string, string> = {
   movie: 'Movie',
   series: 'Series',
-  tv: 'Tv',
+  tv: 'TV',
+  channel: 'Channel',
+  sport: 'Sport',
+  sports: 'Sports',
   audiobook: 'Audiobook',
   anime: 'Anime',
   other: 'Other',

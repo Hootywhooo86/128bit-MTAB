@@ -2,17 +2,20 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, Text, TextInput } from 'react-native';
 
 import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
+import { HardcoverCard } from '@/components/hardcover-card';
 import { usePrefs } from '@/lib/prefs';
 import {
   disconnect,
   getUsername,
   isConnected,
   pollDeviceAuth,
+  setTraktKeys,
   startDeviceAuth,
+  traktBuiltIn,
   traktConfigured,
   type DeviceCode,
 } from '@/lib/trakt';
@@ -21,12 +24,17 @@ export default function TrackingSettings() {
   const styles = useStyles();
   const { prefs, setPref } = usePrefs();
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [configured, setConfigured] = useState(traktBuiltIn);
+  const [editKeys, setEditKeys] = useState(false);
+  const [clientId, setClientId] = useState('');
+  const [secret, setSecret] = useState('');
   const [username, setUsername] = useState<string | null>(null);
   const [code, setCode] = useState<DeviceCode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
+    setConfigured(await traktConfigured());
     const yes = await isConnected();
     setConnected(yes);
     if (yes)
@@ -83,6 +91,15 @@ export default function TrackingSettings() {
     }
   }
 
+  async function saveKeys() {
+    setError(null);
+    await setTraktKeys(clientId, secret);
+    setEditKeys(false);
+    setClientId('');
+    setSecret('');
+    load();
+  }
+
   async function signOut() {
     await disconnect();
     setUsername(null);
@@ -125,15 +142,56 @@ export default function TrackingSettings() {
             <Text style={styles.traktBody}>
               Sync watch progress, continue watching and scrobbles with Trakt.
             </Text>
-            {traktConfigured ? (
-              <Pressable style={styles.connectButton} onPress={connect}>
-                <Text style={styles.connectLabel}>Connect Trakt</Text>
-              </Pressable>
+            {configured && !editKeys ? (
+              <>
+                <Pressable style={styles.connectButton} onPress={connect}>
+                  <Text style={styles.connectLabel}>Connect Trakt</Text>
+                </Pressable>
+                {!traktBuiltIn ? (
+                  <Pressable onPress={() => setEditKeys(true)} hitSlop={8}>
+                    <Text style={styles.traktLink}>Change API keys</Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : (
-              <Text style={styles.traktBody}>
-                Trakt isn’t set up in this build yet: add EXPO_PUBLIC_TRAKT_CLIENT_ID and
-                EXPO_PUBLIC_TRAKT_CLIENT_SECRET to app/.env (see .env.example).
-              </Text>
+              <>
+                <Text style={styles.traktBody}>
+                  Trakt needs your own (free) API app. On trakt.tv: Settings → Your API Apps → New
+                  application. Name it 128bit, set the redirect URI to{' '}
+                  <Text style={{ fontWeight: '800' }}>urn:ietf:wg:oauth:2.0:oob</Text>, save, then
+                  paste the Client ID and Client Secret here.
+                </Text>
+                <Pressable
+                  onPress={() => Linking.openURL('https://trakt.tv/oauth/applications/new')}
+                  hitSlop={8}>
+                  <Text style={styles.traktLink}>Open trakt.tv/oauth/applications</Text>
+                </Pressable>
+                <TextInput
+                  style={styles.keyInput}
+                  placeholder="Client ID"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={clientId}
+                  onChangeText={setClientId}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TextInput
+                  style={styles.keyInput}
+                  placeholder="Client Secret"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={secret}
+                  onChangeText={setSecret}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                />
+                <Pressable
+                  style={[styles.connectButton, !(clientId.trim() && secret.trim()) && { opacity: 0.5 }]}
+                  disabled={!(clientId.trim() && secret.trim())}
+                  onPress={saveKeys}>
+                  <Text style={styles.connectLabel}>Save keys</Text>
+                </Pressable>
+              </>
             )}
           </>
         )}
@@ -155,6 +213,9 @@ export default function TrackingSettings() {
           onChange={(v) => setPref('traktContinueWatching', v)}
         />
       </Group>
+
+      <SectionTitle>Books</SectionTitle>
+      <HardcoverCard />
     </SettingsPage>
   );
 }
@@ -197,4 +258,13 @@ const useStyles = makeStyles(() => ({
     marginTop: Spacing.three,
   },
   connectLabel: { color: '#000', fontWeight: '700', fontSize: 17 },
+  keyInput: {
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    fontSize: 16,
+    marginTop: Spacing.two,
+  },
 }));

@@ -13,7 +13,7 @@ import {
 
 import { Body, Button, EmptyState, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { fetchMetas, isBrowsable } from '@/lib/addons';
+import { CHANNEL_TYPES, SPORT_TYPES, fetchMetas, isBrowsable } from '@/lib/addons';
 import { fetchPlaylist, getPlaylists } from '@/lib/m3u';
 import { getActiveAddons } from '@/lib/storage';
 import { setNowWatching } from '@/lib/video';
@@ -23,12 +23,17 @@ type Row = {
   name: string;
   logo?: string;
   group?: string;
+  kind: Kind;
+  /** Extra line, e.g. "LIVE" or a kick-off time for sports. */
+  info?: string;
+  live?: boolean;
   /** M3U channels play straight away; addon channels open their stream list. */
   url?: string;
   meta?: { type: string; id: string; addon: string };
 };
 
 const ALL = 'All';
+type Kind = 'channels' | 'sports';
 
 export default function LiveScreen() {
   const Colors = useColors();
@@ -36,6 +41,7 @@ export default function LiveScreen() {
   const [channels, setChannels] = useState<Row[] | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [group, setGroup] = useState(ALL);
+  const [kind, setKind] = useState<Kind>('channels');
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
@@ -43,34 +49,47 @@ export default function LiveScreen() {
     const errs: string[] = [];
     const lists = await Promise.all([
       ...playlists.map((p) =>
-        fetchPlaylist(p).catch((e) => {
-          errs.push(String(e.message ?? e));
-          return [];
-        }),
+        fetchPlaylist(p)
+          .then((list) => list.map<Row>((c) => ({ ...c, kind: 'channels', live: true })))
+          .catch((e) => {
+            errs.push(String(e.message ?? e));
+            return [] as Row[];
+          }),
       ),
       ...addons.flatMap((a) =>
         a.manifest.catalogs
-          .filter((c) => c.type === 'tv' && isBrowsable(c))
-          .map((c) =>
-            fetchMetas(a, c)
+          .filter(
+            (c) =>
+              (CHANNEL_TYPES.includes(c.type) || SPORT_TYPES.includes(c.type)) && isBrowsable(c),
+          )
+          .map((c) => {
+            const sports = SPORT_TYPES.includes(c.type);
+            return fetchMetas(a, c)
               .then((metas) =>
-                metas.map<Row>((m) => ({
-                  id: `${a.manifest.id}:${m.id}`,
-                  name: m.name,
-                  logo: m.logo ?? m.poster,
-                  group: m.genres?.[0] ?? c.name,
-                  meta: {
-                    type: m.type || 'tv',
-                    id: m.id,
-                    addon: a.manifest.id,
-                  },
-                })),
+                metas.map<Row>((m) => {
+                  const live = sports ? /\blive\b/i.test(m.releaseInfo ?? '') : true;
+                  return {
+                    id: `${a.manifest.id}:${c.id}:${m.id}`,
+                    name: m.name,
+                    logo: m.logo ?? m.poster,
+                    // Sports are grouped by the addon's catalogs (Live Now, Today, Hockey…).
+                    group: sports ? c.name : (m.genres?.[0] ?? c.name),
+                    kind: sports ? 'sports' : 'channels',
+                    info: sports && !live ? m.releaseInfo : undefined,
+                    live,
+                    meta: {
+                      type: m.type || c.type,
+                      id: m.id,
+                      addon: a.manifest.id,
+                    },
+                  };
+                }),
               )
               .catch((e) => {
                 errs.push(`${a.manifest.name}: ${e.message ?? e}`);
                 return [] as Row[];
-              }),
-          ),
+              });
+          }),
       ),
     ]);
     setChannels(lists.flat());
@@ -83,14 +102,34 @@ export default function LiveScreen() {
     }, [load]),
   );
 
+  const hasSports = (channels ?? []).some((c) => c.kind === 'sports');
+  const hasChannels = (channels ?? []).some((c) => c.kind === 'channels');
+  // Only sports installed? Show them without making you switch.
+  const shown: Kind = kind === 'sports' || !hasChannels ? 'sports' : 'channels';
+  const ofKind = useMemo(
+    () => (channels ?? []).filter((c) => c.kind === shown),
+    [channels, shown],
+  );
   const groups = useMemo(
-    () => [ALL, ...new Set((channels ?? []).map((c) => c.group).filter(Boolean) as string[])],
-    [channels],
+    () => [ALL, ...new Set(ofKind.map((c) => c.group).filter(Boolean) as string[])],
+    [ofKind],
   );
   const q = query.trim().toLowerCase();
-  const visible = (channels ?? []).filter(
-    (c) => (group === ALL || c.group === group) && (!q || c.name.toLowerCase().includes(q)),
-  );
+  const seen = new Set<string>();
+  const visible = ofKind.filter((c) => {
+    if (group !== ALL && c.group !== group) return false;
+    if (q && !c.name.toLowerCase().includes(q)) return false;
+    // A match can be in several sports catalogs; list it once under All.
+    const key = c.meta ? `${c.meta.addon}:${c.meta.id}` : c.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  function switchKind(k: Kind) {
+    setKind(k);
+    setGroup(ALL);
+  }
 
   function open(c: Row) {
     if (c.url) {
@@ -121,7 +160,7 @@ export default function LiveScreen() {
       <View style={styles.screen}>
         <EmptyState
           title="No channels yet"
-          body="Add an M3U playlist from your TV provider, or install an addon with TV channels.">
+          body="Add an M3U playlist from your TV provider, or install an addon with TV channels or live sports.">
           <Button label="Add a playlist or addon" onPress={() => router.push('/addons')} />
           {errors.map((e) => (
             <Body key={e} style={{ color: Colors.danger, fontSize: 12 }}>
@@ -136,8 +175,22 @@ export default function LiveScreen() {
   return (
     <View style={styles.screen}>
       <View style={{ padding: Spacing.three, gap: Spacing.two }}>
+        {hasSports && hasChannels ? (
+          <View style={styles.segment}>
+            {(['channels', 'sports'] as const).map((k) => (
+              <Pressable
+                key={k}
+                onPress={() => switchKind(k)}
+                style={[styles.segmentItem, shown === k && styles.segmentActive]}>
+                <Text style={[styles.segmentText, shown === k && { color: Colors.accentText }]}>
+                  {k === 'channels' ? 'Channels' : 'Sports'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <Input
-          placeholder="Search channels"
+          placeholder={shown === 'sports' ? 'Search matches' : 'Search channels'}
           value={query}
           onChangeText={setQuery}
           clearButtonMode="while-editing"
@@ -194,9 +247,13 @@ export default function LiveScreen() {
               <Text style={styles.name} numberOfLines={1}>
                 {item.name}
               </Text>
-              {item.group ? <Text style={styles.group}>{item.group}</Text> : null}
+              {item.info || item.group ? (
+                <Text style={styles.group} numberOfLines={1}>
+                  {[item.info, item.group].filter(Boolean).join(' · ')}
+                </Text>
+              ) : null}
             </View>
-            <Text style={styles.live}>● LIVE</Text>
+            {item.live ? <Text style={styles.live}>● LIVE</Text> : null}
           </Pressable>
         )}
       />
@@ -214,6 +271,20 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: Colors.surfaceRaised,
   },
   chipActive: { backgroundColor: Colors.accent },
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surfaceRaised,
+    borderRadius: Radius.lg,
+    padding: 3,
+  },
+  segmentItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.lg,
+  },
+  segmentActive: { backgroundColor: Colors.accent },
+  segmentText: { color: Colors.text, fontWeight: '700' },
   chipText: { color: Colors.text, fontWeight: '700', fontSize: 13 },
   row: {
     flexDirection: 'row',

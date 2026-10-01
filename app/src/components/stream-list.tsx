@@ -4,7 +4,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'r
 
 import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { fetchStreams, type AddonStreams } from '@/lib/addons';
+import { LIVE_TYPES, fetchStreams, type AddonStreams } from '@/lib/addons';
 import { usePrefs } from '@/lib/prefs';
 import { getActiveAddons, getTorboxKey } from '@/lib/storage';
 import { parseStream, qualityRank, type Quality } from '@/lib/stream-info';
@@ -93,7 +93,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
       uri,
       headers,
       link,
-      live: type === 'tv',
+      live: LIVE_TYPES.includes(type),
       series: type === 'series' ? getSeriesContext(link.id) : undefined,
       source: { addonId, bingeGroup: stream.behaviorHints?.bingeGroup },
     });

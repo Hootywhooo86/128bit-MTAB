@@ -77,6 +77,7 @@ function AppNavigator() {
           <Stack.Screen name="addons" options={{ title: 'Addons' }} />
           <Stack.Screen name="settings/content" options={{ title: 'Content & Discovery' }} />
           <Stack.Screen name="settings/playlists" options={{ title: 'Live TV playlists' }} />
+          <Stack.Screen name="settings/sources" options={{ title: 'Download sources' }} />
           <Stack.Screen name="settings/layout" options={{ title: 'Layout' }} />
           <Stack.Screen name="settings/tracking" options={{ title: 'Tracking' }} />
           <Stack.Screen name="settings/playback" options={{ title: 'Playback' }} />

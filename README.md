@@ -7,9 +7,9 @@ Shows, movies, live TV and audiobooks in one app, powered by **addons**, like St
 | **Home** | Featured title, Continue watching, Continue listening and top catalogs. |
 | **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker (quality/size badges, filters). Subtitles, audio tracks, Next episode / auto-play. |
 | **Movies** | Same for movies. |
-| **Live TV** | Channels from M3U playlists and Stremio `tv` addons, with group filters and search. |
-| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search for new books from addons, your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
-| **Settings** (⚙ top right) | Tracking (Trakt), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
+| **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
+| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
+| **Settings** (⚙ top right) | Tracking (Trakt, Hardcover), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
 
@@ -75,10 +75,18 @@ Scan the QR code with **Expo Go** on your phone, or press `w` to open it in a br
 ### Optional: Trakt
 
 1. Create an app at <https://trakt.tv/oauth/applications> with redirect URI `urn:ietf:wg:oauth:2.0:oob`.
-2. Copy `app/.env.example` to `app/.env` and fill in the client ID and secret.
-3. Restart `npx expo start`, then go to **Settings → Tracking → Connect Trakt**. Enter the code shown on trakt.tv/activate.
+2. In the app: **Settings → Tracking**, paste the Client ID and Client Secret, tap **Save keys**, then **Connect Trakt** and enter the code on trakt.tv/activate.
+   (Or bake the keys into the build: repo secrets `TRAKT_CLIENT_ID` / `TRAKT_CLIENT_SECRET`, or `app/.env` locally.)
 
 When connected, what you watch is scrobbled to Trakt, and your Trakt paused items show up in Continue Watching.
+
+### Optional: Hardcover
+
+**Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress, and Read when you finish. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book.
+
+### Audiobook download sources (Pageturner format)
+
+**Settings → Content & Discovery → Audiobook download sources**: paste a source URL from <https://pageturner-dsc.elfhosted.com/> (pick a source, tap Copy). Torrent sources are searched when you search in Audiobooks; tap **TorBox** on a result to add it to your TorBox account, then play or download it from **Your TorBox cloud**. Direct-download (HLS) sources aren't supported yet, and some sources only answer the Pageturner app itself.
 
 ## Install on your phone
 

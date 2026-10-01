@@ -3,19 +3,52 @@
  * "continue watching" back.
  *
  * Needs a Trakt API app (https://trakt.tv/oauth/applications) with redirect URI
- * `urn:ietf:wg:oauth:2.0:oob`. Put its keys in app/.env:
- *   EXPO_PUBLIC_TRAKT_CLIENT_ID=...
- *   EXPO_PUBLIC_TRAKT_CLIENT_SECRET=...
+ * `urn:ietf:wg:oauth:2.0:oob`. Its keys come from the build (app/.env:
+ * EXPO_PUBLIC_TRAKT_CLIENT_ID / EXPO_PUBLIC_TRAKT_CLIENT_SECRET) or are typed in
+ * Settings → Tracking.
  */
 import { secureGet, secureSet } from './storage';
 import type { WatchProgress } from './video';
 
 const API = 'https://api.trakt.tv';
-const CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID ?? '';
-const CLIENT_SECRET = process.env.EXPO_PUBLIC_TRAKT_CLIENT_SECRET ?? '';
+const BUILD_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID ?? '';
+const BUILD_SECRET = process.env.EXPO_PUBLIC_TRAKT_CLIENT_SECRET ?? '';
 const TOKEN_KEY = '128bit.trakt';
+const APP_KEY = '128bit.traktApp';
 
-export const traktConfigured = !!(CLIENT_ID && CLIENT_SECRET);
+let CLIENT_ID = BUILD_ID;
+let CLIENT_SECRET = BUILD_SECRET;
+let keysLoaded = !!(BUILD_ID && BUILD_SECRET);
+
+/** True when the build has keys baked in (then there's nothing to type). */
+export const traktBuiltIn = keysLoaded;
+
+async function loadKeys() {
+  if (keysLoaded) return;
+  const raw = await secureGet(APP_KEY);
+  if (raw) {
+    const k = JSON.parse(raw) as { id: string; secret: string };
+    CLIENT_ID = k.id;
+    CLIENT_SECRET = k.secret;
+  }
+  keysLoaded = true;
+}
+
+/** Are Trakt API keys available (from the build or typed in by the user)? */
+export async function traktConfigured() {
+  await loadKeys();
+  return !!(CLIENT_ID && CLIENT_SECRET);
+}
+
+/** Saves the user's own Trakt API app keys. Signing in again is needed after a change. */
+export async function setTraktKeys(id: string, secret: string) {
+  id = id.trim();
+  secret = secret.trim();
+  await secureSet(APP_KEY, id && secret ? JSON.stringify({ id, secret }) : null);
+  await saveTokens(null);
+  CLIENT_ID = id || BUILD_ID;
+  CLIENT_SECRET = secret || BUILD_SECRET;
+}
 
 type Tokens = {
   access_token: string;
@@ -25,6 +58,7 @@ type Tokens = {
 };
 
 async function getTokens(): Promise<Tokens | null> {
+  await loadKeys();
   const raw = await secureGet(TOKEN_KEY);
   return raw ? JSON.parse(raw) : null;
 }
@@ -96,7 +130,7 @@ export type DeviceCode = {
 };
 
 export async function startDeviceAuth(): Promise<DeviceCode> {
-  if (!traktConfigured) throw new Error('Trakt keys are missing (see app/.env.example)');
+  if (!(await traktConfigured())) throw new Error('Add your Trakt API keys first');
   const { status, data } = await post<DeviceCode>('/oauth/device/code', {
     client_id: CLIENT_ID,
   });
@@ -170,7 +204,7 @@ export async function scrobble(
   progressPercent: number,
 ) {
   const target = scrobbleTarget(key, type);
-  if (!target || !traktConfigured) return;
+  if (!target || !(await traktConfigured())) return;
   const token = await accessToken();
   if (!token) return;
   await post(

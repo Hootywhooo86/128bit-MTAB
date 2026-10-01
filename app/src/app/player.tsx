@@ -14,6 +14,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 
+import { HardcoverPill } from '@/components/hardcover-match';
 import { Body, Button, Cover, EmptyState, ProgressBar, Title, formatTime } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getBookmarks, removeBookmark, type Bookmark } from '@/lib/bookmarks';
@@ -175,6 +176,7 @@ export default function PlayerScreen() {
           <Ionicons name="bookmark" size={14} color={Colors.text} />
           <Text style={styles.pillText}>Bookmark</Text>
         </Pressable>
+        <HardcoverPill book={book} />
       </View>
 
       <View style={styles.tabs}>

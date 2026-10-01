@@ -1,12 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { SourceResults } from '@/components/source-results';
 import { Body, Button, Cover, EmptyState, Heading, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchCatalog, supportsSearch } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
+import { getSources } from '@/lib/sources';
 import type { BookPreview, CatalogDef, InstalledAddon } from '@/lib/types';
 
 type Row = {
@@ -23,6 +25,13 @@ export default function BrowseAudiobooksScreen() {
   const { addons } = useAddons();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
+  const [sourceCount, setSourceCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      getSources().then((all) => setSourceCount(all.filter((x) => x.enabled !== false).length));
+    }, []),
+  );
 
   const rows: Row[] = addons.flatMap((addon) => {
     const catalogs = addon.manifest.catalogs.filter((c) => c.type === 'audiobook');
@@ -81,12 +90,27 @@ export default function BrowseAudiobooksScreen() {
           <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </Pressable>
       ) : null}
-      {rows.length === 0 ? (
+      {!submitted ? (
+        <Pressable style={styles.cloud} onPress={() => router.push('/settings/sources')}>
+          <Ionicons name="cloud-download-outline" size={24} color={Colors.accent} />
+          <View style={{ flex: 1 }}>
+            <Heading>Download sources</Heading>
+            <Body muted style={{ fontSize: 13 }}>
+              {sourceCount
+                ? `${sourceCount} active. Search above, then send a result to TorBox`
+                : 'Add Pageturner sources to search for books to send to TorBox'}
+            </Body>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </Pressable>
+      ) : null}
+      {submitted ? <SourceResults key={submitted} query={submitted} /> : null}
+      {rows.length === 0 && !(submitted && sourceCount) ? (
         <EmptyState
           title={submitted ? 'Nothing to search' : 'No audiobook addons'}
           body={
             submitted
-              ? 'None of your audiobook addons support search.'
+              ? 'None of your audiobook addons support search, and no download sources are set up.'
               : 'Install an audiobook addon to browse catalogs here.'
           }>
           <Button label="Manage addons" onPress={() => router.push('/addons')} />

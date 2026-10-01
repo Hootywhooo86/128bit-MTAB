@@ -19,6 +19,12 @@ export default function ContentSettings() {
           subtitle="Add M3U playlists from your TV provider."
           onPress={() => router.push('/settings/playlists')}
         />
+        <Row
+          icon="cloud-download"
+          title="Audiobook download sources"
+          subtitle="Pageturner-style sources. Search them from Audiobooks and send to TorBox."
+          onPress={() => router.push('/settings/sources')}
+        />
       </Group>
     </SettingsPage>
   );

@@ -40,7 +40,12 @@ export async function installDefaultAddons() {
   if (results.some((r) => r.status === 'fulfilled')) await AsyncStorage.setItem(SEEDED_KEY, '1');
 }
 
-export const SUPPORTED_TYPES = ['audiobook', 'movie', 'series', 'tv'];
+/** Types shown in the Live TV tab. "tv"/"channel" are channels; the rest are sports and events. */
+export const CHANNEL_TYPES = ['tv', 'channel'];
+export const SPORT_TYPES = ['sport', 'sports', 'events', 'event', 'live'];
+export const LIVE_TYPES = [...CHANNEL_TYPES, ...SPORT_TYPES];
+
+export const SUPPORTED_TYPES = ['audiobook', 'movie', 'series', ...LIVE_TYPES];
 
 /** Accepts `https://x/manifest.json`, `https://x/`, `stremio://x/manifest.json` or `128bit://…`. */
 export function normalizeManifestUrl(input: string): string {
@@ -62,7 +67,8 @@ function validateManifest(m: Partial<Manifest>): Manifest {
   const types = Array.isArray(m.types) ? m.types : [];
   if (!types.some((t) => SUPPORTED_TYPES.includes(t))) {
     throw new Error(
-      'This addon has nothing 128bit can use (no audiobook, movie, series or tv type)',
+      `128bit doesn't know where to put this addon's content (type: ${types.join(', ') || 'none'}). ` +
+        'It understands audiobook, movie, series, tv/channel and sport.',
     );
   }
   return {

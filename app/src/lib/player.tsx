@@ -17,6 +17,7 @@ import {
 } from 'react';
 
 import { absReportProgress, absResumePoint, isAbsBook } from './audiobookshelf';
+import { hardcoverProgress } from './hardcover';
 import { addBookmark as storeBookmark } from './bookmarks';
 import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
 import { httpRangeReader, readMp4Chapters } from './mp4-chapters';
@@ -267,6 +268,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         finished.current = true;
         saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
         if (isAbsBook(book)) absReportProgress(book, chapterIndex, status.duration, true);
+        hardcoverProgress(book, 1, true);
       }
     };
   }, [book, chapterIndex, loadChapter, prefs.autoNextChapter, sleep, status.duration]);
@@ -284,13 +286,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const now = Date.now();
     if (!status.playing || now - lastSave.current > SAVE_EVERY_MS) {
       lastSave.current = now;
+      const fraction = bookFraction(book, chapterIndex, status.currentTime, status.duration);
       saveProgress(book.key, {
         chapter: chapterIndex,
         position: status.currentTime,
-        fraction: bookFraction(book, chapterIndex, status.currentTime, status.duration),
+        fraction,
         finished: false,
       });
       if (isAbsBook(book)) absReportProgress(book, chapterIndex, status.currentTime, false);
+      hardcoverProgress(book, fraction, false);
     }
   }, [book, chapterIndex, status.currentTime, status.duration, status.playing, status.isLoaded]);
 
