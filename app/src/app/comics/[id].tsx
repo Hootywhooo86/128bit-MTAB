@@ -8,6 +8,7 @@ import { Body, Button, EmptyState, Title } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   chapterLabel,
+  comicImage,
   getChapters,
   getComic,
   getComicProgress,
@@ -95,7 +96,7 @@ export default function ComicScreen() {
             <View style={{ flexDirection: 'row', gap: Spacing.three }}>
               <View style={styles.cover}>
                 {comic.cover ? (
-                  <Image source={{ uri: comic.cover }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  <Image source={comicImage(comic.cover)} style={StyleSheet.absoluteFill} contentFit="cover" />
                 ) : null}
               </View>
               <View style={{ flex: 1, gap: 4 }}>

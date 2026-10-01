@@ -1,19 +1,23 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ComicTile } from '@/components/comic-tile';
 import { Body, Heading, Input } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
+  browseSuwayomi,
   getAllComicProgress,
   getComicLibrary,
   listComics,
   searchComics,
   type Comic,
-  type ComicList,
   type ReadProgress,
 } from '@/lib/comics';
+import { usePrefs } from '@/lib/prefs';
+import { getSuwayomi, listSources, type SuwaSource } from '@/lib/suwayomi';
+
+const MANGADEX = 'mangadex';
 
 /** Comics tab: your comics, what you're reading, and MangaDex to browse and search. */
 export default function ComicsScreen() {
@@ -25,25 +29,40 @@ export default function ComicsScreen() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [library, setLibrary] = useState<Comic[]>([]);
   const [progress, setProgress] = useState<Record<string, ReadProgress>>({});
+  const [sources, setSources] = useState<SuwaSource[]>([]);
+  const [source, setSource] = useState(MANGADEX);
 
   useFocusEffect(
     useCallback(() => {
       getComicLibrary().then(setLibrary);
       getAllComicProgress().then(setProgress);
+      // Sources from your Suwayomi extensions (Keiyoushi etc.), when a server is connected.
+      getSuwayomi().then((c) =>
+        c ? listSources().then(setSources, () => setSources([])) : setSources([]),
+      );
     }, []),
   );
+
+  const { prefs } = usePrefs();
+  const shownSources = prefs.comicAllLanguages
+    ? sources
+    : sources.filter((s) => ['en', 'all', 'multi', 'other'].includes(s.lang));
+  const current = shownSources.find((s) => s.id === source);
 
   useEffect(() => {
     if (!submitted) return;
     let cancelled = false;
-    searchComics(submitted).then(
+    (current
+      ? browseSuwayomi(current.id, 'SEARCH', 1, submitted).then((r) => r.comics)
+      : searchComics(submitted)
+    ).then(
       (r) => !cancelled && setResults(r),
       (e) => !cancelled && setSearchError(e.message),
     );
     return () => {
       cancelled = true;
     };
-  }, [submitted]);
+  }, [submitted, current]);
 
   const reading = library
     .filter((c) => progress[c.id])
@@ -58,9 +77,29 @@ export default function ComicsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
+      {shownSources.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
+          {[{ id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
+            <Pressable
+              key={s.id}
+              onPress={() => {
+                setSource(s.id);
+                setResults(null);
+              }}
+              style={[styles.chip, source === s.id && { backgroundColor: Colors.accent }]}>
+              <Text style={[styles.chipText, source === s.id && { color: Colors.accentText }]}>
+                {s.displayName}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
       <View style={{ paddingHorizontal: Spacing.three }}>
         <Input
-          placeholder="Search comics and manga"
+          placeholder={`Search ${current ? current.name : 'comics and manga'}`}
           value={query}
           onChangeText={(t) => {
             setQuery(t);
@@ -105,13 +144,32 @@ export default function ComicsScreen() {
               ))}
             </Row>
           ) : null}
-          <ListRow title="Popular" kind="popular" />
-          <ListRow title="Latest updates" kind="latest" />
-          <ListRow title="Top rated" kind="top" />
-          <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
-            Comics and manga from MangaDex. Officially licensed series are often taken down there,
-            so some have few or no chapters.
-          </Body>
+          {current ? (
+            <>
+              <ListRow
+                key={`${current.id}:popular`}
+                title={`Popular on ${current.name}`}
+                load={async (page) => (await browseSuwayomi(current.id, 'POPULAR', page)).comics}
+              />
+              {current.supportsLatest ? (
+                <ListRow
+                  key={`${current.id}:latest`}
+                  title="Latest updates"
+                  load={async (page) => (await browseSuwayomi(current.id, 'LATEST', page)).comics}
+                />
+              ) : null}
+            </>
+          ) : (
+            <>
+              <ListRow key="md:popular" title="Popular" load={(page) => listComics('popular', (page - 1) * 24)} />
+              <ListRow key="md:latest" title="Latest updates" load={(page) => listComics('latest', (page - 1) * 24)} />
+              <ListRow key="md:top" title="Top rated" load={(page) => listComics('top', (page - 1) * 24)} />
+              <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
+                Comics and manga from MangaDex. Officially licensed series are often taken down
+                there. For Mihon extensions (Keiyoushi), connect Suwayomi in Settings → Comics.
+              </Body>
+            </>
+          )}
         </>
       )}
     </ScrollView>
@@ -132,28 +190,32 @@ function Row({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ListRow({ title, kind }: { title: string; kind: ComicList }) {
+function ListRow({ title, load }: { title: string; load: (page: number) => Promise<Comic[]> }) {
   const Colors = useColors();
   const [items, setItems] = useState<Comic[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
-    listComics(kind).then(
+    load(1).then(
       (r) => !cancelled && setItems(r),
       (e) => !cancelled && setError(e.message),
     );
     return () => {
       cancelled = true;
     };
-  }, [kind]);
+    // Each row loads once; its key changes when the source does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function more() {
     if (!items || loadingMore) return;
     setLoadingMore(true);
     try {
-      const next = await listComics(kind, items.length);
+      const next = await load(page + 1);
+      setPage(page + 1);
       setItems((cur) => [...(cur ?? []), ...next.filter((n) => !cur?.some((c) => c.id === n.id))]);
     } catch {
       // Keep what we have.
@@ -188,6 +250,13 @@ function ListRow({ title, kind }: { title: string; kind: ComicList }) {
 
 const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
+  chip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
+    backgroundColor: Colors.surfaceRaised,
+  },
+  chipText: { color: Colors.text, fontWeight: '700', fontSize: 13 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

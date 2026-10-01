@@ -42,6 +42,12 @@ export default function SettingsScreen() {
           onPress={() => router.push('/settings/downloads')}
         />
         <Row
+          icon="book"
+          title="Comics"
+          subtitle="Suwayomi, extension repos (Keiyoushi), extensions and the reader"
+          onPress={() => router.push('/settings/comics')}
+        />
+        <Row
           icon="play"
           title="Playback"
           subtitle="Skip times, speed, resume and stream order"
@@ -60,7 +66,7 @@ export default function SettingsScreen() {
         <Row
           icon="information-circle"
           title="About 128bit"
-          subtitle="Version, data sources and licences"
+          subtitle="Version, check for updates, data sources"
           onPress={() => router.push('/settings/about')}
         />
       </Group>

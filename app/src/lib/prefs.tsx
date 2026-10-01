@@ -38,6 +38,8 @@ export type Prefs = {
   readerMode: 'vertical' | 'ltr' | 'rtl';
   /** Smaller, compressed comic pages (saves data). */
   comicDataSaver: boolean;
+  /** Comics tab: list extension sources in every language (otherwise English + multi-language). */
+  comicAllLanguages: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -57,6 +59,7 @@ export const DEFAULT_PREFS: Prefs = {
   autoPlayNextEpisode: true,
   readerMode: 'vertical',
   comicDataSaver: false,
+  comicAllLanguages: false,
 };
 
 const KEY = '128bit.prefs';

@@ -8,6 +8,7 @@ import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
 import { installDefaultSources } from '@/lib/sources';
+import { getSuwayomi } from '@/lib/suwayomi';
 import { runAutoDownloads } from '@/lib/wanted';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
@@ -35,6 +36,8 @@ function AppNavigator() {
     installDefaultAddons().catch(() => {});
     installDefaultSources().catch(() => {});
     installDefaultFeeds().catch(() => {});
+    // Load the Suwayomi server early so comic images get their sign-in headers.
+    getSuwayomi().catch(() => {});
   }, []);
 
   // Wanted books marked "download when ready": check TorBox every minute while the app is open.
@@ -90,6 +93,7 @@ function AppNavigator() {
             name="comics/read"
             options={{ headerShown: false, presentation: 'fullScreenModal', orientation: 'all' }}
           />
+          <Stack.Screen name="settings/comics" options={{ title: 'Comics' }} />
           <Stack.Screen name="settings/stats" options={{ title: 'Statistics' }} />
           <Stack.Screen name="settings/index" options={{ title: '' }} />
           <Stack.Screen name="addons" options={{ title: 'Addons' }} />

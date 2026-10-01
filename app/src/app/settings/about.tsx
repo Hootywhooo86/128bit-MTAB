@@ -2,6 +2,8 @@ import Constants from 'expo-constants';
 import { Linking, Text } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
+import { UpdateCard } from '@/components/update-card';
+import { BUILD } from '@/lib/app-update';
 import { makeStyles } from '@/constants/theme';
 
 const SOURCES = [
@@ -26,6 +28,16 @@ const SOURCES = [
     url: 'https://librivox.org',
   },
   {
+    title: 'MangaDex',
+    subtitle: 'Comics and manga',
+    url: 'https://mangadex.org',
+  },
+  {
+    title: 'Suwayomi',
+    subtitle: 'Runs Mihon extensions (Keiyoushi) for the Comics tab',
+    url: 'https://github.com/Suwayomi/Suwayomi-Server',
+  },
+  {
     title: 'Expo & React Native',
     subtitle: 'App framework (MIT)',
     url: 'https://expo.dev',
@@ -41,9 +53,12 @@ export default function AboutSettings() {
         <Row
           icon="information-circle"
           title="128bit"
-          value={`v${Constants.expoConfig?.version ?? '1.0.0'}`}
+          value={`v${Constants.expoConfig?.version ?? '1.0.0'}${BUILD ? ` · build ${BUILD}` : ''}`}
         />
       </Group>
+
+      <SectionTitle>Updates</SectionTitle>
+      <UpdateCard />
 
       <SectionTitle>Data sources & attribution</SectionTitle>
       <Group>

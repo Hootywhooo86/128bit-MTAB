@@ -19,6 +19,7 @@ import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { knownChapters, rememberChapters } from '@/lib/comic-session';
 import {
   chapterLabel,
+  comicImage,
   getChapters,
   getComic,
   getComicProgress,
@@ -31,6 +32,12 @@ import { usePrefs } from '@/lib/prefs';
 import { addChapterRead } from '@/lib/stats';
 
 const MODES = ['vertical', 'rtl', 'ltr'] as const;
+
+/** Load the next pages early. (Suwayomi pages need sign-in headers, so they load on demand.) */
+function prefetch(urls: string[]) {
+  const plain = urls.filter((u) => !comicImage(u)?.headers);
+  if (plain.length) Image.prefetch(plain);
+}
 // FlatList doesn't allow these to change between renders, so they're fixed objects.
 const PAGED_VIEW = { itemVisiblePercentThreshold: 60 };
 const SCROLL_VIEW = { itemVisiblePercentThreshold: 30 };
@@ -85,7 +92,7 @@ export default function ReaderScreen() {
         setPages(urls);
         setPage(at);
         setStartPage(at);
-        Image.prefetch(urls.slice(at, at + 4));
+        prefetch(urls.slice(at, at + 4));
       },
       (e) => !cancelled && setError(e.message),
     );
@@ -113,7 +120,7 @@ export default function ReaderScreen() {
       finishedFor.current = chapter.id;
       addChapterRead(comic);
     }
-    Image.prefetch(pages.slice(page + 1, page + 4));
+    prefetch(pages.slice(page + 1, page + 4));
   }, [comic, chapter, page, pages]);
 
   // FlatList needs the same function every render.
@@ -170,7 +177,7 @@ export default function ReaderScreen() {
           renderItem={({ item, index: i }) => (
             <Pressable onPress={toggle}>
               <Image
-                source={{ uri: item }}
+                source={comicImage(item)}
                 style={
                   paged
                     ? { width, height }

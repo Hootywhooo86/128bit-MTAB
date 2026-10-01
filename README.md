@@ -97,6 +97,20 @@ Searching in **Find audiobooks** also searches AudiobookBay's whole catalog (the
 
 **Audiobooks → Wanted** keeps books you want but don't have yet. Each one is checked against AudiobookBay and your download sources; when a match turns up, tap **TorBox** on it. With Hardcover connected, Wanted syncs with your **Want to Read** shelf both ways (new Want to Read books come in; books you add here go there).
 
+### Comics from Mihon extensions (Keiyoushi) via Suwayomi
+
+Mihon/Tachiyomi extensions are Android plug-ins only Mihon-style apps can run, so 128bit uses [Suwayomi](https://github.com/Suwayomi/Suwayomi-Server), which runs them on a computer, NAS or ElfHosted.
+
+1. Run Suwayomi and note its address (e.g. `http://192.168.1.20:4567`).
+2. **Settings → Comics → Suwayomi server**: address (+ username/password if set) → **Connect**.
+3. **Add Keiyoushi repo** (`https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json`) or any other repo URL.
+4. **Update repos** fetches the newest extension list from GitHub; install, update (**Update all**) or remove extensions.
+5. The **Comics** tab gets a source switcher: MangaDex plus every source from your extensions (popular, latest, search). Read progress syncs back to Suwayomi.
+
+### App updates
+
+**Settings → About → Check for updates** compares your build with the newest GitHub release and opens the APK download. The repo is private, so the first check asks for a read-only fine-grained GitHub token (only this repo, Contents: Read-only).
+
 ### Optional: TMDB and MDBList
 
 **Settings → Integrations → Metadata & ratings**:

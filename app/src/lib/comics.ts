@@ -7,6 +7,19 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import {
+  browseSource,
+  getChapterPages,
+  getManga,
+  getMangaChapters,
+  markChapter,
+  setInLibrary,
+  suwayomiImageHeaders,
+  suwayomiNow,
+  suwayomiUrl,
+  type SuwaManga,
+} from './suwayomi';
+
 const API = 'https://api.mangadex.org';
 const COVERS = 'https://uploads.mangadex.org/covers';
 const LIBRARY_KEY = '128bit.comics.library';
@@ -36,6 +49,8 @@ export type ComicChapter = {
   publishedAt?: string;
   /** Hosted elsewhere (e.g. the official publisher); opens in the browser. */
   externalUrl?: string;
+  /** Shown as-is instead of "Ch. N · title" (Suwayomi chapter names already say it). */
+  label?: string;
 };
 
 export type ReadProgress = {
@@ -110,7 +125,45 @@ export async function searchComics(query: string): Promise<Comic[]> {
   return data.data.map(toComic);
 }
 
+// --- Suwayomi (Mihon extensions) ---------------------------------------------------
+// Comics from Suwayomi have ids starting with "sw:"; everything else is MangaDex.
+
+const isSw = (id: string) => id.startsWith('sw:');
+const swId = (id: string) => Number(id.slice(3));
+
+export function comicFromSuwayomi(m: SuwaManga): Comic {
+  return {
+    id: `sw:${m.id}`,
+    title: m.title,
+    cover: suwayomiUrl(m.thumbnailUrl),
+    author: [m.author, m.artist].filter((x, i, a) => x && a.indexOf(x) === i).join(', ') || undefined,
+    description: m.description ?? undefined,
+    status: m.status && m.status !== 'UNKNOWN' ? m.status.toLowerCase().replace(/_/g, ' ') : undefined,
+    tags: m.genre,
+  };
+}
+
+/** Popular / latest / search results from one of your Suwayomi sources. */
+export async function browseSuwayomi(
+  sourceId: string,
+  kind: 'POPULAR' | 'LATEST' | 'SEARCH',
+  page = 1,
+  query?: string,
+) {
+  const r = await browseSource(sourceId, kind, page, query);
+  return { comics: r.mangas.map(comicFromSuwayomi), hasNextPage: r.hasNextPage };
+}
+
+/** Image source for expo-image: adds Suwayomi's sign-in headers for its covers and pages. */
+export function comicImage(uri?: string) {
+  if (!uri) return undefined;
+  const sw = suwayomiNow();
+  if (sw && uri.startsWith(sw.url)) return { uri, headers: suwayomiImageHeaders() };
+  return { uri };
+}
+
 export async function getComic(id: string): Promise<Comic> {
+  if (isSw(id)) return comicFromSuwayomi(await getManga(swId(id)));
   const data = await get<{ data: RawManga }>(
     `/manga/${id}?includes[]=cover_art&includes[]=author`,
   );
@@ -121,6 +174,17 @@ type RawChapter = { id: string; attributes: Record<string, any>; relationships: 
 
 /** English chapters in reading order, one upload per chapter number. */
 export async function getChapters(id: string): Promise<ComicChapter[]> {
+  if (isSw(id)) {
+    return (await getMangaChapters(swId(id))).map((c) => ({
+      id: `sw:${c.id}`,
+      number: c.chapterNumber >= 0 ? String(c.chapterNumber) : undefined,
+      label: c.name,
+      // The page count is only known once a chapter has been opened.
+      pages: c.pageCount > 0 ? c.pageCount : 1,
+      group: c.scanlator ?? undefined,
+      publishedAt: c.uploadDate ? new Date(Number(c.uploadDate)).toISOString() : undefined,
+    }));
+  }
   const all: RawChapter[] = [];
   for (let offset = 0; offset < 5000; offset += 500) {
     const page = await get<{ data: RawChapter[]; total: number }>(
@@ -150,11 +214,12 @@ export async function getChapters(id: string): Promise<ComicChapter[]> {
     });
 }
 
-export const chapterLabel = (c: Pick<ComicChapter, 'number' | 'volume' | 'title'>) =>
-  [c.number ? `Ch. ${c.number}` : 'Oneshot', c.title].filter(Boolean).join(' · ');
+export const chapterLabel = (c: Pick<ComicChapter, 'number' | 'volume' | 'title' | 'label'>) =>
+  c.label ?? [c.number ? `Ch. ${c.number}` : 'Oneshot', c.title].filter(Boolean).join(' · ');
 
 /** Image URLs for a chapter's pages. `saver` uses MangaDex's smaller, compressed images. */
 export async function getPages(chapterId: string, saver: boolean): Promise<string[]> {
+  if (isSw(chapterId)) return getChapterPages(swId(chapterId));
   const d = await get<{
     baseUrl: string;
     chapter: { hash: string; data: string[]; dataSaver: string[] };
@@ -183,6 +248,7 @@ export async function inComicLibrary(id: string) {
 export async function toggleComicLibrary(comic: Comic): Promise<boolean> {
   const list = await getComicLibrary();
   const has = list.some((c) => c.id === comic.id);
+  if (isSw(comic.id)) setInLibrary(swId(comic.id), !has).catch(() => {});
   await AsyncStorage.setItem(
     LIBRARY_KEY,
     JSON.stringify(has ? list.filter((c) => c.id !== comic.id) : [comic, ...list]),
@@ -217,6 +283,7 @@ export async function saveComicProgress(
     updatedAt: Date.now(),
   };
   await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+  if (isSw(chapter.id)) markChapter(swId(chapter.id), page, finished).catch(() => {});
   // Reading something puts it in your library.
   if (!(await inComicLibrary(comic.id))) await toggleComicLibrary(comic);
 }

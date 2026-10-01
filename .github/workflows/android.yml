@@ -29,6 +29,9 @@ jobs:
       # Optional: add these as repository secrets to turn on Trakt in the build.
       EXPO_PUBLIC_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
       EXPO_PUBLIC_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+      # Lets the app's "Check for updates" compare itself with the newest release.
+      EXPO_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
+      EXPO_PUBLIC_RELEASES_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
 

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radius, makeStyles } from '@/constants/theme';
-import type { Comic } from '@/lib/comics';
+import { comicImage, type Comic } from '@/lib/comics';
 
 /** Portrait cover with title; opens the comic. */
 export function ComicTile({
@@ -23,7 +23,7 @@ export function ComicTile({
       <View style={[styles.cover, { width, height: width * 1.45 }]}>
         {comic.cover ? (
           <Image
-            source={{ uri: comic.cover }}
+            source={comicImage(comic.cover)}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={150}
