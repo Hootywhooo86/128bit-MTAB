@@ -13,6 +13,7 @@ import {
 
 import { BookRow } from '@/components/book-row';
 import { HeaderButtons } from '@/components/header-buttons';
+import { WantedList } from '@/components/wanted-list';
 import { Button, EmptyState } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { deleteDownload, getDownloadedBooks, offlineSupported } from '@/lib/downloads';
@@ -26,8 +27,9 @@ import {
   type Progress,
 } from '@/lib/storage';
 import type { PlayableBook } from '@/lib/types';
+import { getWanted } from '@/lib/wanted';
 
-type Tab = 'library' | 'downloads';
+type Tab = 'library' | 'downloads' | 'wanted';
 type Filter = 'all' | 'favorites' | 'progress' | 'finished';
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -61,6 +63,7 @@ export default function AudiobooksScreen() {
   const [downloads, setDownloads] = useState<PlayableBook[]>([]);
   const [progress, setProgress] = useState<Record<string, Progress>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [wantedCount, setWantedCount] = useState(0);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -79,7 +82,13 @@ export default function AudiobooksScreen() {
   }, [navigation]);
 
   const load = useCallback(async () => {
-    const [lib, dl, favs] = await Promise.all([getLibrary(), getDownloadedBooks(), getFavorites()]);
+    const [lib, dl, favs, wanted] = await Promise.all([
+      getLibrary(),
+      getDownloadedBooks(),
+      getFavorites(),
+      getWanted(),
+    ]);
+    setWantedCount(wanted.length);
     setLibrary(lib);
     setDownloads(dl);
     setFavorites(favs);
@@ -123,13 +132,15 @@ export default function AudiobooksScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.segments}>
-        {(['library', 'downloads'] as const).map((t) => (
+        {(['library', 'downloads', 'wanted'] as const).map((t) => (
           <Pressable key={t} style={styles.segment} onPress={() => setTab(t)}>
             <Text style={[styles.segmentLabel, tab === t && styles.segmentLabelActive]}>
-              {t === 'library' ? 'Library' : 'Downloads'}
+              {t === 'library' ? 'Library' : t === 'downloads' ? 'Downloads' : 'Wanted'}
             </Text>
             <Text style={styles.segmentCount}>
-              {plural(t === 'library' ? library.length : downloads.length)}
+              {plural(
+                t === 'library' ? library.length : t === 'downloads' ? downloads.length : wantedCount,
+              )}
             </Text>
             <View style={[styles.underline, tab === t && { backgroundColor: Colors.accent }]} />
           </Pressable>
@@ -155,7 +166,9 @@ export default function AudiobooksScreen() {
         </ScrollView>
       ) : null}
 
+      {tab === 'wanted' ? <WantedList onCount={setWantedCount} /> : null}
       <FlatList
+        style={tab === 'wanted' ? { display: 'none' } : undefined}
         data={books}
         keyExtractor={(b) => b.key}
         contentContainerStyle={{

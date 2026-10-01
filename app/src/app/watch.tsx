@@ -9,6 +9,7 @@ import {
   type VideoPlayer,
   type VideoSource,
 } from 'expo-video';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,10 +54,6 @@ const toSource = (item: WatchItem): VideoSource => ({
 });
 
 // Track switching mutates the native player; kept outside the component for the React Compiler.
-function setStaysActiveInBackground(player: VideoPlayer, on: boolean) {
-  player.staysActiveInBackground = on;
-}
-
 function setSubtitleTrack(player: VideoPlayer, track: SubtitleTrack | null) {
   player.subtitleTrack = track;
 }
@@ -85,10 +82,8 @@ export default function WatchScreen() {
     p.play();
   });
 
-  // Keep playing with the screen off (lock-screen controls come with it).
-  useEffect(() => {
-    setStaysActiveInBackground(player, prefs.backgroundVideo);
-  }, [player, prefs.backgroundVideo]);
+  // Video needs the screen: keep it on while watching. (Only audiobooks play with it off.)
+  useKeepAwake();
 
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   const { currentTime } = useEvent(player, 'timeUpdate', {

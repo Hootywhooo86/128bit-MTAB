@@ -1,11 +1,13 @@
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
+import { AbbResults } from '@/components/abb-results';
 import { SourceResults } from '@/components/source-results';
 import { Body, Button, Cover, Input, Title } from '@/components/ui';
 import { Spacing, makeStyles } from '@/constants/theme';
 import { cleanTitle, getSources, isCatalog } from '@/lib/sources';
+import { addWanted, isWanted, markSent, wantedId } from '@/lib/wanted';
 
 /** A book from a catalog (iTunes, Audible…): details, then torrents for it from your download sources. */
 export default function FindBookScreen() {
@@ -25,6 +27,16 @@ export default function FindBookScreen() {
   const [submitted, setSubmitted] = useState(query);
   const [downloadSources, setDownloadSources] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [wanted, setWanted] = useState(false);
+
+  useEffect(() => {
+    isWanted(p.title ?? '', p.author || undefined).then(setWanted);
+  }, [p.title, p.author]);
+
+  // Sending something for a wanted book ticks it off the list.
+  const onSent = () => {
+    if (wanted) markSent(wantedId(p.title ?? '', p.author || undefined), p.title ?? '');
+  };
 
   useEffect(() => {
     getSources().then((all) =>
@@ -52,6 +64,21 @@ export default function FindBookScreen() {
           {facts.length ? <Body muted style={{ fontSize: 13 }}>{facts.join(' · ')}</Body> : null}
         </View>
       </View>
+      <View style={{ paddingHorizontal: Spacing.three }}>
+        <Button
+          label={wanted ? '✓ On your Wanted list' : 'Add to Wanted'}
+          variant="secondary"
+          disabled={wanted}
+          onPress={async () => {
+            await addWanted({
+              title: p.title ?? '',
+              author: p.author || undefined,
+              cover: p.cover || undefined,
+            });
+            setWanted(true);
+          }}
+        />
+      </View>
       {p.description ? (
         <Text
           style={styles.description}
@@ -71,17 +98,13 @@ export default function FindBookScreen() {
           onSubmitEditing={() => setSubmitted(query.trim())}
         />
       </View>
-      {downloadSources === 0 ? (
-        <View style={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
-          <Body muted>Add a download source to look for this book and send it to TorBox.</Body>
-          <Button label="Add download sources" onPress={() => router.push('/settings/sources')} />
-        </View>
-      ) : submitted ? (
+      {submitted ? <AbbResults key={`abb:${submitted}`} query={submitted} onSent={onSent} /> : null}
+      {submitted && downloadSources ? (
         <SourceResults
           key={submitted}
           query={submitted}
           author={p.author || undefined}
-          title="Get it with TorBox"
+          title="Other download sources"
         />
       ) : null}
     </ScrollView>

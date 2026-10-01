@@ -9,7 +9,7 @@ Shows, movies, live TV and audiobooks in one app, powered by **addons**, like St
 | **Movies** | Same for movies. |
 | **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
 | **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
-| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters) and **Downloads** (books saved to the phone). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
+| **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
 | **Settings** (⚙ top right) | Tracking (Trakt, Hardcover), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox), About. |
 
 Shows, Movies and Live TV only stream. Audiobooks can stream or download.
@@ -84,6 +84,12 @@ When connected, what you watch is scrobbled to Trakt, and your Trakt paused item
 ### RSS feeds (new uploads)
 
 **Find audiobooks → New on AudiobookBay** lists the newest posts from an RSS feed (AudiobookBay's `/rss` is added by default; add more in **Settings → Content & Discovery → Audiobook download sources → RSS feeds**). Tap **TorBox** on a post: 128bit takes the magnet from the feed item, or reads the info hash and trackers from the post's page, builds the magnet and sends it to TorBox.
+
+### AudiobookBay search and the Wanted list
+
+Searching in **Find audiobooks** also searches AudiobookBay's whole catalog (the same way [audiobookbay-automated](https://github.com/JamesRy96/audiobookbay-automated) does), with **Load more**. Tapping a book from iTunes/Audible shows AudiobookBay matches too, plus **Add to Wanted**.
+
+**Audiobooks → Wanted** keeps books you want but don't have yet. Each one is checked against AudiobookBay and your download sources; when a match turns up, tap **TorBox** on it. With Hardcover connected, Wanted syncs with your **Want to Read** shelf both ways (new Want to Read books come in; books you add here go there).
 
 ### Optional: Hardcover
 

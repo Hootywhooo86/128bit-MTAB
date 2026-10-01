@@ -231,3 +231,42 @@ export async function hardcoverProgress(book: PlayableBook, fraction: number, fi
     lastResult = { at: Date.now(), ok: false, message: e instanceof Error ? e.message : String(e) };
   }
 }
+
+// --- Want to Read (the Wanted list) -----------------------------------------
+
+/** Adds a book to your Hardcover "Want to Read" (left alone if it's already on a shelf). */
+export async function hardcoverWantToRead(title: string, author?: string) {
+  if (!(await getHardcoverToken())) return;
+  const [best] = await searchHardcover([clean(title), author].filter(Boolean).join(' '));
+  if (!best) return;
+  if (await userBook(best.id)) return;
+  await gql(
+    `mutation W($id: Int!) { insert_user_book(object: { book_id: $id, status_id: ${STATUS.wantToRead} }) { id error } }`,
+    { id: best.id },
+  );
+}
+
+type WantRow = {
+  book: {
+    id: number;
+    title: string;
+    image?: { url?: string } | null;
+    contributions?: { author?: { name?: string } | null }[];
+  };
+};
+
+/** Your Hardcover "Want to Read" books, newest first. */
+export async function hardcoverWantList(): Promise<HardcoverBook[]> {
+  const data = await gql<{ me: { user_books: WantRow[] }[] | { user_books: WantRow[] } }>(
+    `query { me { user_books(where: { status_id: { _eq: ${STATUS.wantToRead} } }, order_by: { id: desc }, limit: 200) {
+      book { id title image { url } contributions(limit: 1) { author { name } } }
+    } } }`,
+  );
+  const me = Array.isArray(data.me) ? data.me[0] : data.me;
+  return (me?.user_books ?? []).map(({ book }) => ({
+    id: book.id,
+    title: book.title,
+    author: book.contributions?.[0]?.author?.name ?? undefined,
+    cover: book.image?.url ?? undefined,
+  }));
+}
