@@ -145,7 +145,7 @@ The reader remembers the exact page **and how far down it** you scrolled. Tappin
 
 ### Listening with the screen off
 
-Audiobooks keep playing with the screen off, with the app in the background **and after you swipe the app away**: the player runs outside the app's screens and the lock-screen/notification controls keep it alive. The Now Playing screen frames the cover, title and author in a blocky pixel border in your accent colour, with an equalizer that bounces while the book plays. The whole app uses the **Press Start 2P** pixel font (video subtitles stay in a normal font). The lock screen shows the book cover (or the 128bitPlay pixel art), title, author and **current chapter** ("Ch. 3 of 12"), with play/pause, back/forward 30 s and previous/next chapter. Videos still need the screen on.
+Audiobooks keep playing with the screen off, with the app in the background **and after you swipe the app away**: the player runs outside the app's screens and the lock-screen/notification controls keep it alive. The Now Playing screen frames the cover, title and author in a blocky pixel border in your accent colour, with an equalizer that bounces while the book plays. The lock screen shows the book cover (or the 128bitPlay pixel art), title, author and **current chapter** ("Ch. 3 of 12"), with play/pause, back/forward 30 s and previous/next chapter. Videos still need the screen on.
 
 (The chapter buttons and 30 s skips are a small patch to expo-audio in `app/patches/`, applied by the build; `package.json` builds expo-audio and expo-video from source so the patches are used.)
 

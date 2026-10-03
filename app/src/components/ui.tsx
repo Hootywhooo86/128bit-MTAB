@@ -14,29 +14,22 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Radius, Spacing, makeStyles, pixelText, useColors } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { useCover } from '@/lib/covers';
-
-/** Inline size overrides (e.g. fontSize: 12) get the pixel-font scaling too. */
-function scaled(style: TextProps['style']) {
-  const flat = StyleSheet.flatten(style) as Record<string, unknown> | undefined;
-  if (!flat || !('fontSize' in flat)) return style;
-  return pixelText(flat);
-}
 
 export function Title({ style, ...rest }: TextProps) {
   const styles = useStyles();
-  return <Text style={[styles.title, scaled(style)]} {...rest} />;
+  return <Text style={[styles.title, style]} {...rest} />;
 }
 
 export function Heading({ style, ...rest }: TextProps) {
   const styles = useStyles();
-  return <Text style={[styles.heading, scaled(style)]} {...rest} />;
+  return <Text style={[styles.heading, style]} {...rest} />;
 }
 
 export function Body({ style, muted, ...rest }: TextProps & { muted?: boolean }) {
   const styles = useStyles();
-  return <Text style={[styles.body, muted && styles.muted, scaled(style)]} {...rest} />;
+  return <Text style={[styles.body, muted && styles.muted, style]} {...rest} />;
 }
 
 type ButtonProps = PressableProps & {

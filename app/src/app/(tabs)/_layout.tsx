@@ -5,7 +5,7 @@ import { Image, View, type ColorValue } from 'react-native';
 
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
-import { PixelFont, useColors } from '@/constants/theme';
+import { useColors } from '@/constants/theme';
 import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-grab';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -55,13 +55,13 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
         headerShadowVisible: false,
-        headerTitleStyle: { fontFamily: PixelFont, fontSize: 16 },
+        headerTitleStyle: { fontWeight: '800', fontSize: 22 },
         tabBarStyle: {
           backgroundColor: Colors.background,
           borderTopColor: Colors.border,
         },
         // Six tabs: keep the labels small enough to fit on a phone.
-        tabBarLabelStyle: { fontFamily: PixelFont, fontSize: 6, marginTop: 2 },
+        tabBarLabelStyle: { fontSize: 10 },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
         headerRight: () => <HeaderButtons />,
@@ -95,7 +95,7 @@ export default function TabLayout() {
           tabBarIcon: icon('book-outline'),
           // Downloads carry on in the background; the badge shows how many are coming.
           tabBarBadge: comicsComing || undefined,
-          tabBarBadgeStyle: { backgroundColor: Colors.accent, color: Colors.accentText, fontFamily: PixelFont, fontSize: 7 },
+          tabBarBadgeStyle: { backgroundColor: Colors.accent, color: Colors.accentText, fontSize: 10 },
         }}
       />
     </Tabs>
