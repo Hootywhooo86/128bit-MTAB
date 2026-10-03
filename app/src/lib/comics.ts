@@ -184,7 +184,7 @@ export async function getComic(id: string): Promise<Comic> {
     return s.comic;
   }
   if (isSw(id)) return comicFromSuwayomi(await getManga(swId(id)));
-  if (isWebtoon(id)) return getWebtoon(id);
+  if (isWebtoon(id)) return getWebtoon(id, (await getComicLibrary()).find((c) => c.id === id));
   const data = await get<{ data: RawManga }>(
     `/manga/${id}?includes[]=cover_art&includes[]=author`,
   );
