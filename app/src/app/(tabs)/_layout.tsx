@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BottomTabBar, Tabs } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
-import type { ColorValue } from 'react-native';
+import { Image, View, type ColorValue } from 'react-native';
 
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
@@ -13,6 +13,21 @@ const icon = (name: IconName) =>
   function TabBarIcon({ color, size }: { color: ColorValue; size: number }) {
     return <Ionicons name={name} color={color} size={size} />;
   };
+
+/**
+ * The Anime tab's own icon: the crystal-wing face, half white and half the accent colour
+ * (the dark parts stay see-through to the black tab bar). Dimmed when not selected.
+ */
+function AnimeIcon({ focused, size, accent }: { focused: boolean; size: number; accent: string }) {
+  const s = size + 4;
+  const style = { position: 'absolute' as const, width: s, height: s };
+  return (
+    <View style={{ width: s, height: s, opacity: focused ? 1 : 0.55 }}>
+      <Image source={require('../../../assets/images/anime-tab-left.png')} style={[style, { tintColor: '#FFFFFF' }]} />
+      <Image source={require('../../../assets/images/anime-tab-right.png')} style={[style, { tintColor: accent }]} />
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const Colors = useColors();
@@ -51,7 +66,15 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen name="shows" options={{ title: 'Shows', tabBarIcon: icon('tv-outline') }} />
       <Tabs.Screen name="movies" options={{ title: 'Movies', tabBarIcon: icon('film-outline') }} />
-      <Tabs.Screen name="anime" options={{ title: 'Anime', tabBarIcon: icon('sparkles-outline') }} />
+      <Tabs.Screen
+        name="anime"
+        options={{
+          title: 'Anime',
+          tabBarIcon: ({ focused, size }) => (
+            <AnimeIcon focused={focused} size={size} accent={Colors.accent} />
+          ),
+        }}
+      />
       <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
       <Tabs.Screen name="comics" options={{ title: 'Comics', tabBarIcon: icon('book-outline') }} />
     </Tabs>
