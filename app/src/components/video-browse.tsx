@@ -26,6 +26,8 @@ import {
   getWatchProgress,
   markAnime,
   removeWatchProgress,
+  resumeSavedStream,
+  streamsRoute,
   type WatchProgress,
 } from '@/lib/video';
 
@@ -104,6 +106,22 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
   const { prefs } = usePrefs();
   const styles = useStyles();
   const [continuing, setContinuing] = useState<WatchProgress[]>([]);
+  const [starting, setStarting] = useState<string | null>(null);
+  const Colors = useColors();
+
+  /** One tap: the same stream again from where you stopped; else the stream picker / title. */
+  async function open(item: WatchProgress) {
+    if (starting) return;
+    if (item.stream) {
+      setStarting(item.key);
+      const ok = await resumeSavedStream(item).catch(() => false);
+      setStarting(null);
+      if (ok) router.push('/watch');
+      else router.push(streamsRoute(item));
+      return;
+    }
+    if (item.link) router.push({ pathname: '/title', params: { type: item.link.type, id: item.link.id } });
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -174,13 +192,7 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
           <Pressable
             style={{ width: 200, gap: 6 }}
             onLongPress={() => remove(item)}
-            onPress={() =>
-              item.link &&
-              router.push({
-                pathname: '/title',
-                params: { type: item.link.type, id: item.link.id },
-              })
-            }>
+            onPress={() => open(item)}>
             <View style={styles.landscape}>
               {item.poster ? (
                 <Image
@@ -188,6 +200,11 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
                 />
+              ) : null}
+              {starting === item.key ? (
+                <View style={[StyleSheet.absoluteFill, styles.starting]}>
+                  <ActivityIndicator color={Colors.accent} />
+                </View>
               ) : null}
             </View>
             <ProgressBar value={item.duration ? item.position / item.duration : 0} />
@@ -313,6 +330,7 @@ export function PosterTile({
 }
 
 const useStyles = makeStyles((Colors) => ({
+  starting: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
   screen: { flex: 1, backgroundColor: Colors.background },
   poster: {
     width: 112,

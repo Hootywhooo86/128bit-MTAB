@@ -63,7 +63,7 @@ export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
     const key = `${colors.accent}|${colors.background}`;
     let styles = cache.get(key);
     if (!styles) {
-      styles = StyleSheet.create(factory(colors));
+      styles = StyleSheet.create(pixelizeAll(factory(colors)) as T);
       cache.set(key, styles);
     }
     return styles;
@@ -72,6 +72,34 @@ export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
 
 /** The 128bit pixel font. Use small sizes (8–16): it's big for its point size. */
 export const PixelFont = 'PressStart2P_400Regular';
+
+/**
+ * Press Start 2P everywhere: turns a text style into the pixel font at a size that fits
+ * (it's much wider than a normal font and has no bold or italic). Styles that already
+ * name a font are left alone; name a style `plain…` to keep the normal font.
+ */
+export function pixelText<S extends Record<string, unknown>>(style: S): S {
+  if (!style || typeof style !== 'object' || 'fontFamily' in style) return style;
+  if (!('fontSize' in style) && !('fontWeight' in style)) return style;
+  const out: Record<string, unknown> = { ...style, fontFamily: PixelFont };
+  const size = typeof style.fontSize === 'number' ? style.fontSize : 15;
+  const px = Math.max(7, Math.min(18, Math.round(size * 0.66)));
+  out.fontSize = px;
+  out.lineHeight =
+    typeof style.lineHeight === 'number' ? Math.max(Math.round(px * 1.5), Math.round(style.lineHeight * 0.8)) : Math.round(px * 1.6);
+  delete out.fontWeight;
+  delete out.fontStyle;
+  delete out.letterSpacing;
+  return out as S;
+}
+
+function pixelizeAll<T extends Record<string, unknown>>(styles: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [name, style] of Object.entries(styles)) {
+    out[name] = name.startsWith('plain') ? style : pixelText(style as Record<string, unknown>);
+  }
+  return out as T;
+}
 
 export const Spacing = {
   one: 4,

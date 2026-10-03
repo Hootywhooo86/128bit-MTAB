@@ -28,6 +28,10 @@ export type WatchItem = {
   series?: { metaId: string; episodes: EpisodeRef[] };
   /** Where this stream came from, to pick the same kind of stream for the next episode. */
   source?: { addonId: string; bingeGroup?: string };
+  /** The addon stream itself, so Continue watching can play it again in one tap. */
+  stream?: Stream;
+  /** Opened from Continue watching: if it doesn't start, go to the stream picker instead. */
+  fallback?: boolean;
 };
 
 let nowWatching: WatchItem | null = null;
@@ -157,6 +161,10 @@ export type WatchProgress = {
   duration: number;
   updatedAt: number;
   link?: { type: string; id: string };
+  /** The stream you were watching (and where it came from), to start it again in one tap. */
+  stream?: Stream;
+  source?: WatchItem['source'];
+  series?: WatchItem['series'];
 };
 
 export async function getWatchProgress(): Promise<WatchProgress[]> {
@@ -197,6 +205,48 @@ export async function saveWatchProgress(entry: Omit<WatchProgress, 'updatedAt'>)
   const rest = all.filter((p) => p.key !== entry.key);
   const next = finished ? rest : [{ ...entry, updatedAt: Date.now() }, ...rest].slice(0, MAX_ITEMS);
   await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(next));
+}
+
+/** The stream picker for a Continue watching item (also the fallback when its stream fails). */
+export function streamsRoute(p: Pick<WatchProgress, 'key' | 'title' | 'subtitle' | 'poster' | 'link'>) {
+  return {
+    pathname: '/streams' as const,
+    params: {
+      type: p.link?.type ?? 'movie',
+      id: p.key,
+      title: p.title,
+      subtitle: p.subtitle ?? '',
+      poster: p.poster ?? '',
+      linkId: p.link?.id ?? p.key,
+    },
+  };
+}
+
+/**
+ * Continue watching, one tap: the same stream again (TorBox links fetched fresh), from
+ * where you stopped. Returns false when there's no saved stream or it can't start now, so
+ * the caller opens the stream picker instead.
+ */
+export async function resumeSavedStream(p: WatchProgress): Promise<boolean> {
+  const stream = p.stream;
+  if (!stream || (!stream.url && !stream.infoHash)) return false;
+  const name = p.subtitle ? `${p.title} ${p.subtitle}` : p.title;
+  const r = await resolveStream(stream, name).catch(() => null);
+  if (r?.status !== 'ready') return false;
+  setNowWatching({
+    key: p.key,
+    title: p.title,
+    subtitle: p.subtitle,
+    poster: p.poster,
+    uri: r.uri,
+    headers: r.headers,
+    link: p.link,
+    series: p.series,
+    source: p.source,
+    stream,
+    fallback: true,
+  });
+  return true;
 }
 
 // --- Anime (English audio + subtitles first) ---------------------------------------

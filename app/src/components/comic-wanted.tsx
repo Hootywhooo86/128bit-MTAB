@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-native';
 
-import { Body } from '@/components/ui';
+import { Body, formatBytes } from '@/components/ui';
 import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
+  cancelComic,
   checkFollows,
   dismissNewIssue,
   getComicWanted,
@@ -28,6 +29,38 @@ const STATE_LABEL: Record<WantedComic['state'], string> = {
   done: 'On this phone ▶ read',
   error: 'Failed',
 };
+
+const active = (w: WantedComic) => w.state === 'queued' || w.state === 'torbox' || w.state === 'downloading';
+
+/** "123 MB of 565 MB · 4.2 MB/s" (or the TorBox percentage before it reaches the phone). */
+function detail(w: WantedComic) {
+  if (w.state === 'downloading' && w.bytes) {
+    return [
+      w.total ? `${formatBytes(w.bytes)} of ${formatBytes(w.total)}` : formatBytes(w.bytes),
+      w.speed && w.phase !== 'Unpacking' ? `${formatBytes(w.speed)}/s` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+  return w.progress ? `${Math.round(w.progress * 100)}%` : '';
+}
+
+/** ✕: stop it and delete what came down. Big ones (or ones in TorBox) ask first. */
+function askCancel(w: WantedComic) {
+  const big = (w.total ?? w.release.size ?? 0) > 100 * 1024 * 1024;
+  if (!big && !w.torboxId) {
+    cancelComic(w.id);
+    return;
+  }
+  const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+    { text: 'Keep going', style: 'cancel' },
+    { text: 'Cancel download', style: 'destructive', onPress: () => cancelComic(w.id) },
+  ];
+  if (w.torboxId) {
+    buttons.push({ text: 'Cancel + delete from TorBox', style: 'destructive', onPress: () => cancelComic(w.id, true) });
+  }
+  Alert.alert('Cancel this download?', `${w.title}\n\nWhat has downloaded so far will be deleted.`, buttons);
+}
 
 /** Comics you grabbed (and where they are), plus followed series and their new issues. */
 export function ComicWanted() {
@@ -95,7 +128,7 @@ export function ComicWanted() {
                 ? router.push({ pathname: '/comics/[id]', params: { id: w.seriesId } })
                 : undefined
             }
-            onLongPress={() => removeComicWanted(w.id)}>
+            onLongPress={() => (active(w) ? askCancel(w) : removeComicWanted(w.id))}>
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={styles.title} numberOfLines={2}>
                 {w.title}
@@ -106,16 +139,21 @@ export function ComicWanted() {
                   w.state === 'done' && { color: Colors.success },
                   w.state === 'error' && { color: Colors.danger },
                 ]}>
-                {STATE_LABEL[w.state]}
-                {(w.state === 'torbox' || w.state === 'downloading') && w.progress
-                  ? ` · ${Math.round(w.progress * 100)}%`
-                  : ''}
+                {active(w) && w.phase ? w.phase : STATE_LABEL[w.state]}
                 {w.error ? ` · ${w.error}` : ''}
               </Text>
-              {w.state === 'torbox' || w.state === 'downloading' ? (
-                <PixelProgress value={w.progress} />
+              {active(w) ? (
+                <>
+                  <PixelProgress value={w.progress} busy={w.phase === 'Unpacking'} />
+                  {detail(w) ? <Text style={styles.muted}>{detail(w)}</Text> : null}
+                </>
               ) : null}
             </View>
+            {active(w) ? (
+              <Pressable style={styles.btn} onPress={() => askCancel(w)} hitSlop={8} accessibilityLabel="Cancel download">
+                <Text style={styles.btnText}>✕</Text>
+              </Pressable>
+            ) : null}
             {w.state === 'error' ? (
               <Pressable style={styles.btn} onPress={() => retryComic(w.id)}>
                 <Text style={styles.btnText}>RETRY</Text>
@@ -123,7 +161,7 @@ export function ComicWanted() {
             ) : null}
           </Pressable>
         ))}
-        {wanted?.length ? <Body muted style={{ fontSize: 12 }}>Hold one to remove it from the list.</Body> : null}
+        {wanted?.length ? <Body muted style={{ fontSize: 12 }}>Hold one to remove it from the list. Downloads keep going when you leave this page.</Body> : null}
       </View>
 
       <View style={{ gap: Spacing.two }}>
@@ -174,10 +212,10 @@ export function ComicWanted() {
   );
 }
 
-function PixelProgress({ value }: { value: number }) {
+function PixelProgress({ value, busy }: { value: number; busy?: boolean }) {
   const styles = useStyles();
   const blocks = 16;
-  const filled = Math.round(Math.max(0, Math.min(1, value)) * blocks);
+  const filled = busy ? blocks : Math.round(Math.max(0, Math.min(1, value)) * blocks);
   return (
     <View style={{ flexDirection: 'row', gap: 2, height: 8 }}>
       {Array.from({ length: blocks }, (_, i) => (

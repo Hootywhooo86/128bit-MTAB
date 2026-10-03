@@ -21,6 +21,14 @@ import {
   suwayomiUrl,
   type SuwaManga,
 } from './suwayomi';
+import {
+  WEBTOON_HEADERS,
+  getWebtoon,
+  getWebtoonEpisodes,
+  getWebtoonPages,
+  isWebtoon,
+  isWebtoonImage,
+} from './webtoons';
 
 const API = 'https://api.mangadex.org';
 const COVERS = 'https://uploads.mangadex.org/covers';
@@ -60,6 +68,8 @@ export type ReadProgress = {
   chapterLabel: string;
   page: number;
   pages: number;
+  /** How far down that page you were (0..1), for the scrolling reader. */
+  offset?: number;
   /** Chapter ids you've finished. */
   read: string[];
   updatedAt: number;
@@ -163,6 +173,7 @@ export function comicImage(uri?: string) {
   if (!uri) return undefined;
   const sw = suwayomiNow();
   if (sw && uri.startsWith(sw.url)) return { uri, headers: suwayomiImageHeaders() };
+  if (isWebtoonImage(uri)) return { uri, headers: WEBTOON_HEADERS };
   return { uri };
 }
 
@@ -173,6 +184,7 @@ export async function getComic(id: string): Promise<Comic> {
     return s.comic;
   }
   if (isSw(id)) return comicFromSuwayomi(await getManga(swId(id)));
+  if (isWebtoon(id)) return getWebtoon(id);
   const data = await get<{ data: RawManga }>(
     `/manga/${id}?includes[]=cover_art&includes[]=author`,
   );
@@ -187,6 +199,7 @@ export async function getChapters(id: string): Promise<ComicChapter[]> {
     const s = await getLocalSeries(id);
     return (s?.chapters ?? []).map((c) => ({ id: c.id, label: c.label, pages: c.files.length }));
   }
+  if (isWebtoon(id)) return getWebtoonEpisodes(id);
   if (isSw(id)) {
     return (await getMangaChapters(swId(id))).map((c) => ({
       id: `sw:${c.id}`,
@@ -238,6 +251,7 @@ export async function getPages(chapterId: string, saver: boolean, remoteOnly = f
     if (local) return local;
   }
   if (isSw(chapterId)) return getChapterPages(swId(chapterId));
+  if (isWebtoon(chapterId)) return getWebtoonPages(chapterId);
   const d = await get<{
     baseUrl: string;
     chapter: { hash: string; data: string[]; dataSaver: string[] };
@@ -287,6 +301,7 @@ export async function saveComicProgress(
   page: number,
   pages: number,
   finished: boolean,
+  offset = 0,
 ) {
   const all = await getAllComicProgress();
   const prev = all[comic.id];
@@ -297,6 +312,7 @@ export async function saveComicProgress(
     chapterLabel: chapterLabel(chapter),
     page,
     pages,
+    offset: Math.max(0, Math.min(1, offset)),
     read: [...readIds],
     updatedAt: Date.now(),
   };

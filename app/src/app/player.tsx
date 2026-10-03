@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { HardcoverPill } from '@/components/hardcover-match';
+import { PixelFrame } from '@/components/pixel-frame';
 import { Body, Button, Cover, EmptyState, Title, formatTime } from '@/components/ui';
 import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getBookmarks, removeBookmark, type Bookmark } from '@/lib/bookmarks';
@@ -107,15 +108,19 @@ export default function PlayerScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.coverFrame}>
-        <View style={styles.coverShadow} />
-        <View style={styles.coverInner}>
-          <Cover uri={book.cover} size={232} title={book.title} author={book.author} />
+      <PixelFrame playing={p.playing}>
+        <View style={styles.coverFrame}>
+          <View style={styles.coverShadow} />
+          <View style={styles.coverInner}>
+            <Cover uri={book.cover} size={212} title={book.title} author={book.author} />
+          </View>
         </View>
-      </View>
-      <View style={{ alignItems: 'center', gap: Spacing.two }}>
-        <Text style={styles.bookTitle}>{book.title}</Text>
-        {book.author ? <Body muted>{book.author}</Body> : null}
+        <View style={{ alignItems: 'center', gap: Spacing.two }}>
+          <Text style={styles.bookTitle}>{book.title}</Text>
+          {book.author ? <Body muted>{book.author}</Body> : null}
+        </View>
+      </PixelFrame>
+      <View style={{ alignItems: 'center', gap: Spacing.two, alignSelf: 'stretch' }}>
         <View style={styles.chapterTag}>
           <Text style={styles.chapterText} numberOfLines={2}>
             ▶ {heading}
@@ -342,9 +347,9 @@ const useStyles = makeStyles((Colors) => ({
   content: { padding: Spacing.four, gap: Spacing.four, alignItems: 'center' },
   times: { flexDirection: 'row', justifyContent: 'space-between' },
   time: { color: Colors.textSecondary, fontSize: 9, fontFamily: PixelFont },
-  coverFrame: { width: 244, height: 244 },
-  coverShadow: { position: 'absolute', left: 8, top: 8, width: 236, height: 236, backgroundColor: Colors.accent, opacity: 0.35 },
-  coverInner: { width: 236, height: 236, borderWidth: 2, borderColor: Colors.accent, backgroundColor: Colors.background },
+  coverFrame: { width: 224, height: 224 },
+  coverShadow: { position: 'absolute', left: 8, top: 8, width: 216, height: 216, backgroundColor: Colors.accent, opacity: 0.35 },
+  coverInner: { width: 216, height: 216, borderWidth: 2, borderColor: Colors.accent, backgroundColor: Colors.background },
   bookTitle: { color: Colors.text, fontFamily: PixelFont, fontSize: 14, lineHeight: 22, textAlign: 'center' },
   chapterTag: {
     borderWidth: 2,

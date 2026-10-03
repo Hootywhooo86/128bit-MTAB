@@ -132,6 +132,7 @@ async function matchFor(book: PlayableBook): Promise<HardcoverBook | null> {
 type UserBook = {
   id: number;
   status_id: number;
+  edition_id?: number | null;
   user_book_reads: { id: number; finished_at?: string | null }[];
 };
 
@@ -140,7 +141,7 @@ async function userBook(bookId: number): Promise<UserBook | null> {
     `query UB($id: Int!) {
       me {
         user_books(where: { book_id: { _eq: $id } }, limit: 1) {
-          id status_id
+          id status_id edition_id
           user_book_reads(order_by: { id: desc }, limit: 1) { id finished_at }
         }
       }
@@ -194,6 +195,68 @@ let lastResult: { at: number; ok: boolean; message: string } | null = null;
 /** What the last sync did, for Settings. */
 export const lastHardcoverSync = () => lastResult;
 
+/** The edition Hardcover measures your progress against. */
+type Edition = { id: number; seconds?: number; pages?: number };
+const EDITION_KEY = (bookId: number) => `128bit.hardcover.edition.${bookId}`;
+
+/**
+ * Hardcover works out the % from an EDITION: progress_seconds ÷ the edition's audio
+ * length (or progress_pages ÷ pages). Without one it can't show a percentage, which is
+ * why progress wasn't showing there. Picks the audiobook edition closest to our length
+ * (or Hardcover's default audio edition), else a print/ebook edition with pages.
+ */
+async function editionFor(bookId: number, ourSeconds: number): Promise<Edition | null> {
+  const cached = await AsyncStorage.getItem(EDITION_KEY(bookId));
+  if (cached) return JSON.parse(cached) as Edition | null;
+  type Ed = { id: number; audio_seconds?: number | null; pages?: number | null };
+  let picked: Edition | null = null;
+  try {
+    const data = await gql<{
+      books_by_pk: {
+        default_audio_edition?: Ed | null;
+        default_physical_edition?: Ed | null;
+        editions?: Ed[];
+      } | null;
+    }>(
+      `query E($id: Int!) { books_by_pk(id: $id) {
+        default_audio_edition { id audio_seconds pages }
+        default_physical_edition { id audio_seconds pages }
+        editions(where: { audio_seconds: { _gt: 0 } }, order_by: { users_count: desc }, limit: 25) { id audio_seconds pages }
+      } }`,
+      { id: bookId },
+    );
+    const b = data.books_by_pk;
+    const audio = [b?.default_audio_edition, ...(b?.editions ?? [])].filter(
+      (e): e is Ed => !!e && !!e.audio_seconds,
+    );
+    const best = ourSeconds
+      ? [...audio].sort((x, y) => Math.abs(x.audio_seconds! - ourSeconds) - Math.abs(y.audio_seconds! - ourSeconds))[0]
+      : audio[0];
+    if (best) picked = { id: best.id, seconds: best.audio_seconds! };
+    else if (b?.default_physical_edition?.pages) {
+      picked = { id: b.default_physical_edition.id, pages: b.default_physical_edition.pages };
+    }
+  } catch {
+    return null; // try again next time
+  }
+  await AsyncStorage.setItem(EDITION_KEY(bookId), JSON.stringify(picked));
+  return picked;
+}
+
+/** Progress fields for a read, measured against `edition` (or our own length). */
+function progressFields(fraction: number, edition: Edition | null, ownTotal: number) {
+  const f = Math.max(0, Math.min(1, fraction));
+  if (edition?.seconds) return { edition_id: edition.id, progress_seconds: Math.round(f * edition.seconds) };
+  if (edition?.pages) return { edition_id: edition.id, progress_pages: Math.max(1, Math.round(f * edition.pages)) };
+  return ownTotal ? { progress_seconds: Math.round(f * ownTotal) } : {};
+}
+
+/** Mutations answer `{ id, error }`; a non-empty error means Hardcover refused it. */
+function check(result: { id?: number | null; error?: string | null } | undefined, what: string) {
+  if (result?.error) throw new Error(`Hardcover: ${result.error}`);
+  if (!result?.id) throw new Error(`Hardcover didn't save the ${what}`);
+}
+
 /**
  * Updates Hardcover with how far through `book` you are (0..1). Throttled, safe to
  * call often; does nothing when Hardcover isn't connected.
@@ -214,25 +277,39 @@ export async function hardcoverProgress(
     if (!match) return;
     const ub = await ensureUserBook(match.id, finished ? STATUS.read : STATUS.reading);
     const total = totalSeconds(book, match);
-    const read: Record<string, unknown> = {};
-    if (total) read.progress_seconds = Math.round(total * Math.min(1, fraction));
+    const edition = await editionFor(match.id, total);
+    // The book on your shelf uses that edition too, so Hardcover shows its length.
+    if (edition && ub.edition_id !== edition.id) {
+      await gql(
+        `mutation UE($id: Int!, $e: Int!) { update_user_book(id: $id, object: { edition_id: $e }) { id error } }`,
+        { id: ub.id, e: edition.id },
+      ).catch(() => {});
+    }
+    const read: Record<string, unknown> = progressFields(fraction, edition, total);
     if (finished) read.finished_at = today();
     const current = ub.user_book_reads[0];
     if (current && !current.finished_at) {
-      await gql(
+      const r = await gql<{ update_user_book_read: { id: number | null; error?: string | null } }>(
         `mutation U($id: Int!, $r: DatesReadInput!) { update_user_book_read(id: $id, object: $r) { id error } }`,
         { id: current.id, r: read },
       );
+      check(r.update_user_book_read, 'progress');
     } else {
-      await gql(
+      const r = await gql<{ insert_user_book_read: { id: number | null; error?: string | null } }>(
         `mutation R($id: Int!, $r: DatesReadInput!) { insert_user_book_read(user_book_id: $id, user_book_read: $r) { id error } }`,
         { id: ub.id, r: { started_at: today(), ...read } },
       );
+      check(r.insert_user_book_read, 'progress');
     }
+    const pct = Math.round(Math.min(1, fraction) * 100);
     lastResult = {
       at: Date.now(),
       ok: true,
-      message: `${match.title}: ${finished ? 'marked read' : `${Math.round(fraction * 100)}%`}`,
+      message: finished
+        ? `${match.title}: marked read`
+        : read.progress_seconds || read.progress_pages
+          ? `${match.title}: ${pct}% on Hardcover`
+          : `${match.title}: ${pct}% (Hardcover has no length for this book, so it can't show a %)`,
     };
   } catch (e) {
     lastResult = { at: Date.now(), ok: false, message: e instanceof Error ? e.message : String(e) };
@@ -244,7 +321,7 @@ export async function hardcoverProgress(
 type RemoteRead = {
   book_id: number;
   status_id: number;
-  user_book_reads: { progress_seconds?: number | null; finished_at?: string | null }[];
+  user_book_reads: { progress_seconds?: number | null; progress_pages?: number | null; finished_at?: string | null }[];
 };
 
 /** Where `seconds` into the book lands: chapter and position (when chapter lengths are known). */
@@ -302,7 +379,7 @@ export async function syncHardcover(): Promise<string | null> {
     const data = await gql<{ me: { user_books: RemoteRead[] }[] | { user_books: RemoteRead[] } }>(
       `query Sync($ids: [Int!]!) { me { user_books(where: { book_id: { _in: $ids } }) {
         book_id status_id
-        user_book_reads(order_by: { id: desc }, limit: 1) { progress_seconds finished_at }
+        user_book_reads(order_by: { id: desc }, limit: 1) { progress_seconds progress_pages finished_at }
       } } }`,
       { ids },
     );
@@ -318,7 +395,16 @@ export async function syncHardcover(): Promise<string | null> {
       const total = totalSeconds(b, m);
       const read = r?.user_book_reads[0];
       const theirsDone = r?.status_id === STATUS.read || !!read?.finished_at;
-      const theirs = theirsDone ? 1 : total && read?.progress_seconds ? read.progress_seconds / total : 0;
+      const edition = await editionFor(m.id, total);
+      const theirs = theirsDone
+        ? 1
+        : edition?.seconds && read?.progress_seconds
+          ? Math.min(1, read.progress_seconds / edition.seconds)
+          : edition?.pages && read?.progress_pages
+            ? Math.min(1, read.progress_pages / edition.pages)
+            : total && read?.progress_seconds
+              ? Math.min(1, read.progress_seconds / total)
+              : 0;
       if (theirsDone && !mine.finished) {
         await saveProgress(b.key, { chapter: 0, position: 0, fraction: 1, finished: true });
         pulled++;

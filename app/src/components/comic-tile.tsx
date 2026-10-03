@@ -3,23 +3,37 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radius, makeStyles } from '@/constants/theme';
-import { comicImage, type Comic } from '@/lib/comics';
+import { comicImage, type Comic, type ReadProgress } from '@/lib/comics';
 
-/** Portrait cover with title; opens the comic. */
+/**
+ * Portrait cover with title. With `resume`, a tap goes straight back into the reader where
+ * you stopped (or the next chapter if that one's done); long-press opens the comic's page.
+ */
 export function ComicTile({
   comic,
   width = 120,
   note,
+  resume,
 }: {
   comic: Comic;
   width?: number;
   note?: string;
+  resume?: ReadProgress;
 }) {
   const styles = useStyles();
+  const details = () => router.push({ pathname: '/comics/[id]', params: { id: comic.id } });
   return (
     <Pressable
       style={{ width, gap: 4 }}
-      onPress={() => router.push({ pathname: '/comics/[id]', params: { id: comic.id } })}>
+      onLongPress={resume ? details : undefined}
+      onPress={() =>
+        resume
+          ? router.push({
+              pathname: '/comics/read',
+              params: { id: comic.id, chapter: resume.chapterId, resume: '1' },
+            })
+          : details()
+      }>
       <View style={[styles.cover, { width, height: width * 1.45 }]}>
         {comic.cover ? (
           <Image

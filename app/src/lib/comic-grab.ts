@@ -13,12 +13,12 @@
  * next issue number every few hours while the app is open (optionally grabbing it).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, DownloadTask, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { canOpenRar } from './comic-archive';
 import { importComicFiles, setSeriesCover } from './comic-downloads';
-import { addMagnet, getItem, magnetFromHash, requestLink, type TorboxFile } from './torbox';
+import { addMagnet, deleteTorrent, getItem, magnetFromHash, requestLink, type TorboxFile } from './torbox';
 
 const WANTED_KEY = '128bit.comicWanted';
 const FOLLOW_KEY = '128bit.comicFollows';
@@ -213,6 +213,12 @@ export type WantedComic = {
   release: ComicRelease;
   state: 'queued' | 'torbox' | 'downloading' | 'done' | 'error';
   progress: number;
+  /** Bytes on the phone so far / in all, and the speed (bytes per second). */
+  bytes?: number;
+  total?: number;
+  speed?: number;
+  /** What it's doing right now, e.g. "Finding the file" or "Unpacking". */
+  phase?: string;
   error?: string;
   torboxId?: number;
   /** The series on the phone once it's imported. */
@@ -232,7 +238,7 @@ export async function getComicWanted(): Promise<WantedComic[]> {
     }
     // Downloads cut off when the app closed start again.
     wantedCache = wantedCache.map((w) =>
-      w.state === 'downloading' ? { ...w, state: w.torboxId ? 'torbox' : 'queued' } : w,
+      w.state === 'downloading' ? { ...w, state: w.torboxId ? 'torbox' : 'queued', phase: undefined, speed: 0 } : w,
     );
   }
   return wantedCache;
@@ -255,6 +261,49 @@ async function patchWanted(id: string, patch: Partial<WantedComic>) {
   await saveWanted((await getComicWanted()).map((w) => (w.id === id ? { ...w, ...patch } : w)));
 }
 
+/** Progress ticks come often: tell the screen right away, write to storage at most once a second. */
+let tickTimer: ReturnType<typeof setTimeout> | null = null;
+async function tickWanted(id: string, patch: Partial<WantedComic>) {
+  const list = (await getComicWanted()).map((w) => (w.id === id ? { ...w, ...patch } : w));
+  wantedCache = list;
+  wantedListeners.forEach((l) => l(list));
+  if (!tickTimer) {
+    tickTimer = setTimeout(() => {
+      tickTimer = null;
+      AsyncStorage.setItem(WANTED_KEY, JSON.stringify(wantedCache)).catch(() => {});
+    }, 1000);
+  }
+}
+
+/** Downloads running now (one per wanted comic), so ✕ can stop them. */
+const tasks = new Map<string, { task: DownloadTask; file: File }>();
+const cancelled = new Set<string>();
+
+/**
+ * ✕ on a download: stops it, deletes what came down so far and takes it off the list.
+ * `fromTorbox` also deletes the torrent from your TorBox cloud.
+ */
+export async function cancelComic(id: string, fromTorbox = false) {
+  cancelled.add(id);
+  const t = tasks.get(id);
+  if (t) {
+    t.task.cancel();
+    tasks.delete(id);
+    try {
+      if (t.file.exists) t.file.delete();
+    } catch {
+      // Already gone.
+    }
+  }
+  const w = (await getComicWanted()).find((x) => x.id === id);
+  await removeComicWanted(id);
+  if (fromTorbox && w?.torboxId) await deleteTorrent(w.torboxId).catch(() => {});
+}
+
+/** How many comics are on their way (for the badge on the Comics tab). */
+export const activeComicCount = (list: WantedComic[]) =>
+  list.filter((w) => w.state === 'queued' || w.state === 'torbox' || w.state === 'downloading').length;
+
 export async function removeComicWanted(id: string) {
   await saveWanted((await getComicWanted()).filter((w) => w.id !== id));
 }
@@ -274,6 +323,7 @@ export async function grabComic(release: ComicRelease): Promise<WantedComic> {
     progress: 0,
     addedAt: Date.now(),
   };
+  cancelled.delete(release.id);
   await saveWanted([entry, ...list.filter((w) => w.id !== release.id)]);
   runComicQueue().catch(() => {});
   return entry;
@@ -339,13 +389,40 @@ export async function getComicsFile(post: string): Promise<{ url: string; name?:
 
 const comicFile = (name: string) => /\.(cbz|zip|cbr|rar|cb7|7z|pdf)$/i.test(name);
 
-async function downloadToPhone(url: string, name: string) {
+/**
+ * Downloads one file with live progress (bytes, total, speed). `before`/`known` add the
+ * files already done in a pack, so the bar covers the whole thing.
+ */
+async function downloadToPhone(id: string, url: string, name: string, before = 0, known = 0, guess = 0) {
   const dir = new Directory(Paths.cache, 'comic-grab');
   dir.create({ intermediates: true, idempotent: true });
   const safe = name.replace(/[^\w.()\[\] -]+/g, '_').slice(-120) || 'comic.cbz';
   const target = new File(dir, safe);
   if (target.exists) target.delete();
-  return File.downloadFileAsync(url, target, { idempotent: true });
+  let last = { at: Date.now(), bytes: 0 };
+  let speed = 0;
+  const task = new DownloadTask(url, target, {
+    headers: { 'User-Agent': UA },
+    onProgress: ({ bytesWritten, totalBytes }) => {
+      const now = Date.now();
+      if (now - last.at >= 1000) {
+        const s = ((bytesWritten - last.bytes) * 1000) / (now - last.at);
+        speed = speed ? speed * 0.6 + s * 0.4 : s; // smoothed
+        last = { at: now, bytes: bytesWritten };
+      }
+      const total = known || (totalBytes > 0 ? before + totalBytes : guess);
+      const bytes = before + bytesWritten;
+      tickWanted(id, { bytes, total: total || undefined, speed, progress: total ? bytes / total : 0 });
+    },
+  });
+  tasks.set(id, { task, file: target });
+  try {
+    const done = await task.downloadAsync();
+    if (!done || cancelled.has(id)) throw new Error('Cancelled');
+    return done;
+  } finally {
+    tasks.delete(id);
+  }
 }
 
 function checkOpenable(names: string[]) {
@@ -379,11 +456,14 @@ export async function runComicQueue() {
 async function step(w: WantedComic) {
   const r = w.release;
   if (r.source === 'getcomics') {
-    await patchWanted(w.id, { state: 'downloading', progress: 0 });
+    await patchWanted(w.id, { state: 'downloading', progress: 0, phase: 'Finding the file' });
     const { url, name } = await getComicsFile(r.link!);
     if (name) checkOpenable([name]);
-    const file = await downloadToPhone(url, name && comicFile(name) ? name : `${r.title}.cbz`);
+    await patchWanted(w.id, { phase: 'Downloading' });
+    const file = await downloadToPhone(w.id, url, name && comicFile(name) ? name : `${r.title}.cbz`, 0, 0, r.size ?? 0);
     try {
+      if (cancelled.has(w.id)) return;
+      await patchWanted(w.id, { phase: 'Unpacking', speed: 0 });
       const series = await importComicFiles([file], r.title.replace(/\s*\(\d{4}\)\s*$/, ''), true);
       await addCover(series.comic.id, r);
       await patchWanted(w.id, { state: 'done', progress: 1, seriesId: series.comic.id });
@@ -401,7 +481,7 @@ async function step(w: WantedComic) {
   }
   const item = await getItem('torrent', torboxId);
   if (!item.download_finished) {
-    await patchWanted(w.id, { state: 'torbox', progress: item.progress ?? 0 });
+    await patchWanted(w.id, { state: 'torbox', progress: item.progress ?? 0, phase: 'TorBox is downloading it' });
     return; // Next run checks again.
   }
   const files = item.files.filter((f: TorboxFile) => comicFile(f.short_name ?? f.name));
@@ -409,14 +489,20 @@ async function step(w: WantedComic) {
   const cbz = files.filter((f) =>
     (canOpenRar ? /\.(cbz|zip|cbr|rar|cb7|7z)$/i : /\.(cbz|zip)$/i).test(f.short_name ?? f.name),
   );
-  await patchWanted(w.id, { state: 'downloading', progress: 0 });
+  const all = cbz.reduce((n, f) => n + (f.size ?? 0), 0);
+  await patchWanted(w.id, { state: 'downloading', progress: 0, bytes: 0, total: all || undefined, phase: 'Downloading' });
   const local: File[] = [];
   try {
+    let before = 0;
     for (const [i, f] of cbz.entries()) {
+      if (cancelled.has(w.id)) return;
       const link = await requestLink('torrent', torboxId, f.id);
-      local.push(await downloadToPhone(link, f.short_name ?? f.name.split('/').pop() ?? `${i}.cbz`));
-      await patchWanted(w.id, { progress: (i + 1) / cbz.length });
+      if (cbz.length > 1) await patchWanted(w.id, { phase: `Downloading file ${i + 1} of ${cbz.length}` });
+      local.push(await downloadToPhone(w.id, link, f.short_name ?? f.name.split('/').pop() ?? `${i}.cbz`, before, all));
+      before += f.size ?? 0;
     }
+    if (cancelled.has(w.id)) return;
+    await patchWanted(w.id, { phase: 'Unpacking', speed: 0 });
     const series = await importComicFiles(local, cbz.length > 1 ? cleanPackName(r.title) : undefined, true);
     await addCover(series.comic.id, r);
     await patchWanted(w.id, { state: 'done', progress: 1, seriesId: series.comic.id });

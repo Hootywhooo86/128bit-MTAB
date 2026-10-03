@@ -193,6 +193,15 @@ export async function checkCached(hashes: string[]): Promise<Set<string>> {
   return new Set(Object.keys(data ?? {}).map((h) => h.toLowerCase()));
 }
 
+/** Removes a torrent from the TorBox cloud. */
+export async function deleteTorrent(id: number) {
+  await call('/torrents/controltorrent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ torrent_id: id, operation: 'delete' }),
+  });
+}
+
 // --- Streaming links --------------------------------------------------------
 
 /** Returns a short-lived direct link for one file. */

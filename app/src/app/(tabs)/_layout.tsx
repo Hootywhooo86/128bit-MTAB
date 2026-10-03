@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BottomTabBar, Tabs } from 'expo-router/js-tabs';
-import type { ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { Image, View, type ColorValue } from 'react-native';
 
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
-import { useColors } from '@/constants/theme';
+import { PixelFont, useColors } from '@/constants/theme';
+import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-grab';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -29,8 +30,19 @@ function AnimeIcon({ focused, size, accent }: { focused: boolean; size: number; 
   );
 }
 
+/** Comics on their way to the phone, for the badge on the Comics tab. */
+function useComicsComing() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    getComicWanted().then((l) => setN(activeComicCount(l)), () => {});
+    return onComicWanted((l) => setN(activeComicCount(l)));
+  }, []);
+  return n;
+}
+
 export default function TabLayout() {
   const Colors = useColors();
+  const comicsComing = useComicsComing();
   return (
     <Tabs
       tabBar={(props) => (
@@ -43,13 +55,13 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
         headerShadowVisible: false,
-        headerTitleStyle: { fontWeight: '800', fontSize: 22 },
+        headerTitleStyle: { fontFamily: PixelFont, fontSize: 16 },
         tabBarStyle: {
           backgroundColor: Colors.background,
           borderTopColor: Colors.border,
         },
         // Six tabs: keep the labels small enough to fit on a phone.
-        tabBarLabelStyle: { fontSize: 10 },
+        tabBarLabelStyle: { fontFamily: PixelFont, fontSize: 6, marginTop: 2 },
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
         headerRight: () => <HeaderButtons />,
@@ -76,7 +88,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
-      <Tabs.Screen name="comics" options={{ title: 'Comics', tabBarIcon: icon('book-outline') }} />
+      <Tabs.Screen
+        name="comics"
+        options={{
+          title: 'Comics',
+          tabBarIcon: icon('book-outline'),
+          // Downloads carry on in the background; the badge shows how many are coming.
+          tabBarBadge: comicsComing || undefined,
+          tabBarBadgeStyle: { backgroundColor: Colors.accent, color: Colors.accentText, fontFamily: PixelFont, fontSize: 7 },
+        }}
+      />
     </Tabs>
   );
 }

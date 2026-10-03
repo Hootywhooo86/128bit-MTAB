@@ -9,6 +9,7 @@ import {
   type VideoPlayer,
   type VideoSource,
 } from 'expo-video';
+import { Image } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -16,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TrackSheet, type SubtitleChoice } from '@/components/track-sheet';
 import { EmptyState } from '@/components/ui';
-import { Spacing, makeStyles, useColors } from '@/constants/theme';
+import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePlayer } from '@/lib/player';
 import { usePrefs } from '@/lib/prefs';
 import {
@@ -28,6 +29,7 @@ import {
   type AddonSubtitle,
   type Cue,
 } from '@/lib/subtitles';
+import { MANUAL_SKIP_S, MANUAL_WINDOW_S, getSegments, type Segment } from '@/lib/skip';
 import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
 import { simklScrobble } from '@/lib/simkl';
 import { scrobble } from '@/lib/trakt';
@@ -40,6 +42,7 @@ import {
   pickNextStream,
   resolveStream,
   saveWatchProgress,
+  streamsRoute,
   type StreamResult,
   type WatchItem,
 } from '@/lib/video';
@@ -63,6 +66,14 @@ function setSubtitleTrack(player: VideoPlayer, track: SubtitleTrack | null) {
 
 function setAudioTrack(player: VideoPlayer, track: AudioTrack) {
   player.audioTrack = track;
+}
+
+function seekTo(player: VideoPlayer, t: number) {
+  try {
+    player.currentTime = t;
+  } catch {
+    // Released.
+  }
 }
 
 /** A released player throws on every read; treat that as "unknown". */
@@ -161,22 +172,78 @@ export default function WatchScreen() {
     availableAudioTracks: [],
   });
 
-  // Anime: English dub when there is one, and English subtitles always on.
-  const [anime, setAnime] = useState(false);
-  const userPickedSubs = useRef(false);
-  const animeAudioFor = useRef<string | null>(null);
-  const animeSubsFor = useRef<string | null>(null);
-  const linkId = item?.link?.id;
-  const linkType = item?.link?.type;
+  // Show the poster until the picture actually starts (not just "ready").
+  const [startedFor, setStartedFor] = useState<string | null>(null);
+  const startedKey = item?.key;
   useEffect(() => {
+    const sub = player.addListener('playingChange', ({ isPlaying }) => {
+      if (isPlaying && startedKey) setStartedFor(startedKey);
+    });
+    return () => sub.remove();
+  }, [player, startedKey]);
+
+  // From Continue watching: if the saved stream errors or hasn't started in 30 s, go to
+  // the stream picker for this episode instead.
+  const fallbackFor = item?.fallback ? item : null;
+  const started = startedFor === item?.key;
+  const failed = status === 'error';
+  useEffect(() => {
+    if (!fallbackFor || started) return;
+    const go = () => {
+      try {
+        player.pause();
+      } catch {
+        // Already released.
+      }
+      router.replace(streamsRoute(fallbackFor));
+    };
+    if (failed) {
+      go();
+      return;
+    }
+    const t = setTimeout(go, 30_000);
+    return () => clearTimeout(t);
+  }, [fallbackFor, started, failed, player]);
+
+  // --- Skip intro ---
+  const [segments, setSegments] = useState<{ key: string; list: Segment[] } | null>(null);
+  const skippedFor = useRef<string | null>(null);
+  const segKey = item && !item.live && item.link?.type !== 'movie' ? item.key : null;
+  const segLink = item?.link;
+  const segReady = status === 'readyToPlay';
+  useEffect(() => {
+    if (!segKey || !segReady) return;
     let cancelled = false;
-    isAnime(linkId && linkType ? { id: linkId, type: linkType } : undefined).then(
-      (yes) => !cancelled && setAnime(yes),
-    );
+    (async () => {
+      const anime = await isAnime(segLink).catch(() => false);
+      const list = await getSegments(segKey, anime, known.current.duration);
+      if (!cancelled) setSegments({ key: segKey, list });
+    })();
     return () => {
       cancelled = true;
     };
-  }, [linkId, linkType]);
+  }, [segKey, segLink, segReady]);
+  const skipList = segments && segments.key === segKey ? segments.list : null;
+  const inSegment = skipList?.find(
+    (s) => s.kind !== 'outro' && currentTime >= s.start - 0.5 && currentTime < s.end - 2,
+  );
+  const manualSkip =
+    !!segKey && skipList !== null && !skipList.some((s) => s.kind === 'intro') && currentTime > 2 && currentTime < MANUAL_WINDOW_S;
+  const skipTo = useCallback((t: number) => seekTo(player, t), [player]);
+  // Auto-skip (Settings → Playback): once per segment.
+  const autoSkip = prefs.autoSkipIntro && inSegment ? `${segKey}:${inSegment.start}` : null;
+  useEffect(() => {
+    if (!autoSkip || !inSegment || skippedFor.current === autoSkip) return;
+    skippedFor.current = autoSkip;
+    skipTo(inSegment.end);
+  }, [autoSkip, inSegment, skipTo]);
+
+  // English first (Settings → Playback, on by default): the English audio track when the
+  // video has one, and English subtitles on whenever there are any — for every video.
+  const englishFirst = prefs.englishFirst;
+  const userPickedSubs = useRef(false);
+  const audioSetFor = useRef<string | null>(null);
+  const subsSetFor = useRef<string | null>(null);
 
   // --- Next episode ---
   const [next, setNext] = useState<NextState>({ status: 'idle' });
@@ -222,6 +289,9 @@ export default function WatchScreen() {
           position: time,
           duration,
           link: item.link,
+          stream: item.stream,
+          source: item.source,
+          series: item.series,
         });
       }
     };
@@ -302,15 +372,16 @@ export default function WatchScreen() {
     };
   }, [item, player]);
 
-  // Anime: switch to the English audio track (dub) once tracks are known.
+  // Switch to the English audio track once the video is ready (expo-video ignores a track
+  // change made before that, which is why the anime dub wasn't being picked).
   const playingKey = item?.key;
   useEffect(() => {
-    if (!anime || !playingKey || animeAudioFor.current === playingKey) return;
+    if (!englishFirst || !playingKey || status !== 'readyToPlay') return;
+    if (audioSetFor.current === playingKey || !availableAudioTracks.length) return;
+    audioSetFor.current = playingKey;
     const english = availableAudioTracks.find(isEnglish);
-    if (!availableAudioTracks.length) return;
-    animeAudioFor.current = playingKey;
-    if (english) setAudioTrack(player, english);
-  }, [anime, playingKey, availableAudioTracks, player]);
+    if (english && !isEnglish(player.audioTrack ?? {})) setAudioTrack(player, english);
+  }, [englishFirst, playingKey, status, availableAudioTracks, player]);
 
   const chooseSubtitle = useCallback(
     async (choice: SubtitleChoice) => {
@@ -329,16 +400,17 @@ export default function WatchScreen() {
     [player],
   );
 
-  // Anime: English subtitles always on, even with English audio. The video's own English
-  // track first; otherwise an English one from your subtitle addons (below).
+  // English subtitles always on, even with English audio: the video's own English track
+  // first; otherwise an English one from your subtitle addons (below).
   useEffect(() => {
-    if (!anime || !playingKey || userPickedSubs.current || animeSubsFor.current === playingKey) return;
+    if (!englishFirst || !playingKey || userPickedSubs.current || subsSetFor.current === playingKey) return;
+    if (status !== 'readyToPlay') return;
     const track = englishSubtitle(availableSubtitleTracks);
     if (!track) return;
-    animeSubsFor.current = playingKey;
+    subsSetFor.current = playingKey;
     // After this render (the tracks just arrived).
     Promise.resolve().then(() => chooseSubtitle({ kind: 'embedded', track }));
-  }, [anime, playingKey, availableSubtitleTracks, chooseSubtitle]);
+  }, [englishFirst, playingKey, status, availableSubtitleTracks, chooseSubtitle]);
 
   // Load addon subtitles for this movie/episode, and turn on the preferred language if wanted.
   const itemKey = item?.key;
@@ -350,19 +422,19 @@ export default function WatchScreen() {
       if (cancelled) return;
       const sorted = sortSubtitles(subs, prefs.subtitleLanguage);
       setAddonSubs(sorted);
-      const preferred = anime
+      const preferred = englishFirst
         ? findPreferred(sorted, 'en')
         : prefs.autoSubtitles
           ? findPreferred(sorted, prefs.subtitleLanguage)
           : undefined;
-      // Anime: an addon subtitle only if the video has no English track of its own.
-      if (anime && (userPickedSubs.current || animeSubsFor.current === itemKey)) return;
+      // An addon subtitle only if the video's own English track isn't already on.
+      if (userPickedSubs.current || subsSetFor.current === itemKey) return;
       if (preferred) chooseSubtitle({ kind: 'addon', sub: preferred });
     });
     return () => {
       cancelled = true;
     };
-  }, [itemKey, itemType, prefs.subtitleLanguage, prefs.autoSubtitles, chooseSubtitle, anime]);
+  }, [itemKey, itemType, prefs.subtitleLanguage, prefs.autoSubtitles, chooseSubtitle, englishFirst]);
 
   // --- Next episode ---
   const playNext = useCallback(async () => {
@@ -383,6 +455,8 @@ export default function WatchScreen() {
             uri: result.uri,
             headers: result.headers,
             source: { addonId: pick.addonId, bingeGroup: pick.stream.behaviorHints?.bingeGroup },
+            stream: pick.stream,
+            fallback: false,
           };
           await player.replaceAsync(toSource(nextItem));
           player.play();
@@ -440,8 +514,22 @@ export default function WatchScreen() {
         allowsPictureInPicture
         fullscreenOptions={{ enable: true }}
       />
-      {status === 'loading' ? (
-        <ActivityIndicator size="large" color={Colors.accent} style={StyleSheet.absoluteFill} />
+      {startedFor !== item.key && status !== 'error' ? (
+        <View style={styles.loadingArt} pointerEvents="none">
+          {item.poster ? (
+            <Image source={{ uri: item.poster }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          ) : null}
+          <View style={styles.loadingShade} />
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          {item.subtitle ? (
+            <Text style={styles.loadingSub} numberOfLines={1}>
+              {item.subtitle}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
       {status === 'error' ? (
         <View style={styles.errorBox}>
@@ -455,7 +543,7 @@ export default function WatchScreen() {
 
       {line ? (
         <View style={styles.subtitleWrap} pointerEvents="none">
-          <Text style={[styles.subtitleText, { fontSize: SUB_SIZES[prefs.subtitleSize] }]}>
+          <Text style={[styles.plainSubtitleText, { fontSize: SUB_SIZES[prefs.subtitleSize] }]}>
             {line}
           </Text>
         </View>
@@ -489,6 +577,16 @@ export default function WatchScreen() {
           </Pressable>
         ) : null}
       </SafeAreaView>
+
+      {inSegment && !prefs.autoSkipIntro ? (
+        <Pressable style={styles.skipButton} onPress={() => skipTo(inSegment.end)}>
+          <Text style={styles.skipText}>{inSegment.kind === 'recap' ? 'SKIP RECAP ▶▶' : 'SKIP INTRO ▶▶'}</Text>
+        </Pressable>
+      ) : manualSkip && !inSegment ? (
+        <Pressable style={[styles.skipButton, styles.skipManual]} onPress={() => skipTo(currentTime + MANUAL_SKIP_S)}>
+          <Text style={styles.skipText}>+{MANUAL_SKIP_S}s ▶▶</Text>
+        </Pressable>
+      ) : null}
 
       {upNext && (nearEnd || next.status !== 'idle') ? (
         <View style={styles.nextWrap}>
@@ -541,6 +639,18 @@ export default function WatchScreen() {
 
 const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: '#000' },
+  skipButton: {
+    position: 'absolute',
+    right: Spacing.four,
+    bottom: 96,
+    backgroundColor: Colors.accent,
+    borderWidth: 3,
+    borderColor: '#fff',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  skipManual: { backgroundColor: 'rgba(0,0,0,0.7)', borderColor: Colors.accent },
+  skipText: { color: '#fff', fontFamily: PixelFont, fontSize: 10 },
   video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   top: {
     position: 'absolute',
@@ -563,6 +673,16 @@ const useStyles = makeStyles((Colors) => ({
     padding: Spacing.four,
   },
   errorText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  loadingArt: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.three,
+    backgroundColor: '#000',
+  },
+  loadingShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
+  loadingTitle: { color: '#fff', fontFamily: PixelFont, fontSize: 14, lineHeight: 22, textAlign: 'center', paddingHorizontal: Spacing.four },
+  loadingSub: { color: '#ddd', fontFamily: PixelFont, fontSize: 9, lineHeight: 15 },
   errorDetail: { color: '#aaa', fontSize: 12, marginTop: 6, textAlign: 'center' },
   errorBack: { marginTop: Spacing.three, borderWidth: 2, borderColor: '#fff', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   errorBackText: { color: '#fff', fontWeight: '700' },
@@ -573,7 +693,7 @@ const useStyles = makeStyles((Colors) => ({
     bottom: 96,
     alignItems: 'center',
   },
-  subtitleText: {
+  plainSubtitleText: {
     color: '#fff',
     textAlign: 'center',
     fontWeight: '600',

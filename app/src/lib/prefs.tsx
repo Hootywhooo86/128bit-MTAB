@@ -42,6 +42,10 @@ export type Prefs = {
   comicAllLanguages: boolean;
   /** Delete a comic chapter's pages from the phone once you've read it (saves space). */
   comicDeleteRead: boolean;
+  /** Every video: English audio track when there is one, and English subtitles always on. */
+  englishFirst: boolean;
+  /** Jump over openings and recaps by themselves (otherwise a Skip button shows). */
+  autoSkipIntro: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -63,6 +67,8 @@ export const DEFAULT_PREFS: Prefs = {
   comicDataSaver: false,
   comicAllLanguages: false,
   comicDeleteRead: false,
+  englishFirst: true,
+  autoSkipIntro: false,
 };
 
 const KEY = '128bit.prefs';

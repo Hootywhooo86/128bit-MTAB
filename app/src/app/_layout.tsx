@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
 
-import { useColors } from '@/constants/theme';
+import { PixelFont, useColors } from '@/constants/theme';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
@@ -98,7 +98,7 @@ function AppNavigator() {
             headerTintColor: Colors.text,
             headerShadowVisible: false,
             headerStyle: { backgroundColor: Colors.background },
-            headerTitleStyle: { fontWeight: '800' },
+            headerTitleStyle: { fontFamily: PixelFont, fontSize: 12 },
             contentStyle: { backgroundColor: Colors.background },
           }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

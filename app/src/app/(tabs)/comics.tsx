@@ -10,6 +10,7 @@ import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/t
 import {
   browseSuwayomi,
   getAllComicProgress,
+  getComicLibrary,
   listComics,
   searchComics,
   type Comic,
@@ -24,8 +25,10 @@ import {
   type LocalSeries,
 } from '@/lib/comic-downloads';
 import { getSuwayomi, listSources, type SuwaSource } from '@/lib/suwayomi';
+import { searchWebtoons } from '@/lib/webtoons';
 
 const MANGADEX = 'mangadex';
+const WEBTOONS = 'webtoons';
 /** Find's sources: GetComics + Pirate Bay (download to the phone), MangaDex, Suwayomi sources. */
 const WEB = 'web';
 const SECTIONS = ['Library', 'Find', 'Wanted'] as const;
@@ -41,6 +44,8 @@ export default function ComicsScreen() {
   const [results, setResults] = useState<Comic[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, ReadProgress>>({});
+  /** WEBTOON series you're reading online (not on the phone). */
+  const [online, setOnline] = useState<Comic[]>([]);
   const [sources, setSources] = useState<SuwaSource[]>([]);
   const [onPhone, setOnPhone] = useState<LocalSeries[]>([]);
   const [importing, setImporting] = useState(false);
@@ -68,6 +73,7 @@ export default function ComicsScreen() {
   useFocusEffect(
     useCallback(() => {
       getAllComicProgress().then(setProgress);
+      getComicLibrary().then((l) => setOnline(l.filter((c) => c.id.startsWith('wt:'))));
       // Sources from your Suwayomi extensions (Keiyoushi etc.), when a server is connected.
       getSuwayomi().then((c) =>
         c ? listSources().then(setSources, () => setSources([])) : setSources([]),
@@ -84,9 +90,11 @@ export default function ComicsScreen() {
   useEffect(() => {
     if (!submitted) return;
     let cancelled = false;
-    (current
-      ? browseSuwayomi(current.id, 'SEARCH', 1, submitted).then((r) => r.comics)
-      : searchComics(submitted)
+    (source === WEBTOONS
+      ? searchWebtoons(submitted)
+      : current
+        ? browseSuwayomi(current.id, 'SEARCH', 1, submitted).then((r) => r.comics)
+        : searchComics(submitted)
     ).then(
       (r) => !cancelled && setResults(r),
       (e) => !cancelled && setSearchError(e.message),
@@ -94,7 +102,7 @@ export default function ComicsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [submitted, current]);
+  }, [submitted, current, source]);
 
   function search() {
     const q = query.trim();
@@ -135,6 +143,25 @@ export default function ComicsScreen() {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
         {tabs}
+        {online.length ? (
+          <View style={{ gap: Spacing.two }}>
+            <Heading style={{ paddingHorizontal: Spacing.three }}>Reading online · WEBTOON</Heading>
+            <View style={styles.grid}>
+              {[...online]
+                .sort((a, b) => (progress[b.id]?.updatedAt ?? 0) - (progress[a.id]?.updatedAt ?? 0))
+                .map((c) => (
+                  <ComicTile
+                    key={c.id}
+                    comic={c}
+                    width={108}
+                    resume={progress[c.id]}
+                    note={progress[c.id]?.chapterLabel ?? 'Not started'}
+                  />
+                ))}
+            </View>
+            {sorted.length ? <Heading style={{ paddingHorizontal: Spacing.three }}>On this phone</Heading> : null}
+          </View>
+        ) : null}
         {sorted.length ? (
           <View style={styles.grid}>
             {sorted.map((s) => (
@@ -142,6 +169,7 @@ export default function ComicsScreen() {
                 key={s.comic.id}
                 comic={s.comic}
                 width={108}
+                resume={progress[s.comic.id]}
                 note={
                   progress[s.comic.id]?.chapterLabel ??
                   `${s.chapters.filter((c) => c.state === 'done').length} ch. · new`
@@ -149,7 +177,7 @@ export default function ComicsScreen() {
               />
             ))}
           </View>
-        ) : (
+        ) : online.length ? null : (
           <Body muted style={{ paddingHorizontal: Spacing.three }}>
             Nothing downloaded yet. Use Find to get comics (GetComics, Pirate Bay, MangaDex…), or
             import CBZ/CBR files below.
@@ -177,7 +205,7 @@ export default function ComicsScreen() {
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
-      {[{ id: WEB, displayName: 'GetComics + Pirate Bay' }, { id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
+      {[{ id: WEB, displayName: 'GetComics + Pirate Bay' }, { id: WEBTOONS, displayName: 'WEBTOON' }, { id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
         <Pressable
           key={s.id}
           onPress={() => {
@@ -212,7 +240,7 @@ export default function ComicsScreen() {
       {chips}
       <View style={{ paddingHorizontal: Spacing.three }}>
         <Input
-          placeholder={`Search ${current ? current.name : 'MangaDex'}`}
+          placeholder={`Search ${source === WEBTOONS ? 'WEBTOON (e.g. Dungeon Crawler Carl)' : current ? current.name : 'MangaDex'}`}
           value={query}
           onChangeText={(t) => {
             setQuery(t);
@@ -241,6 +269,12 @@ export default function ComicsScreen() {
             </View>
           )}
         </View>
+      ) : source === WEBTOONS ? (
+        <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
+          WEBTOON series read online (nothing is downloaded): search for one, open it, tap an
+          episode. The end of each episode has a Next button, and it shows up in your Library
+          under Reading online.
+        </Body>
       ) : current ? (
         <>
           <ListRow

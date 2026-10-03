@@ -130,14 +130,22 @@ Mihon extensions themselves only run inside Mihon-style apps, so for those sourc
 Comics tab → **Find**: one search covers GetComics and The Pirate Bay's Comics category. **CBZ and CBR both open** in the Android app (CBR = RAR4 and RAR5, also CB7/CBT), unpacked by the app's own native module (`app/modules/comic-archive`, libarchive) straight to files, so even 500 MB volumes don't need to fit in memory. The downloaded archive is deleted once unpacked. PDF comics aren't supported.
 
 - **Get**: GetComics comics download straight to the phone (through the post's **PixelDrain** mirror, which serves files to apps; "Download Now" is tried next; MEGA/TeraBox-type mirrors are web pages and are never used); Pirate Bay torrents go to **TorBox** and, when ready, the CBZ files inside are downloaded (a pack becomes one series, each file a chapter). The comic lands under **On this phone** with its cover (GetComics cover art, or the closest GetComics match for torrents).
-- **Wanted** shows each comic's progress (In TorBox / Downloading / On this phone); hold to remove, Retry on failure. TorBox is checked every minute while the app is open.
+- **Wanted** shows each comic's progress: a pixel bar with **"123 MB of 565 MB · 4.2 MB/s"** and what it's doing (Finding the file / TorBox is downloading it / Downloading / Unpacking). Downloads run in the background (leave the page, background the app, screen off) and the **Comics tab shows a badge** with how many are coming. **✕** cancels: stops the download, deletes the partial file and takes it off the list (big ones ask first, and torrents can also be deleted from TorBox). Retry on failure. TorBox is checked every minute while the app is open.
 - **Follow** a series: GetComics and TPB are checked every 6 hours for issues after the one you have; they show under **New issues** (Get or dismiss), or turn on **Get new issues automatically**.
 - If a site moves, change its address in **Settings → Comics → Find comics**.
 - **Saving space**: **Settings → Downloads → Comics → Delete read chapters** removes every chapter you've finished (shows how much space is used), and **Settings → Comics → Delete chapters after reading** does it automatically (a chapter leaves the phone when you finish the next one). Import from the phone also takes CBR files.
 
+### WEBTOON (read online)
+
+Comics tab → **Find → WEBTOON**: search webtoons.com (Originals and Canvas, e.g. *Dungeon Crawler Carl*), open a series, tap an episode. Episodes stream to the phone (nothing is downloaded) in the scrolling reader, with a **Next** button at the end of each. Series you read show in **Library → Reading online**.
+
+### Picking up where you left off (comics)
+
+The reader remembers the exact page **and how far down it** you scrolled. Tapping a comic in **Library** goes straight back into the reader at that spot (if you'd finished the chapter, the next one opens); hold it for the comic's page.
+
 ### Listening with the screen off
 
-Audiobooks keep playing with the screen off, with the app in the background **and after you swipe the app away**: the player runs outside the app's screens and the lock-screen/notification controls keep it alive. The lock screen shows the book cover (or the 128bitPlay pixel art), title, author and **current chapter** ("Ch. 3 of 12"), with play/pause, back/forward 30 s and previous/next chapter. Videos still need the screen on.
+Audiobooks keep playing with the screen off, with the app in the background **and after you swipe the app away**: the player runs outside the app's screens and the lock-screen/notification controls keep it alive. The Now Playing screen frames the cover, title and author in a blocky pixel border in your accent colour, with an equalizer that bounces while the book plays. The whole app uses the **Press Start 2P** pixel font (video subtitles stay in a normal font). The lock screen shows the book cover (or the 128bitPlay pixel art), title, author and **current chapter** ("Ch. 3 of 12"), with play/pause, back/forward 30 s and previous/next chapter. Videos still need the screen on.
 
 (The chapter buttons and 30 s skips are a small patch to expo-audio in `app/patches/`, applied by the build; `package.json` builds expo-audio and expo-video from source so the patches are used.)
 
@@ -145,9 +153,15 @@ Audiobooks keep playing with the screen off, with the app in the background **an
 
 The video player decodes audio with **FFmpeg** first (Jellyfin's media3 FFmpeg decoder, patched into expo-video in `app/patches/`), so Dolby Digital Plus (EAC3), AC3, DTS and TrueHD tracks play even on phones whose own decoder is missing or fails (e.g. `c2.dolby.eac3.decoder` errors). The Android back button / back swipe leaves the player, and a failed stream offers **Back to pick another stream**.
 
-### Anime: English first
+### Continue watching, skip intro, loading poster
 
-For anime (Anime tab, Kitsu/MAL ids), the player switches to an **English audio track** (dub) when the video has one and **always turns on English subtitles** when there are any (the video's own track, otherwise an English one from your subtitle addons). Streams that look like English dubs ("Dual Audio", "English Dub", 🇬🇧) are listed first and badged **EN dub**.
+- **Continue watching** remembers the stream you were watching: one tap starts it again from your spot (TorBox links are fetched fresh). If it hasn't started within 30 s or fails, the stream picker opens instead.
+- **Skip intro**: anime openings come from **AniSkip**, show intros and recaps from **IntroDB**; a **SKIP INTRO** button shows during them (or turn on **Settings → Playback → Skip intros automatically**). Episodes nobody has marked get a **+85s** button for the first 5 minutes.
+- While a stream loads, the show's art, title and episode show until the picture actually starts.
+
+### English first (every video)
+
+**Settings → Playback → English first** (on by default): every video (anime, shows, movies) switches to an **English audio track** (dub) when the video has one and **always turns on English subtitles** when there are any (the video's own track, otherwise an English one from your subtitle addons). Streams that look like English dubs ("Dual Audio", "English Dub", 🇬🇧) are listed first and badged **EN dub**.
 
 ### App updates
 
@@ -169,7 +183,7 @@ Movies, episodes and anime (IMDb and Kitsu ids) are scrobbled to Simkl, next to 
 
 ### Optional: Hardcover
 
-**Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress (every few minutes and whenever you pause), and Read when you finish. **Each time the app opens**, progress syncs both ways: if Hardcover is further along (you listened elsewhere) your place here moves up, and if this phone is further along Hardcover is updated. **Sync now** does it on demand. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book.
+**Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress (every few minutes and whenever you pause), and Read when you finish. **Each time the app opens**, progress syncs both ways: if Hardcover is further along (you listened elsewhere) your place here moves up, and if this phone is further along Hardcover is updated. **Sync now** does it on demand. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book. Progress is sent against the book's **audiobook edition** (the one closest to your audiobook's length), so Hardcover shows the % complete.
 
 ### Audiobook sources (Pageturner format)
 

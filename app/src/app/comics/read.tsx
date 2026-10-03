@@ -3,11 +3,14 @@ import { Image } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Text,
   View,
   useWindowDimensions,
@@ -42,6 +45,9 @@ function prefetch(urls: string[]) {
 const PAGED_VIEW = { itemVisiblePercentThreshold: 60 };
 const SCROLL_VIEW = { itemVisiblePercentThreshold: 30 };
 const MODE_LABEL = { vertical: 'Scroll', rtl: 'Pages ←', ltr: 'Pages →' };
+const DEFAULT_RATIO = 1.45;
+/** Page shapes per chapter, so the scroll reader can land exactly where you stopped. */
+const RATIOS_KEY = (chapterId: string) => `128bit.comics.ratios.${chapterId}`;
 
 /** Full-screen comic reader. Tap to show or hide the controls. */
 export default function ReaderScreen() {
@@ -51,8 +57,10 @@ export default function ReaderScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { prefs, setPref } = usePrefs();
-  const mode = prefs.readerMode;
-  const params = useLocalSearchParams<{ id: string; chapter: string }>();
+  const params = useLocalSearchParams<{ id: string; chapter: string; resume?: string }>();
+  // WEBTOON episodes are one long strip: always the scroll reader.
+  const webtoon = params.id.startsWith('wt:');
+  const mode = webtoon ? 'vertical' : prefs.readerMode;
 
   const [comic, setComic] = useState<Comic | null>(null);
   const [chapters, setChapters] = useState<ComicChapter[]>(knownChapters(params.id) ?? []);
@@ -61,6 +69,10 @@ export default function ReaderScreen() {
   const [ratios, setRatios] = useState<Record<number, number>>({});
   const [page, setPage] = useState(0);
   const [startPage, setStartPage] = useState<number | null>(null);
+  const startOffset = useRef(0);
+  const startRatio = useRef(DEFAULT_RATIO);
+  /** Where you are in the scroll reader: page + how far down it (0..1). */
+  const pos = useRef({ page: 0, offset: 0 });
   const [controls, setControls] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const list = useRef<FlatList<string>>(null);
@@ -88,7 +100,19 @@ export default function ReaderScreen() {
       async (urls) => {
         if (cancelled) return;
         const saved = await getComicProgress(params.id);
-        const at = saved?.chapterId === chapterId && saved.page < urls.length - 1 ? saved.page : 0;
+        const here = saved?.chapterId === chapterId && saved.page < urls.length;
+        const at = here ? saved!.page : 0;
+        startOffset.current = here ? (saved!.offset ?? 0) : 0;
+        pos.current = { page: at, offset: startOffset.current };
+        startRatio.current = DEFAULT_RATIO;
+        try {
+          const known = JSON.parse((await AsyncStorage.getItem(RATIOS_KEY(chapterId))) ?? '{}');
+          startRatio.current = known[at] ?? DEFAULT_RATIO;
+          if (!cancelled) setRatios(known);
+        } catch {
+          // Shapes come in as the pages load.
+        }
+        if (cancelled) return;
         setPages(urls);
         setPage(at);
         setStartPage(at);
@@ -105,23 +129,67 @@ export default function ReaderScreen() {
   useEffect(() => {
     if (startPage === null || !pages) return;
     const t = setTimeout(() => {
-      if (startPage > 0) list.current?.scrollToIndex({ index: startPage, animated: false });
+      if (startPage > 0 || startOffset.current > 0) {
+        // Scroll reader: also how far down the page you were.
+        const h = mode === 'vertical' ? width * startRatio.current : 0;
+        list.current?.scrollToIndex({
+          index: startPage,
+          animated: false,
+          viewOffset: -startOffset.current * h,
+        });
+      }
       setStartPage(null);
-    }, 50);
+    }, 80);
     return () => clearTimeout(t);
-  }, [startPage, pages]);
+  }, [startPage, pages, mode, width]);
 
   // Save the page; the last page marks the chapter read.
   useEffect(() => {
     if (!comic || !chapter || !pages) return;
     const last = page >= pages.length - 1;
-    saveComicProgress(comic, chapter, page, pages.length, last);
+    saveComicProgress(comic, chapter, page, pages.length, last, pos.current.page === page ? pos.current.offset : 0);
     if (last && finishedFor.current !== chapter.id) {
       finishedFor.current = chapter.id;
       addChapterRead(comic);
     }
     prefetch(pages.slice(page + 1, page + 4));
   }, [comic, chapter, page, pages]);
+
+  // Keep the page shapes, for an exact resume next time.
+  useEffect(() => {
+    if (pages && Object.keys(ratios).length) {
+      AsyncStorage.setItem(RATIOS_KEY(chapterId), JSON.stringify(ratios)).catch(() => {});
+    }
+  }, [ratios, pages, chapterId]);
+
+  // Where each page starts in the scroll reader (from the page shapes).
+  const tops = useMemo(() => {
+    const t: number[] = [];
+    let y = 0;
+    for (let i = 0; i < (pages?.length ?? 0); i++) {
+      t.push(y);
+      y += width * (ratios[i] ?? DEFAULT_RATIO);
+    }
+    return t;
+  }, [pages, ratios, width]);
+
+  // Scroll reader: remember the exact spot, saved when you stop scrolling.
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (mode !== 'vertical' || !tops.length) return;
+      const y = e.nativeEvent.contentOffset.y;
+      let i = 0;
+      while (i + 1 < tops.length && tops[i + 1] <= y) i++;
+      const h = width * (ratios[i] ?? DEFAULT_RATIO);
+      pos.current = { page: i, offset: h ? Math.min(1, Math.max(0, (y - tops[i]) / h)) : 0 };
+    },
+    [mode, tops, ratios, width],
+  );
+  const saveSpot = useCallback(() => {
+    if (!comic || !chapter || !pages) return;
+    const { page: p, offset } = pos.current;
+    saveComicProgress(comic, chapter, p, pages.length, p >= pages.length - 1, offset);
+  }, [comic, chapter, pages]);
 
   // FlatList needs the same function every render.
   const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -136,6 +204,20 @@ export default function ReaderScreen() {
     setPage(0);
     setChapterId(c.id);
   }, []);
+
+  // Opened with "resume": if that chapter was finished, carry on with the next one.
+  const resumed = useRef(params.resume !== '1');
+  useEffect(() => {
+    if (resumed.current || !chapters.length) return;
+    resumed.current = true;
+    getComicProgress(params.id).then((saved) => {
+      const i = chapters.findIndex((c) => c.id === params.chapter);
+      const done =
+        saved?.chapterId === params.chapter &&
+        (saved.read.includes(params.chapter) || saved.page >= saved.pages - 1);
+      if (done && i >= 0 && i + 1 < chapters.length) goTo(chapters[i + 1]);
+    }, () => {});
+  }, [chapters, params.id, params.chapter, goTo]);
 
   const cycleMode = () => setPref('readerMode', MODES[(MODES.indexOf(mode) + 1) % MODES.length]);
 
@@ -168,9 +250,15 @@ export default function ReaderScreen() {
           viewabilityConfig={paged ? PAGED_VIEW : SCROLL_VIEW}
           initialNumToRender={3}
           windowSize={7}
-          getItemLayout={
-            paged ? (_, i) => ({ length: width, offset: width * i, index: i }) : undefined
+          getItemLayout={(_, i) =>
+            paged
+              ? { length: width, offset: width * i, index: i }
+              : { length: width * (ratios[i] ?? DEFAULT_RATIO), offset: tops[i] ?? 0, index: i }
           }
+          onScroll={onScroll}
+          scrollEventThrottle={200}
+          onMomentumScrollEnd={saveSpot}
+          onScrollEndDrag={saveSpot}
           onScrollToIndexFailed={({ index: i }) =>
             setTimeout(() => list.current?.scrollToIndex({ index: i, animated: false }), 200)
           }
@@ -223,9 +311,11 @@ export default function ReaderScreen() {
                 {chapter ? chapterLabel(chapter) : ''}
               </Text>
             </View>
-            <Pressable onPress={cycleMode} style={styles.modeButton} accessibilityLabel="Reading mode">
-              <Text style={styles.modeText}>{MODE_LABEL[mode]}</Text>
-            </Pressable>
+            {webtoon ? null : (
+              <Pressable onPress={cycleMode} style={styles.modeButton} accessibilityLabel="Reading mode">
+                <Text style={styles.modeText}>{MODE_LABEL[mode]}</Text>
+              </Pressable>
+            )}
           </View>
           <View style={[styles.bar, styles.bottom, { paddingBottom: insets.bottom + Spacing.two }]}>
             <Pressable

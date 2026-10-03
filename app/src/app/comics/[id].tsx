@@ -100,6 +100,8 @@ export default function ComicScreen() {
 
   const read = new Set(progress?.read ?? []);
   const isLocalComic = comic.id.startsWith('local:');
+  // WEBTOON is read online only (streams to the phone, nothing saved).
+  const online = comic.id.startsWith('wt:');
   const readable = (c: ComicChapter) => c.pages > 0 && !(c.externalUrl && !c.pages);
   const toDownload = (chapters ?? []).filter((c) => readable(c) && !read.has(c.id) && !local.has(c.id));
 
@@ -114,7 +116,7 @@ export default function ComicScreen() {
           setProgress(await getComicProgress(comic!.id));
         },
       },
-      ...(isLocalComic
+      ...(isLocalComic || online
         ? []
         : [
             onPhone
@@ -187,7 +189,7 @@ export default function ComicScreen() {
               variant="secondary"
               onPress={async () => setSaved(await toggleComicLibrary(comic))}
             />
-            {!isLocalComic && comicDownloadsSupported && toDownload.length ? (
+            {!isLocalComic && !online && comicDownloadsSupported && toDownload.length ? (
               <Button
                 label={`Download ${toDownload.length} unread chapter${toDownload.length === 1 ? '' : 's'} to phone`}
                 variant="secondary"
@@ -210,7 +212,9 @@ export default function ComicScreen() {
                 Hold a chapter for read / download options · {[...local.values()].filter((c) => c.state === 'done').length} on this phone
               </Text>
             ) : (
-              <Text style={styles.meta}>Hold a chapter for read / download options</Text>
+              <Text style={styles.meta}>
+                {online ? 'Read online · hold an episode to mark it read' : 'Hold a chapter for read / download options'}
+              </Text>
             )}
             {comic.description ? (
               <Text

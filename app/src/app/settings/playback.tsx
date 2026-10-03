@@ -86,8 +86,24 @@ export default function PlaybackSettings() {
         />
       </Group>
 
+      <SectionTitle>Skip intro</SectionTitle>
+      <Group>
+        <ToggleRow
+          title="Skip intros automatically"
+          subtitle="Anime openings (AniSkip) and show intros and recaps (IntroDB). Off: a Skip intro button shows instead. When an episode isn't marked, a +85 s button shows for the first 5 minutes."
+          value={prefs.autoSkipIntro}
+          onChange={(v) => setPref('autoSkipIntro', v)}
+        />
+      </Group>
+
       <SectionTitle>Subtitles</SectionTitle>
       <Group>
+        <ToggleRow
+          title="English first"
+          subtitle="Every video plays the English audio track when it has one (e.g. anime dubs) and turns on English subtitles whenever there are any."
+          value={prefs.englishFirst}
+          onChange={(v) => setPref('englishFirst', v)}
+        />
         <ChoiceRow
           title="Preferred language"
           subtitle="Listed first, and used when subtitles turn on automatically"
