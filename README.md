@@ -196,6 +196,24 @@ Two kinds, both added in **Settings → Content & Discovery → Audiobook downlo
 - **Book catalogs** (iTunes, Audible…) fill **Find audiobooks** with Bestsellers, New Releases and genre rows, plus search results. Tap a book to look for it in your download sources.
 - **Download sources** (torrent indexes): paste a source URL from <https://pageturner-dsc.elfhosted.com/> (pick a source, tap Copy). Torrent sources are searched when you search in Audiobooks; tap **TorBox** on a result to add it to your TorBox account, then play or download it from **Your TorBox cloud**. Direct-download (HLS) sources aren't supported yet, and some sources only answer the Pageturner app itself.
 
+### Android TV app ("128bitPlay TV")
+
+Every build also makes `128bit-tv-<version>-build<N>.apk`: the same app for Android TV with **Shows, Movies, Anime and Live TV** only (no Books or Comics). It has its own name and package (`app.bit128.mtab.tv`), so it installs next to the phone app, and it shows in the TV's launcher with a banner. Everything works with the remote: the focused item gets a ring in your accent colour. Live TV has big channel rows and **CH ▲ / CH ▼** buttons in the player to flip through the list you opened. Sideload it with e.g. *Downloader* or *Send Files to TV*. (The phone APK also switches to this layout if it's installed on a TV.)
+
+### Account & sync (your own Supabase project)
+
+**Settings → Account & sync** signs you in on every phone and TV so your setup follows you: add-ons (in order), settings, Live TV playlists, TorBox / TMDB / MDBList keys, Trakt and Simkl sign-ins, Continue watching, and on phones also books (library, positions, wanted) and comics (library, progress, follows). Changes are sent a few seconds after you make them and fetched each time the app opens; **Sync now** does both. The TV only takes the video parts and leaves books/comics in the account untouched.
+
+Setup, once (free):
+
+1. Create a project at [supabase.com](https://supabase.com) → **New project**.
+2. **SQL Editor** → paste the setup SQL (**Settings → Account & sync → Copy setup SQL** in the app, or `SETUP_SQL` in `app/src/lib/account.ts`) → **Run**.
+3. **Authentication → Sign In / Providers**: turn on **Anonymous sign-ins** (that's how TVs pair). Optionally turn off **Confirm email** so new accounts work straight away.
+4. **Settings → API**: copy the **Project URL** and the **anon public** key into the app (once per device), or add them as repo secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY` so every build has them built in.
+5. On the phone: **Create account** (email + password). On the TV: Settings → Account & sync shows a code and a QR code; scan the QR with the phone (or enter the code under **Sign in a TV**) and the TV fills in.
+
+Your settings and keys are stored in your own project; the tables can only be reached through the setup functions, each account sees only its own row, and a paired TV sees only its owner's.
+
 ## Install on your phone
 
 **Easiest:** download the newest APK from the repo's [Releases page](../../releases). Every push that changes `app/` builds a new one automatically (GitHub Actions → *Android APK*).

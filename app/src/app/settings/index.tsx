@@ -9,6 +9,12 @@ export default function SettingsScreen() {
       <SectionTitle>Account</SectionTitle>
       <Group>
         <Row
+          icon="person-circle"
+          title="Account & sync"
+          subtitle={IS_TV ? 'Sign in with your phone to bring your add-ons and settings here.' : 'Your add-ons and settings on every phone and TV.'}
+          onPress={() => router.push('/settings/account')}
+        />
+        <Row
           icon="sync"
           title="Tracking"
           subtitle={IS_TV ? 'Trakt and Simkl for what you watch.' : 'Trakt and Simkl for what you watch, Hardcover for books.'}

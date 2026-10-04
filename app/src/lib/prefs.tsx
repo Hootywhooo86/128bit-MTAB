@@ -4,6 +4,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
+import { lastSync, onAccount } from './account';
+
 export const ACCENTS = {
   white: { name: 'White', color: '#FFFFFF', onAccent: '#000000' },
   crimson: { name: 'Crimson', color: '#E53935', onAccent: '#FFFFFF' },
@@ -94,6 +96,13 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
       .then((raw) => raw && setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) }))
       .catch(() => {})
       .finally(() => setLoaded(true));
+    // Preferences synced in from your account (another device) take effect right away.
+    return onAccount(() => {
+      if (!lastSync()?.pulled.includes('prefs')) return;
+      AsyncStorage.getItem(KEY)
+        .then((raw) => raw && setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) }))
+        .catch(() => {});
+    });
   }, []);
 
   const setPref = useCallback(<K extends keyof Prefs>(key: K, value: Prefs[K]) => {

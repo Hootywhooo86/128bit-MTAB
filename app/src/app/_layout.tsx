@@ -7,6 +7,7 @@ import { AppState } from 'react-native';
 
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
+import { startAccountSync } from '@/lib/account';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
@@ -43,6 +44,8 @@ function AppNavigator() {
   // First launch: add Cinemeta + OpenSubtitles so there's something to browse right away.
   useEffect(() => {
     installDefaultAddons().catch(() => {});
+    // Account sync (Settings → Account): pull from your other devices, push changes made here.
+    startAccountSync();
     // Audiobook sources/feeds and comics aren't part of the TV app.
     if (IS_TV) return;
     installDefaultSources().catch(() => {});
@@ -125,6 +128,7 @@ function AppNavigator() {
           <Stack.Screen name="trakt" options={{ title: 'Trakt library' }} />
           <Stack.Screen name="settings/comics" options={{ title: 'Comics' }} />
           <Stack.Screen name="settings/stats" options={{ title: 'Statistics' }} />
+          <Stack.Screen name="settings/account" options={{ title: 'Account & sync' }} />
           <Stack.Screen name="settings/index" options={{ title: '' }} />
           <Stack.Screen name="addons" options={{ title: 'Addons' }} />
           <Stack.Screen name="settings/content" options={{ title: 'Content & Discovery' }} />

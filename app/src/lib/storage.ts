@@ -42,8 +42,11 @@ export function onAddonsChanged(listener: () => void) {
 
 export async function saveAddons(addons: InstalledAddon[]) {
   await setJSON(KEYS.addons, addons);
-  addonListeners.forEach((l) => l());
+  notifyAddonsChanged();
 }
+
+/** The addon list changed underneath (e.g. synced from your account). */
+export const notifyAddonsChanged = () => addonListeners.forEach((l) => l());
 
 export const isEnabled = (a: InstalledAddon) => a.enabled !== false;
 
@@ -57,7 +60,15 @@ export async function secureGet(key: string): Promise<string | null> {
   return SecureStore.getItemAsync(key);
 }
 
+let secureListener: ((key: string) => void) | null = null;
+
+/** Account sync watches secret changes (TorBox key, sign-ins) so they reach your other devices. */
+export function onSecureChange(fn: (key: string) => void) {
+  secureListener = fn;
+}
+
 export async function secureSet(key: string, value: string | null) {
+  secureListener?.(key);
   if (Platform.OS === 'web') {
     return value ? AsyncStorage.setItem(key, value) : AsyncStorage.removeItem(key);
   }
