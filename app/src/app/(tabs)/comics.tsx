@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, Text, View } from 'react-native';
 
 import { ComicFind } from '@/components/comic-find';
 import { ComicTile } from '@/components/comic-tile';
@@ -27,6 +27,7 @@ import {
 import { getSuwayomi, listSources, type SuwaSource } from '@/lib/suwayomi';
 import { searchWeebCentral } from '@/lib/weebcentral';
 import { searchWebtoons } from '@/lib/webtoons';
+import { Pressable } from '@/components/focusable';
 
 const MANGADEX = 'mangadex';
 const WEBTOONS = 'webtoons';

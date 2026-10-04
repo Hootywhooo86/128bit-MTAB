@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { Button, Cover, ProgressBar } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -22,6 +22,7 @@ import {
   type WantedBook,
   type WantedInput,
 } from '@/lib/wanted';
+import { Pressable } from '@/components/focusable';
 
 type Params = {
   title: string;

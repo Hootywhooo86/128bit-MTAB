@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { PlayableActions } from '@/components/playable-actions';
 import {
@@ -18,6 +18,7 @@ import { fetchBook } from '@/lib/addons';
 import { checkTorbox, resolveSource, type ResolveResult } from '@/lib/resolve';
 import { getAddons } from '@/lib/storage';
 import type { BookDetail, Source } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
 
 const POLL_MS = 5000;
 

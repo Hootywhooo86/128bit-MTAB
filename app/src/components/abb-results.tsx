@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { TorboxButton } from '@/components/torbox-button';
 import { Body, Cover, Heading } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { searchAbb, type AbbResult } from '@/lib/abb';
 import { resolveTorrent } from '@/lib/feeds';
+import { Pressable } from '@/components/focusable';
 
 /** AudiobookBay search results for `query`, best matches first, with Load more. */
 export function AbbResults({

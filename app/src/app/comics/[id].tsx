@@ -8,7 +8,6 @@ import {
   FlatList,
   Linking,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -40,6 +39,7 @@ import {
   type LocalSeries,
 } from '@/lib/comic-downloads';
 import { rememberChapters } from '@/lib/comic-session';
+import { Pressable } from '@/components/focusable';
 
 /** A comic: details, add to library, and its chapters. */
 export default function ComicScreen() {

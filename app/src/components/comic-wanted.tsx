@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Switch, Text, View } from 'react-native';
 
 import { Body, formatBytes } from '@/components/ui';
 import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -21,6 +21,7 @@ import {
   type ComicFollow,
   type WantedComic,
 } from '@/lib/comic-grab';
+import { Pressable } from '@/components/focusable';
 
 const STATE_LABEL: Record<WantedComic['state'], string> = {
   queued: 'Waiting…',

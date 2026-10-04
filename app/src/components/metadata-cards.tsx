@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -12,6 +12,7 @@ import {
   type RatingSourceId,
 } from '@/lib/mdblist';
 import { getTmdbKey, setTmdbKey } from '@/lib/tmdb';
+import { Pressable } from '@/components/focusable';
 
 /** Shared "paste a key, test it, save it" card. */
 function KeyCard({

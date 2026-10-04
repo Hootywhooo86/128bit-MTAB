@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, Text, View } from 'react-native';
 
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -20,6 +20,7 @@ import {
   type Kind,
   type TraktList,
 } from '@/lib/trakt-library';
+import { Pressable } from '@/components/focusable';
 
 type State = Awaited<ReturnType<typeof titleState>>;
 type IconName = ComponentProps<typeof Ionicons>['name'];

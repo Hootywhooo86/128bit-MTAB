@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Text, View } from 'react-native';
 
 import { ChoiceRow, Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
@@ -24,6 +24,7 @@ import {
   updateAllExtensions,
   type Extension,
 } from '@/lib/suwayomi';
+import { Pressable } from '@/components/focusable';
 
 type Filter = 'installed' | 'available' | 'updates';
 const SHOW_MAX = 80;

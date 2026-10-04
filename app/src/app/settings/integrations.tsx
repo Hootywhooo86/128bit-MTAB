@@ -8,6 +8,7 @@ import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { absAccount, absLogin, absLoginWithApiKey, absLogout } from '@/lib/audiobookshelf';
 import { getTorboxKey, setTorboxKey } from '@/lib/storage';
 import { testKey } from '@/lib/torbox';
+import { IS_TV } from '@/constants/tv';
 
 export default function IntegrationsSettings() {
   const Colors = useColors();
@@ -96,8 +97,12 @@ export default function IntegrationsSettings() {
         <MdblistCard />
       </View>
 
-      <SectionTitle>Audiobookshelf</SectionTitle>
-      <AudiobookshelfCard />
+      {IS_TV ? null : (
+        <>
+          <SectionTitle>Audiobookshelf</SectionTitle>
+          <AudiobookshelfCard />
+        </>
+      )}
     </SettingsPage>
   );
 }

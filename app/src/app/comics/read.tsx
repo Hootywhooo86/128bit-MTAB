@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Text,
@@ -33,6 +32,7 @@ import {
 } from '@/lib/comics';
 import { usePrefs } from '@/lib/prefs';
 import { addChapterRead } from '@/lib/stats';
+import { Pressable } from '@/components/focusable';
 
 const MODES = ['vertical', 'rtl', 'ltr'] as const;
 

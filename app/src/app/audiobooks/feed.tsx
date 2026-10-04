@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   RefreshControl,
   Text,
   View,
@@ -15,6 +14,7 @@ import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchFeed, resolveTorrent, type FeedItem, type Torrent } from '@/lib/feeds';
 import { getTorboxKey } from '@/lib/storage';
 import { addMagnet, checkCached } from '@/lib/torbox';
+import { Pressable } from '@/components/focusable';
 
 /** The newest posts in an RSS feed; send any of them to TorBox. */
 export default function FeedScreen() {

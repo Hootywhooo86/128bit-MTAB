@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Body, Button, Heading, formatBytes } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { deleteDownload, downloadBook, isBookDownloaded, offlineSupported } from '@/lib/downloads';
 import { usePlayer } from '@/lib/player';
 import type { PlayableBook } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
 
 /** Play / download buttons and the chapter list for a book that is ready. */
 export function PlayableActions({ book }: { book: PlayableBook }) {

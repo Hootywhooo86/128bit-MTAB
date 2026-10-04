@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, Text, View } from 'react-native';
 
 import { Button, Cover, EmptyState, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -12,6 +12,7 @@ import {
   type AbsItem,
   type AbsLibrary,
 } from '@/lib/audiobookshelf';
+import { Pressable } from '@/components/focusable';
 
 /** Browse and search your Audiobookshelf libraries. */
 export default function AbsBrowseScreen() {

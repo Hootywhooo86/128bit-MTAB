@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -16,6 +16,7 @@ import { fetchMeta } from '@/lib/addons';
 import { getActiveAddons } from '@/lib/storage';
 import type { Episode, MetaDetail } from '@/lib/types';
 import { setSeriesContext } from '@/lib/video';
+import { Pressable } from '@/components/focusable';
 
 const episodeNumber = (e: Episode) => e.episode ?? e.number ?? 0;
 

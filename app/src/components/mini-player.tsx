@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Cover } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePlayer } from '@/lib/player';
+import { Pressable } from '@/components/focusable';
 
 /** Sits above the tab bar whenever an audiobook is loaded. */
 export function MiniPlayer() {

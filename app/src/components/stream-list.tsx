@@ -5,7 +5,6 @@ import {
   Alert,
   Linking,
   Platform,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -28,6 +27,7 @@ import {
   setNowWatching,
   type StreamResult,
 } from '@/lib/video';
+import { Pressable } from '@/components/focusable';
 
 type Props = {
   type: string;

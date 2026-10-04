@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Spacing, makeStyles } from '@/constants/theme';
 import { ACCENTS, usePrefs, type AccentId } from '@/lib/prefs';
+import { Pressable } from '@/components/focusable';
 
 export default function LayoutSettings() {
   const styles = useStyles();

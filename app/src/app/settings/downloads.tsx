@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Text, View } from 'react-native';
 
 import { ComicDownloadsList } from '@/components/comic-downloads-list';
 import { VideoDownloads } from '@/components/video-downloads';
@@ -15,6 +15,8 @@ import {
   offlineSupported,
 } from '@/lib/downloads';
 import type { PlayableBook } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
+import { IS_TV } from '@/constants/tv';
 
 function confirm(title: string, message: string, onConfirm: () => void) {
   if (Platform.OS === 'web') {
@@ -105,7 +107,7 @@ export default function DownloadsSettings() {
   return (
     <SettingsPage>
       <View style={styles.segments}>
-        {(['movies', 'tv', 'audiobooks', 'comics'] as const).map((t) => (
+        {(IS_TV ? (['movies', 'tv'] as const) : (['movies', 'tv', 'audiobooks', 'comics'] as const)).map((t) => (
           <Pressable
             key={t}
             onPress={() => setTab(t)}

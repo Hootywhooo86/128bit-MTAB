@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Cover, ProgressBar } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import type { Progress } from '@/lib/storage';
 import type { PlayableBook } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
 
 /** "10:17:59" → "10h 17m" */
 export function formatBookLength(duration?: string) {

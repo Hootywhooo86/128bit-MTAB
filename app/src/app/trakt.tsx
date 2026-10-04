@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Alert, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useTraktConnected } from '@/components/trakt-actions';
 import { Button, EmptyState, Input } from '@/components/ui';
@@ -39,6 +39,7 @@ import {
   type TraktList,
   type TraktStats,
 } from '@/lib/trakt-library';
+import { Pressable } from '@/components/focusable';
 
 type Section =
   | 'upnext'

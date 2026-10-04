@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BottomTabBar, Tabs } from 'expo-router/js-tabs';
+import { BottomTabBar, Tabs, type BottomTabBarButtonProps } from 'expo-router/js-tabs';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Image, View, type ColorValue } from 'react-native';
 
+import { Pressable } from '@/components/focusable';
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
 import { useColors } from '@/constants/theme';
+import { IS_TV } from '@/constants/tv';
 import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-grab';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -34,6 +36,7 @@ function AnimeIcon({ focused, size, accent }: { focused: boolean; size: number; 
 function useComicsComing() {
   const [n, setN] = useState(0);
   useEffect(() => {
+    if (IS_TV) return;
     getComicWanted().then((l) => setN(activeComicCount(l)), () => {});
     return onComicWanted((l) => setN(activeComicCount(l)));
   }, []);
@@ -45,12 +48,17 @@ export default function TabLayout() {
   const comicsComing = useComicsComing();
   return (
     <Tabs
-      tabBar={(props) => (
-        <>
-          <MiniPlayer />
+      tabBar={(props) =>
+        // The TV app is video only: no audiobook mini player.
+        IS_TV ? (
           <BottomTabBar {...props} />
-        </>
-      )}
+        ) : (
+          <>
+            <MiniPlayer />
+            <BottomTabBar {...props} />
+          </>
+        )
+      }
       screenOptions={{
         headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
@@ -61,7 +69,15 @@ export default function TabLayout() {
           borderTopColor: Colors.border,
         },
         // Six tabs: keep the labels small enough to fit on a phone.
-        tabBarLabelStyle: { fontSize: 10 },
+        tabBarLabelStyle: { fontSize: IS_TV ? 14 : 10 },
+        // TV remote: tab buttons show the focus ring.
+        ...(IS_TV
+          ? {
+              tabBarButton: ({ ref: _ref, ...p }: BottomTabBarButtonProps) => (
+                <Pressable {...(p as ComponentProps<typeof Pressable>)} />
+              ),
+            }
+          : {}),
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textSecondary,
         headerRight: () => <HeaderButtons />,
@@ -71,6 +87,8 @@ export default function TabLayout() {
         options={{
           title: 'Audiobooks',
           tabBarLabel: 'Books',
+          // Books and Comics are phone-only; the TV app has Shows, Movies, Anime and Live TV.
+          href: IS_TV ? null : undefined,
           tabBarIcon: icon('headset-outline'),
         }}
       />
@@ -92,6 +110,7 @@ export default function TabLayout() {
         name="comics"
         options={{
           title: 'Comics',
+          href: IS_TV ? null : undefined,
           tabBarIcon: icon('book-outline'),
           // Downloads carry on in the background; the badge shows how many are coming.
           tabBarBadge: comicsComing || undefined,

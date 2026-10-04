@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Radius, makeStyles } from '@/constants/theme';
 import { comicImage, type Comic, type ReadProgress } from '@/lib/comics';
+import { Pressable } from '@/components/focusable';
 
 /**
  * Portrait cover with title. With `resume`, a tap goes straight back into the reader where

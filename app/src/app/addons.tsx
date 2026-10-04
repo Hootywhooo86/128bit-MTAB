@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, Text, View } from 'react-native';
 
 import { Chip, SectionTitle, SettingsPage, ThemedSwitch } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
@@ -18,6 +18,7 @@ import {
 import { useAddons } from '@/lib/hooks';
 import { isEnabled } from '@/lib/storage';
 import type { InstalledAddon } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
 
 const SUGGESTED = DEFAULT_ADDONS;
 

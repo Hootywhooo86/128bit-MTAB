@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
 import { useTraktConnected } from '@/components/trakt-actions';
 import { Heading } from '@/components/ui';
@@ -9,6 +9,7 @@ import { getUpNext, getWatchlist, poster, type TraktItem } from '@/lib/trakt-lib
 import type { MetaPreview } from '@/lib/types';
 
 import { PosterTile } from './video-browse';
+import { Pressable } from '@/components/focusable';
 
 /** Trakt rows for the Shows / Movies tabs: Up next (shows) and your watchlist. */
 export function TraktRows({ type }: { type: 'movie' | 'series' }) {

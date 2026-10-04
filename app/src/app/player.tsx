@@ -5,7 +5,6 @@ import {
   Alert,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -21,6 +20,7 @@ import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/t
 import { getBookmarks, removeBookmark, type Bookmark } from '@/lib/bookmarks';
 import { usePlayer, type Sleep } from '@/lib/player';
 import { usePrefs } from '@/lib/prefs';
+import { Pressable } from '@/components/focusable';
 
 const RATES = [0.8, 1, 1.25, 1.5, 1.75, 2];
 const SLEEP_CHOICES: { label: string; value: Sleep | 'minutes'; minutes?: number }[] = [

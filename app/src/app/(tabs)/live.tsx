@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +16,8 @@ import { CHANNEL_TYPES, SPORT_TYPES, fetchMetas, isBrowsable } from '@/lib/addon
 import { fetchPlaylist, getPlaylists } from '@/lib/m3u';
 import { getActiveAddons } from '@/lib/storage';
 import { setNowWatching } from '@/lib/video';
+import { Pressable } from '@/components/focusable';
+import { IS_TV } from '@/constants/tv';
 
 type Row = {
   id: string;
@@ -133,6 +134,10 @@ export default function LiveScreen() {
 
   function open(c: Row) {
     if (c.url) {
+      // The list you're looking at, so channel up/down works in the player.
+      const channels = visible
+        .filter((x) => x.url)
+        .map((x) => ({ key: x.id, title: x.name, subtitle: x.group, poster: x.logo, uri: x.url! }));
       setNowWatching({
         key: c.id,
         title: c.name,
@@ -140,6 +145,7 @@ export default function LiveScreen() {
         poster: c.logo,
         uri: c.url,
         live: true,
+        channels,
       });
       router.push('/watch');
     } else if (c.meta) {
@@ -295,8 +301,9 @@ const useStyles = makeStyles((Colors) => ({
     borderColor: Colors.border,
   },
   logo: {
-    width: 64,
-    height: 44,
+    // Bigger on a TV, read from across the room.
+    width: IS_TV ? 120 : 64,
+    height: IS_TV ? 80 : 44,
     borderRadius: Radius.sm,
     backgroundColor: Colors.surfaceRaised,
     overflow: 'hidden',
@@ -304,7 +311,7 @@ const useStyles = makeStyles((Colors) => ({
     justifyContent: 'center',
   },
   logoFallback: { color: Colors.textSecondary, fontWeight: '800' },
-  name: { color: Colors.text, fontWeight: '600', fontSize: 15 },
-  group: { color: Colors.textSecondary, fontSize: 12 },
+  name: { color: Colors.text, fontWeight: '600', fontSize: IS_TV ? 22 : 15 },
+  group: { color: Colors.textSecondary, fontSize: IS_TV ? 16 : 12 },
   live: { color: Colors.danger, fontSize: 10, fontWeight: '800' },
 }));

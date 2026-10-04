@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Body, Input, formatBytes } from '@/components/ui';
 import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -11,6 +11,7 @@ import {
   searchComicReleases,
   type ComicRelease,
 } from '@/lib/comic-grab';
+import { Pressable } from '@/components/focusable';
 
 /**
  * Find comics on GetComics and The Pirate Bay (Comics). Tap Get: it goes on your

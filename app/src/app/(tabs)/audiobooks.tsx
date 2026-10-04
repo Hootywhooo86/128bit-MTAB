@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,6 +28,7 @@ import {
 } from '@/lib/storage';
 import type { PlayableBook } from '@/lib/types';
 import { getWanted } from '@/lib/wanted';
+import { Pressable } from '@/components/focusable';
 
 type Tab = 'library' | 'downloads' | 'wanted';
 type Filter = 'all' | 'favorites' | 'progress' | 'finished';

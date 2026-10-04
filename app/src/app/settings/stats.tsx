@@ -1,10 +1,11 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Text, View } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { dayKey, formatDuration, getStats, resetStats, type Stats } from '@/lib/stats';
+import { Pressable } from '@/components/focusable';
 
 // Chart series colours (validated for colour-blind separation and contrast on the dark surfaces).
 const LISTEN = '#3987e5';

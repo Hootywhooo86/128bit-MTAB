@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
-  Pressable,
   Text,
   TextInput,
   View,
@@ -24,6 +23,7 @@ import {
   type SearchMode,
 } from '@/lib/audible';
 import { getWanted, wantedId } from '@/lib/wanted';
+import { Pressable } from '@/components/focusable';
 
 const MODES: { id: SearchMode; label: string; icon: ComponentProps<typeof Ionicons>['name'] }[] = [
   { id: 'title', label: 'Title', icon: 'book-outline' },

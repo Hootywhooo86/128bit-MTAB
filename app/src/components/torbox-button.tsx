@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getTorboxKey } from '@/lib/storage';
 import { addMagnet } from '@/lib/torbox';
+import { Pressable } from '@/components/focusable';
 
 type State = 'idle' | 'sending' | 'sent' | { error: string };
 

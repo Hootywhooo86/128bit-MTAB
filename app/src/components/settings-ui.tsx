@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Children, Fragment, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Pressable } from '@/components/focusable';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 
 import { SectionTitle, SettingsPage, ThemedSwitch } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
@@ -24,6 +24,7 @@ import {
   setSourceEnabled,
   type InstalledSource,
 } from '@/lib/sources';
+import { Pressable } from '@/components/focusable';
 
 const CONFIG_SITE = 'https://pageturner-dsc.elfhosted.com/';
 

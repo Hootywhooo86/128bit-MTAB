@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
 import { Body, Cover, Heading } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -13,6 +13,7 @@ import {
   type DiscoverSection,
   type SourceConfig,
 } from '@/lib/sources';
+import { Pressable } from '@/components/focusable';
 
 /** Rows of books from catalog sources: their discover sections, or search results for `query`. */
 export function CatalogRows({ query }: { query?: string }) {

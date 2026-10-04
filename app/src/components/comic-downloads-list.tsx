@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ComicTile } from '@/components/comic-tile';
 import { formatBytes } from '@/components/ui';
@@ -14,6 +14,7 @@ import {
   onComicDownloads,
   type LocalSeries,
 } from '@/lib/comic-downloads';
+import { Pressable } from '@/components/focusable';
 
 /** Settings → Downloads → Comics: series saved or imported on the phone. */
 export function ComicDownloadsList() {

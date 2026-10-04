@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Heading } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getRatings, type Rating } from '@/lib/mdblist';
 import { enrich, imdbIdFor, type Enrichment, type Similar } from '@/lib/tmdb';
+import { Pressable } from '@/components/focusable';
 
 /** TMDB details for a title, loaded once per screen; null when TMDB isn't set up. */
 export function useEnrichment(id: string, type: string) {

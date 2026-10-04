@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, Text, View } from 'react-native';
 
 import { AbbResults } from '@/components/abb-results';
 import { CatalogRows } from '@/components/catalog-rows';
@@ -13,6 +13,7 @@ import { useAddons } from '@/lib/hooks';
 import { getFeeds, type Feed } from '@/lib/feeds';
 import { getSources, isCatalog } from '@/lib/sources';
 import type { BookPreview, CatalogDef, InstalledAddon } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
 
 type Row = {
   key: string;

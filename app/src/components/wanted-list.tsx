@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, Text, View } from 'react-native';
 
 import { TorboxButton } from '@/components/torbox-button';
 import { Body, Button, Cover, EmptyState, Input } from '@/components/ui';
@@ -19,6 +19,7 @@ import {
   type TorboxState,
   type WantedBook,
 } from '@/lib/wanted';
+import { Pressable } from '@/components/focusable';
 
 let importedThisSession = false;
 

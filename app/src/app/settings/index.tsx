@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
+import { IS_TV } from '@/constants/tv';
 
 export default function SettingsScreen() {
   return (
@@ -10,7 +11,7 @@ export default function SettingsScreen() {
         <Row
           icon="sync"
           title="Tracking"
-          subtitle="Trakt and Simkl for what you watch, Hardcover for books."
+          subtitle={IS_TV ? 'Trakt and Simkl for what you watch.' : 'Trakt and Simkl for what you watch, Hardcover for books.'}
           onPress={() => router.push('/settings/tracking')}
         />
         <Row
@@ -38,15 +39,17 @@ export default function SettingsScreen() {
         <Row
           icon="cloud-download"
           title="Downloads"
-          subtitle="Movies, TV, audiobooks and comics saved on this phone."
+          subtitle={IS_TV ? 'Movies and shows saved on this TV.' : 'Movies, TV, audiobooks and comics saved on this phone.'}
           onPress={() => router.push('/settings/downloads')}
         />
-        <Row
-          icon="book"
-          title="Comics"
-          subtitle="Suwayomi, extension repos (Keiyoushi), extensions and the reader"
-          onPress={() => router.push('/settings/comics')}
-        />
+        {IS_TV ? null : (
+          <Row
+            icon="book"
+            title="Comics"
+            subtitle="Suwayomi, extension repos (Keiyoushi), extensions and the reader"
+            onPress={() => router.push('/settings/comics')}
+          />
+        )}
         <Row
           icon="play"
           title="Playback"

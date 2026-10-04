@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TrackSheet, type SubtitleChoice } from '@/components/track-sheet';
@@ -46,6 +46,7 @@ import {
   type StreamResult,
   type WatchItem,
 } from '@/lib/video';
+import { Pressable } from '@/components/focusable';
 
 const SAVE_EVERY_S = 10;
 /** Show "Next episode" this many seconds before the end. */
@@ -437,6 +438,25 @@ export default function WatchScreen() {
   }, [itemKey, itemType, prefs.subtitleLanguage, prefs.autoSubtitles, chooseSubtitle, englishFirst]);
 
   // --- Next episode ---
+  // --- Live TV: channel up/down through the list the channel was opened from ---
+  const switchChannel = useCallback(
+    async (step: 1 | -1) => {
+      const list = item?.channels;
+      if (!item || !list?.length) return;
+      const i = list.findIndex((c) => c.key === item.key);
+      const c = list[(i + step + list.length) % list.length];
+      const nextItem: WatchItem = { ...item, ...c, live: true, headers: undefined };
+      try {
+        await player.replaceAsync(toSource(nextItem));
+        player.play();
+      } catch {
+        return; // left the player
+      }
+      setItem(nextItem);
+    },
+    [item, player],
+  );
+
   const playNext = useCallback(async () => {
     if (!item || !upNext || next.status === 'loading' || next.status === 'downloading') return;
     if (nextTimer.current) clearTimeout(nextTimer.current);
@@ -564,6 +584,18 @@ export default function WatchScreen() {
           ) : null}
         </View>
         {item.live ? <Text style={styles.live}>● LIVE</Text> : null}
+        {item.live && (item.channels?.length ?? 0) > 1 ? (
+          <>
+            <Pressable onPress={() => switchChannel(-1)} hitSlop={12} accessibilityLabel="Previous channel" style={styles.channelButton}>
+              <Ionicons name="chevron-up" size={22} color="#fff" />
+              <Text style={styles.channelText}>CH</Text>
+            </Pressable>
+            <Pressable onPress={() => switchChannel(1)} hitSlop={12} accessibilityLabel="Next channel" style={styles.channelButton}>
+              <Text style={styles.channelText}>CH</Text>
+              <Ionicons name="chevron-down" size={22} color="#fff" />
+            </Pressable>
+          </>
+        ) : null}
         {hasTracks ? (
           <Pressable
             onPress={() => setSheetOpen(true)}
@@ -666,6 +698,16 @@ const useStyles = makeStyles((Colors) => ({
   title: { color: '#fff', fontWeight: '700', fontSize: 16 },
   subtitle: { color: '#ddd', fontSize: 12 },
   live: { color: Colors.danger, fontWeight: '800', fontSize: 12 },
+  channelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  channelText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   errorBox: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',

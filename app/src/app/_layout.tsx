@@ -6,6 +6,7 @@ import { useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
 
 import { useColors } from '@/constants/theme';
+import { IS_TV } from '@/constants/tv';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
@@ -42,6 +43,8 @@ function AppNavigator() {
   // First launch: add Cinemeta + OpenSubtitles so there's something to browse right away.
   useEffect(() => {
     installDefaultAddons().catch(() => {});
+    // Audiobook sources/feeds and comics aren't part of the TV app.
+    if (IS_TV) return;
     installDefaultSources().catch(() => {});
     installDefaultFeeds().catch(() => {});
     // Load the Suwayomi server early so comic images get their sign-in headers.
@@ -50,6 +53,7 @@ function AppNavigator() {
 
   // Hardcover: bring audiobook progress in line both ways each time the app is opened.
   useEffect(() => {
+    if (IS_TV) return;
     syncHardcover().catch(() => {});
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') syncHardcover().catch(() => {});
@@ -60,8 +64,9 @@ function AppNavigator() {
   // Wanted books marked "download when ready": check TorBox every minute while the app is open.
   useEffect(() => {
     const tick = () => {
-      runAutoDownloads().catch(() => {});
       runVideoQueue().catch(() => {});
+      if (IS_TV) return; // audiobooks and comics are phone-only
+      runAutoDownloads().catch(() => {});
       // Comics: TorBox → phone, and new issues of followed series (every 6 h).
       runComicQueue().catch(() => {});
       checkFollows().catch(() => {});

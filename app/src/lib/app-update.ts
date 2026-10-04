@@ -2,6 +2,8 @@
  * "Check for updates": compares this build with the newest GitHub release of the
  * app (every push builds one). A private repo needs a read-only GitHub token.
  */
+import { IS_TV } from '@/constants/tv';
+
 import { secureGet, secureSet } from './storage';
 
 export const BUILD = Number(process.env.EXPO_PUBLIC_BUILD_NUMBER ?? 0);
@@ -49,6 +51,7 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
     build,
     name: newest.name,
     pageUrl: newest.html_url,
-    apkUrl: newest.assets.find((a) => a.name.endsWith('.apk'))?.browser_download_url,
+    // Each release has the phone APK and the TV APK ("…-tv-…"); pick the one for this app.
+    apkUrl: newest.assets.find((a) => a.name.endsWith('.apk') && /-tv-/.test(a.name) === IS_TV)?.browser_download_url,
   };
 }

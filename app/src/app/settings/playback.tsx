@@ -1,6 +1,7 @@
 import { ChoiceRow, Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { usePrefs } from '@/lib/prefs';
 import { SUBTITLE_LANGUAGES, languageName } from '@/lib/subtitles';
+import { IS_TV } from '@/constants/tv';
 
 const seconds = (values: number[]) => values.map((v) => ({ value: v, label: `${v}s` }));
 const RATES = [0.8, 1, 1.1, 1.25, 1.5, 1.75, 2].map((v) => ({
@@ -13,36 +14,40 @@ export default function PlaybackSettings() {
 
   return (
     <SettingsPage>
-      <SectionTitle>Audiobooks</SectionTitle>
-      <Group>
-        <ChoiceRow
-          title="Skip back"
-          subtitle="The rewind button in the player"
-          value={prefs.skipBack}
-          options={seconds([10, 15, 30, 45, 60])}
-          onChange={(v) => setPref('skipBack', v)}
-        />
-        <ChoiceRow
-          title="Skip forward"
-          subtitle="The fast-forward button in the player"
-          value={prefs.skipForward}
-          options={seconds([10, 15, 30, 45, 60])}
-          onChange={(v) => setPref('skipForward', v)}
-        />
-        <ChoiceRow
-          title="Default speed"
-          subtitle="Used when the app starts"
-          value={prefs.defaultRate}
-          options={RATES}
-          onChange={(v) => setPref('defaultRate', v)}
-        />
-        <ToggleRow
-          title="Auto-play next chapter"
-          subtitle="Keep going when a chapter ends."
-          value={prefs.autoNextChapter}
-          onChange={(v) => setPref('autoNextChapter', v)}
-        />
-      </Group>
+      {IS_TV ? null : (
+        <>
+          <SectionTitle>Audiobooks</SectionTitle>
+          <Group>
+            <ChoiceRow
+              title="Skip back"
+              subtitle="The rewind button in the player"
+              value={prefs.skipBack}
+              options={seconds([10, 15, 30, 45, 60])}
+              onChange={(v) => setPref('skipBack', v)}
+            />
+            <ChoiceRow
+              title="Skip forward"
+              subtitle="The fast-forward button in the player"
+              value={prefs.skipForward}
+              options={seconds([10, 15, 30, 45, 60])}
+              onChange={(v) => setPref('skipForward', v)}
+            />
+            <ChoiceRow
+              title="Default speed"
+              subtitle="Used when the app starts"
+              value={prefs.defaultRate}
+              options={RATES}
+              onChange={(v) => setPref('defaultRate', v)}
+            />
+            <ToggleRow
+              title="Auto-play next chapter"
+              subtitle="Keep going when a chapter ends."
+              value={prefs.autoNextChapter}
+              onChange={(v) => setPref('autoNextChapter', v)}
+            />
+          </Group>
+        </>
+      )}
 
       <SectionTitle>Movies & shows</SectionTitle>
       <Group>
@@ -65,26 +70,30 @@ export default function PlaybackSettings() {
           onChange={(v) => setPref('cachedFirst', v)}
         />
       </Group>
-      <SectionTitle>Comics</SectionTitle>
-      <Group>
-        <ChoiceRow
-          title="Reading mode"
-          subtitle="You can also switch it while reading."
-          value={prefs.readerMode}
-          options={[
-            { value: 'vertical', label: 'Scroll down' },
-            { value: 'rtl', label: 'Pages, right to left' },
-            { value: 'ltr', label: 'Pages, left to right' },
-          ]}
-          onChange={(v) => setPref('readerMode', v)}
-        />
-        <ToggleRow
-          title="Data saver"
-          subtitle="Smaller, compressed pages. Loads faster on mobile data."
-          value={prefs.comicDataSaver}
-          onChange={(v) => setPref('comicDataSaver', v)}
-        />
-      </Group>
+      {IS_TV ? null : (
+        <>
+          <SectionTitle>Comics</SectionTitle>
+          <Group>
+            <ChoiceRow
+              title="Reading mode"
+              subtitle="You can also switch it while reading."
+              value={prefs.readerMode}
+              options={[
+                { value: 'vertical', label: 'Scroll down' },
+                { value: 'rtl', label: 'Pages, right to left' },
+                { value: 'ltr', label: 'Pages, left to right' },
+              ]}
+              onChange={(v) => setPref('readerMode', v)}
+            />
+            <ToggleRow
+              title="Data saver"
+              subtitle="Smaller, compressed pages. Loads faster on mobile data."
+              value={prefs.comicDataSaver}
+              onChange={(v) => setPref('comicDataSaver', v)}
+            />
+          </Group>
+        </>
+      )}
 
       <SectionTitle>Skip intro</SectionTitle>
       <Group>

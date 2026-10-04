@@ -32,7 +32,11 @@ export type WatchItem = {
   stream?: Stream;
   /** Opened from Continue watching: if it doesn't start, go to the stream picker instead. */
   fallback?: boolean;
+  /** Live TV: the channel list it was opened from, for channel up/down in the player. */
+  channels?: LiveChannel[];
 };
+
+export type LiveChannel = { key: string; title: string; subtitle?: string; poster?: string; uri: string };
 
 let nowWatching: WatchItem | null = null;
 

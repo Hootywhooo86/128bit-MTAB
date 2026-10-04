@@ -2,7 +2,6 @@ import { Image } from 'expo-image';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +15,7 @@ import {
 
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { useCover } from '@/lib/covers';
+import { Pressable } from '@/components/focusable';
 
 export function Title({ style, ...rest }: TextProps) {
   const styles = useStyles();

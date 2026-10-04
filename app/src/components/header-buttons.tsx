@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Spacing, useColors } from '@/constants/theme';
+import { Pressable } from '@/components/focusable';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 

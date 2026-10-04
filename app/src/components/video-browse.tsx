@@ -6,7 +6,6 @@ import {
   Alert,
   FlatList,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -32,6 +31,7 @@ import {
 } from '@/lib/video';
 
 import { TraktRows } from './trakt-rows';
+import { Pressable } from '@/components/focusable';
 
 type Props = { type: 'movie' | 'series' | 'anime'; noun: string };
 

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, Text, View } from 'react-native';
 
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -13,6 +13,7 @@ import {
   type HardcoverBook,
 } from '@/lib/hardcover';
 import type { PlayableBook } from '@/lib/types';
+import { Pressable } from '@/components/focusable';
 
 /** Player pill: shows which Hardcover book this is tracked as, and lets you change it. */
 export function HardcoverPill({ book }: { book: PlayableBook }) {

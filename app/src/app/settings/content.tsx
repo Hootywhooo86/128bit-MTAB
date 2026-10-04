@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
+import { IS_TV } from '@/constants/tv';
 
 export default function ContentSettings() {
   return (
@@ -19,12 +20,14 @@ export default function ContentSettings() {
           subtitle="Add M3U playlists from your TV provider."
           onPress={() => router.push('/settings/playlists')}
         />
-        <Row
-          icon="cloud-download"
-          title="Audiobook download sources"
-          subtitle="Pageturner-style sources. Search them from Audiobooks and send to TorBox."
-          onPress={() => router.push('/settings/sources')}
-        />
+        {IS_TV ? null : (
+          <Row
+            icon="cloud-download"
+            title="Audiobook download sources"
+            subtitle="Pageturner-style sources. Search them from Audiobooks and send to TorBox."
+            onPress={() => router.push('/settings/sources')}
+          />
+        )}
       </Group>
     </SettingsPage>
   );

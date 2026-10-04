@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Text, View } from 'react-native';
 
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -15,6 +15,7 @@ import {
   startSimklPin,
   type SimklPin,
 } from '@/lib/simkl';
+import { Pressable } from '@/components/focusable';
 
 /** Connect Simkl: Client ID → PIN code on simkl.com → scrobbling. */
 export function SimklCard() {

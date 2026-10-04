@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Body, Heading, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -15,6 +15,7 @@ import {
 } from '@/lib/sources';
 import { getTorboxKey } from '@/lib/storage';
 import { addMagnet, checkCached, magnetFromHash } from '@/lib/torbox';
+import { Pressable } from '@/components/focusable';
 
 type Sent = 'sending' | 'sent' | { error: string };
 

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { SectionTitle } from '@/components/settings-ui';
 import { ProgressBar, formatBytes } from '@/components/ui';
@@ -17,6 +17,7 @@ import {
   videoDownloadsSupported,
   type VideoDownload,
 } from '@/lib/video-downloads';
+import { Pressable } from '@/components/focusable';
 
 function confirmDelete(title: string, onYes: () => void) {
   if (Platform.OS === 'web') {

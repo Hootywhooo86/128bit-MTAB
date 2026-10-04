@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { AudioTrack, SubtitleTrack } from 'expo-video';
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { languageName, type AddonSubtitle } from '@/lib/subtitles';
+import { Pressable } from '@/components/focusable';
 
 export type SubtitleChoice =
   | { kind: 'off' }

@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, TextInput } from 'react-native';
+import { ActivityIndicator, Linking, Text, TextInput } from 'react-native';
 
 import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
@@ -20,6 +20,8 @@ import {
   traktConfigured,
   type DeviceCode,
 } from '@/lib/trakt';
+import { Pressable } from '@/components/focusable';
+import { IS_TV } from '@/constants/tv';
 
 export default function TrackingSettings() {
   const styles = useStyles();
@@ -222,8 +224,12 @@ export default function TrackingSettings() {
       <SectionTitle>Simkl</SectionTitle>
       <SimklCard />
 
-      <SectionTitle>Books</SectionTitle>
-      <HardcoverCard />
+      {IS_TV ? null : (
+        <>
+          <SectionTitle>Books</SectionTitle>
+          <HardcoverCard />
+        </>
+      )}
     </SettingsPage>
   );
 }
