@@ -25,10 +25,13 @@ import {
   type LocalSeries,
 } from '@/lib/comic-downloads';
 import { getSuwayomi, listSources, type SuwaSource } from '@/lib/suwayomi';
+import { searchWeebCentral } from '@/lib/weebcentral';
 import { searchWebtoons } from '@/lib/webtoons';
 
 const MANGADEX = 'mangadex';
 const WEBTOONS = 'webtoons';
+/** Weeb Central: the full manga catalogue (JJK, Solo Leveling…) that MangaDex no longer has. */
+const MANGA = 'weebcentral';
 /** Find's sources: GetComics + Pirate Bay (download to the phone), MangaDex, Suwayomi sources. */
 const WEB = 'web';
 const SECTIONS = ['Library', 'Find', 'Wanted'] as const;
@@ -44,7 +47,7 @@ export default function ComicsScreen() {
   const [results, setResults] = useState<Comic[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, ReadProgress>>({});
-  /** WEBTOON series you're reading online (not on the phone). */
+  /** WEBTOON / Weeb Central series you're reading online (not on the phone). */
   const [online, setOnline] = useState<Comic[]>([]);
   const [sources, setSources] = useState<SuwaSource[]>([]);
   const [onPhone, setOnPhone] = useState<LocalSeries[]>([]);
@@ -73,7 +76,7 @@ export default function ComicsScreen() {
   useFocusEffect(
     useCallback(() => {
       getAllComicProgress().then(setProgress);
-      getComicLibrary().then((l) => setOnline(l.filter((c) => c.id.startsWith('wt:'))));
+      getComicLibrary().then((l) => setOnline(l.filter((c) => /^(wt|wc):/.test(c.id))));
       // Sources from your Suwayomi extensions (Keiyoushi etc.), when a server is connected.
       getSuwayomi().then((c) =>
         c ? listSources().then(setSources, () => setSources([])) : setSources([]),
@@ -92,6 +95,8 @@ export default function ComicsScreen() {
     let cancelled = false;
     (source === WEBTOONS
       ? searchWebtoons(submitted)
+      : source === MANGA
+        ? searchWeebCentral(submitted)
       : current
         ? browseSuwayomi(current.id, 'SEARCH', 1, submitted).then((r) => r.comics)
         : searchComics(submitted)
@@ -140,14 +145,16 @@ export default function ComicsScreen() {
     const sorted = [...onPhone]
       .filter((s) => s.chapters.some((c) => c.state === 'done'))
       .sort((a, b) => (progress[b.comic.id]?.updatedAt ?? 0) - (progress[a.comic.id]?.updatedAt ?? 0));
+    // Read online and not downloaded (downloaded ones show under On this phone).
+    const onlineOnly = online.filter((c) => !sorted.some((x) => x.comic.id === c.id));
     return (
       <ScrollView style={styles.screen} contentContainerStyle={{ paddingVertical: Spacing.three, gap: Spacing.four }}>
         {tabs}
-        {online.length ? (
+        {onlineOnly.length ? (
           <View style={{ gap: Spacing.two }}>
-            <Heading style={{ paddingHorizontal: Spacing.three }}>Reading online · WEBTOON</Heading>
+            <Heading style={{ paddingHorizontal: Spacing.three }}>Reading online</Heading>
             <View style={styles.grid}>
-              {[...online]
+              {onlineOnly
                 .sort((a, b) => (progress[b.id]?.updatedAt ?? 0) - (progress[a.id]?.updatedAt ?? 0))
                 .map((c) => (
                   <ComicTile
@@ -177,7 +184,7 @@ export default function ComicsScreen() {
               />
             ))}
           </View>
-        ) : online.length ? null : (
+        ) : onlineOnly.length ? null : (
           <Body muted style={{ paddingHorizontal: Spacing.three }}>
             Nothing downloaded yet. Use Find to get comics (GetComics, Pirate Bay, MangaDex…), or
             import CBZ/CBR files below.
@@ -205,7 +212,7 @@ export default function ComicsScreen() {
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.two }}>
-      {[{ id: WEB, displayName: 'GetComics + Pirate Bay' }, { id: WEBTOONS, displayName: 'WEBTOON' }, { id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
+      {[{ id: WEB, displayName: 'GetComics + Pirate Bay' }, { id: MANGA, displayName: 'Manga' }, { id: WEBTOONS, displayName: 'WEBTOON' }, { id: MANGADEX, displayName: 'MangaDex' }, ...shownSources].map((s) => (
         <Pressable
           key={s.id}
           onPress={() => {
@@ -240,7 +247,7 @@ export default function ComicsScreen() {
       {chips}
       <View style={{ paddingHorizontal: Spacing.three }}>
         <Input
-          placeholder={`Search ${source === WEBTOONS ? 'WEBTOON (e.g. Dungeon Crawler Carl)' : current ? current.name : 'MangaDex'}`}
+          placeholder={`Search ${source === MANGA ? 'manga (e.g. Jujutsu Kaisen, Solo Leveling)' : source === WEBTOONS ? 'WEBTOON (e.g. Dungeon Crawler Carl)' : current ? current.name : 'MangaDex'}`}
           value={query}
           onChangeText={(t) => {
             setQuery(t);
@@ -269,6 +276,15 @@ export default function ComicsScreen() {
             </View>
           )}
         </View>
+      ) : source === MANGA ? (
+        <>
+          <ListRow key="wc:popular" title="Popular manga" load={(page) => searchWeebCentral('', 'Popularity', (page - 1) * 32)} />
+          <ListRow key="wc:latest" title="Latest updates" load={(page) => searchWeebCentral('', 'Latest Updates', (page - 1) * 32)} />
+          <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
+            Manga and manhwa from Weeb Central (the full catalogue: Jujutsu Kaisen, Solo Leveling,
+            One Piece…). Read online, or download chapters to the phone from the comic’s page.
+          </Body>
+        </>
       ) : source === WEBTOONS ? (
         <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
           WEBTOON series read online (nothing is downloaded): search for one, open it, tap an
@@ -296,8 +312,9 @@ export default function ComicsScreen() {
           <ListRow key="md:latest" title="Latest updates" load={(page) => listComics('latest', (page - 1) * 24)} />
           <ListRow key="md:top" title="Top rated" load={(page) => listComics('top', (page - 1) * 24)} />
           <Body muted style={{ fontSize: 12, paddingHorizontal: Spacing.three }}>
-            Comics and manga from MangaDex: open one and download chapters to put it in your
-            Library. For Mihon extensions (Keiyoushi), connect Suwayomi in Settings → Comics.
+            Comics and manga from MangaDex. Big licensed series (Jujutsu Kaisen, Solo Leveling…)
+            have been taken down here: use the Manga chip for those. For Mihon extensions
+            (Keiyoushi), connect Suwayomi in Settings → Comics.
           </Body>
         </>
       )}

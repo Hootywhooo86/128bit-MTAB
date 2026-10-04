@@ -135,6 +135,10 @@ Comics tab → **Find**: one search covers GetComics and The Pirate Bay's Comics
 - If a site moves, change its address in **Settings → Comics → Find comics**.
 - **Saving space**: **Settings → Downloads → Comics → Delete read chapters** removes every chapter you've finished (shows how much space is used), and **Settings → Comics → Delete chapters after reading** does it automatically (a chapter leaves the phone when you finish the next one). Import from the phone also takes CBR files.
 
+### Manga: Weeb Central (Jujutsu Kaisen, Solo Leveling…)
+
+MangaDex has taken down most big licensed series. Comics tab → **Find → Manga** searches **Weeb Central**, a full manga/manhwa catalogue (Jujutsu Kaisen, Solo Leveling, One Piece, Blue Lock…), built in like a Mihon extension, no server needed. With no search it shows Popular and Latest updates. Read online in the same reader (resume, Next chapter), or download chapters to the phone from the comic's page. Series you read show in **Library → Reading online**.
+
 ### WEBTOON (read online)
 
 Comics tab → **Find → WEBTOON**: search webtoons.com (Originals and Canvas, e.g. *Dungeon Crawler Carl*), open a series, tap an episode. Episodes stream to the phone (nothing is downloaded) in the scrolling reader, with a **Next** button at the end of each. Series you read show in **Library → Reading online**.

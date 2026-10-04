@@ -29,6 +29,12 @@ import {
   isWebtoon,
   isWebtoonImage,
 } from './webtoons';
+import {
+  getWeebCentral,
+  getWeebCentralChapters,
+  getWeebCentralPages,
+  isWeebCentral,
+} from './weebcentral';
 
 const API = 'https://api.mangadex.org';
 const COVERS = 'https://uploads.mangadex.org/covers';
@@ -184,6 +190,7 @@ export async function getComic(id: string): Promise<Comic> {
     return s.comic;
   }
   if (isSw(id)) return comicFromSuwayomi(await getManga(swId(id)));
+  if (isWeebCentral(id)) return getWeebCentral(id);
   if (isWebtoon(id)) return getWebtoon(id, (await getComicLibrary()).find((c) => c.id === id));
   const data = await get<{ data: RawManga }>(
     `/manga/${id}?includes[]=cover_art&includes[]=author`,
@@ -200,6 +207,7 @@ export async function getChapters(id: string): Promise<ComicChapter[]> {
     return (s?.chapters ?? []).map((c) => ({ id: c.id, label: c.label, pages: c.files.length }));
   }
   if (isWebtoon(id)) return getWebtoonEpisodes(id);
+  if (isWeebCentral(id)) return getWeebCentralChapters(id);
   if (isSw(id)) {
     return (await getMangaChapters(swId(id))).map((c) => ({
       id: `sw:${c.id}`,
@@ -252,6 +260,7 @@ export async function getPages(chapterId: string, saver: boolean, remoteOnly = f
   }
   if (isSw(chapterId)) return getChapterPages(swId(chapterId));
   if (isWebtoon(chapterId)) return getWebtoonPages(chapterId);
+  if (isWeebCentral(chapterId)) return getWeebCentralPages(chapterId);
   const d = await get<{
     baseUrl: string;
     chapter: { hash: string; data: string[]; dataSaver: string[] };
