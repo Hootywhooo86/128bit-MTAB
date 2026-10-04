@@ -195,6 +195,10 @@ function CatalogRow({ addon, catalog, search }: Omit<Row, 'key'>) {
       ) : (
         <FlatList
           horizontal
+          // Rows of posters: only keep the visible ones (and a little either side) mounted.
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
           data={books}
           keyExtractor={(b) => b.id}
           showsHorizontalScrollIndicator={false}

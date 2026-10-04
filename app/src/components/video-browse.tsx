@@ -181,6 +181,10 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
       </Text>
       <FlatList
         horizontal
+        // Rows of posters: only keep the visible ones (and a little either side) mounted.
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
         data={continuing}
         keyExtractor={(p) => p.key}
         showsHorizontalScrollIndicator={false}
@@ -266,6 +270,10 @@ export function CatalogRow({
       ) : (
         <FlatList
           horizontal
+          // Rows of posters: only keep the visible ones (and a little either side) mounted.
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
           data={metas}
           keyExtractor={(m) => m.id}
           showsHorizontalScrollIndicator={false}

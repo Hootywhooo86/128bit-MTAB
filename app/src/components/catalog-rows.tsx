@@ -92,6 +92,10 @@ function BookRow({
       ) : (
         <FlatList
           horizontal
+          // Rows of posters: only keep the visible ones (and a little either side) mounted.
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
           data={books}
           keyExtractor={(b, i) => `${b.id}:${i}`}
           showsHorizontalScrollIndicator={false}

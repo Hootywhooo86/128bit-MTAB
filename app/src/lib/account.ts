@@ -62,7 +62,12 @@ export type Session = {
   refresh_token: string;
   expires_at: number; // seconds
   user: { id: string; email?: string; is_anonymous?: boolean };
+  /** TV: the account (email) a phone linked it to. Until then it isn't signed in. */
+  linkedTo?: string;
 };
+
+/** Signed in for syncing: a normal account, or a TV that a phone has linked. */
+export const isSignedIn = (s: Session | null): s is Session => !!s && (!s.user.is_anonymous || !!s.linkedTo);
 
 let session: Session | null | undefined;
 const listeners = new Set<() => void>();
@@ -174,7 +179,7 @@ async function token(): Promise<string | null> {
     const fresh = toSession(await auth('token?grant_type=refresh_token', { refresh_token: s.refresh_token }));
     if (!fresh) throw new Error('refresh failed');
     // Keep what we knew about the user (refresh answers include it, but be safe).
-    await saveSession({ ...fresh, user: { ...s.user, ...fresh.user } });
+    await saveSession({ ...fresh, user: { ...s.user, ...fresh.user }, linkedTo: s.linkedTo });
     return fresh.access_token;
   } catch (e) {
     // Revoked or expired for good: signed out.
@@ -357,7 +362,7 @@ export function syncNow(): Promise<SyncResult | null> {
 
 async function doSync(): Promise<SyncResult | null> {
   const s = await getSession();
-  if (!s || !(await getProject())) return null;
+  if (!isSignedIn(s) || !(await getProject())) return null;
   const remote = ((await rpc<Doc | null>('get_settings')) ?? { v: 1, sections: {} }) as Doc;
   remote.sections ??= {};
   const times = await readTimes();
@@ -423,7 +428,10 @@ export async function startTvPairing(): Promise<string> {
 
 /** TV: the account it's linked to (its email), once a phone has entered the code. */
 export async function tvLinkedTo(): Promise<string | null> {
-  return rpc<string | null>('tv_status');
+  const email = await rpc<string | null>('tv_status');
+  const s = await getSession();
+  if (email && s && s.linkedTo !== email) await saveSession({ ...s, linkedTo: email });
+  return email;
 }
 
 /** TV: after linking, bring everything over. */

@@ -69,6 +69,14 @@ function setAudioTrack(player: VideoPlayer, track: AudioTrack) {
   player.audioTrack = track;
 }
 
+function setUpdateInterval(player: VideoPlayer, seconds: number) {
+  try {
+    player.timeUpdateEventInterval = seconds;
+  } catch {
+    // Released.
+  }
+}
+
 function seekTo(player: VideoPlayer, t: number) {
   try {
     player.currentTime = t;
@@ -110,7 +118,9 @@ export default function WatchScreen() {
   const { prefs } = usePrefs();
 
   const player = useVideoPlayer(item ? toSource(item) : null, (p) => {
-    p.timeUpdateEventInterval = 0.25;
+    // Once a second is enough for the clock, Skip intro and Next episode; addon subtitles ask
+    // for 4×/s below (each update redraws the screen).
+    p.timeUpdateEventInterval = 1;
     p.showNowPlayingNotification = true;
     // Start as soon as a couple of seconds are buffered instead of waiting for more.
     p.bufferOptions = {
@@ -166,6 +176,9 @@ export default function WatchScreen() {
   const [cues, setCues] = useState<Cue[]>([]);
   const [delay, setDelay] = useState(0);
   const [subError, setSubError] = useState<string | null>(null);
+  // Addon subtitles need the clock 4×/s to line up; otherwise once a second saves redraws.
+  const fineClock = subtitle.kind === 'addon';
+  useEffect(() => setUpdateInterval(player, fineClock ? 0.25 : 1), [player, fineClock]);
   const { availableSubtitleTracks } = useEvent(player, 'availableSubtitleTracksChange', {
     availableSubtitleTracks: [],
   });

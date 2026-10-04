@@ -367,6 +367,10 @@ function ListRow({ title, load }: { title: string; load: (page: number) => Promi
       ) : (
         <FlatList
           horizontal
+          // Rows of posters: only keep the visible ones (and a little either side) mounted.
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
           data={items}
           keyExtractor={(c) => c.id}
           showsHorizontalScrollIndicator={false}

@@ -88,10 +88,10 @@ export default function AccountSettings() {
   }
 
   const signedIn = session && !session.user.is_anonymous;
-  const tvLinked = session?.user.is_anonymous;
+  const tvLinked = !!session?.user.is_anonymous && !!session.linkedTo;
 
   return (
-    <SettingsPage title="Account">
+    <SettingsPage>
       <Body muted style={styles.intro}>
         Sign in on your phone, another phone or the TV app and your add-ons, settings, Live TV
         playlists, TorBox/Trakt/Simkl connections and Continue watching come with you
@@ -105,7 +105,7 @@ export default function AccountSettings() {
         <>
           <SectionTitle>Signed in</SectionTitle>
           <Group>
-            <Row icon="person-circle" title={session.user.email ?? 'This TV is paired'} subtitle={
+            <Row icon="person-circle" title={session.user.email ?? `${session.linkedTo} (this TV)`} subtitle={
               last ? `Last synced ${new Date(last).toLocaleString()}` : 'Not synced yet'
             } />
             <Row

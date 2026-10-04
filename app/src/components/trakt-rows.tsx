@@ -47,6 +47,10 @@ function Row({ title, load, type }: { title: string; load: () => Promise<TraktIt
       </View>
       <FlatList
         horizontal
+        // Rows of posters: only keep the visible ones (and a little either side) mounted.
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
         data={items.slice(0, 30)}
         keyExtractor={(i) => `${i.imdb}:${i.subtitle ?? ''}`}
         showsHorizontalScrollIndicator={false}
