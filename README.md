@@ -208,7 +208,7 @@ Setup, once (free):
 
 1. Create a project at [supabase.com](https://supabase.com) → **New project**.
 2. **SQL Editor** → paste the setup SQL (**Settings → Account & sync → Copy setup SQL** in the app, or `SETUP_SQL` in `app/src/lib/account.ts`) → **Run**.
-3. **Authentication → Sign In / Providers**: turn on **Anonymous sign-ins** (that's how TVs pair). Optionally turn off **Confirm email** so new accounts work straight away.
+3. **Authentication → Sign In / Providers**: turn on **Anonymous sign-ins** (that's how TVs pair). Turn off **Confirm email** too, so new accounts work straight away (otherwise the confirmation link opens a harmless “localhost:3000” error page, because Supabase's default Site URL is `http://localhost:3000`; the account is still confirmed).
 4. **Settings → API**: copy the **Project URL** and the **anon public** key into the app (once per device), or add them as repo secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY` so every build has them built in.
 5. On the phone: **Create account** (email + password). On the TV: Settings → Account & sync shows a code and a QR code; scan the QR with the phone (or enter the code under **Sign in a TV**) and the TV fills in.
 

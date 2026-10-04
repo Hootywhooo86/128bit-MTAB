@@ -187,8 +187,9 @@ function ProjectForm({ onSaved }: { onSaved: () => void }) {
       <Body style={styles.step}>1. supabase.com → New project (free).</Body>
       <Body style={styles.step}>2. SQL Editor → paste the setup SQL (copy below) → Run.</Body>
       <Body style={styles.step}>
-        3. Authentication → Sign In / Providers: turn on Anonymous sign-ins (for TVs). Optional: turn
-        off Confirm email.
+        3. Authentication → Sign In / Providers: turn on Anonymous sign-ins (for TVs), and turn off
+        Confirm email (otherwise the email’s link opens a “localhost:3000” error page; harmless, the
+        account still gets confirmed).
       </Body>
       <Body style={styles.step}>4. Settings → API: copy the Project URL and the anon public key here.</Body>
       <Button
@@ -235,7 +236,7 @@ function SignInForm({ busy, run }: { busy: boolean; run: (fn: () => Promise<stri
           run(async () =>
             (await signUp(email, password))
               ? undefined
-              : 'Account created. Confirm the email Supabase sent you, then sign in.',
+              : 'Account created. Tap the link in the email Supabase sent (if it opens a “localhost:3000” error page, that’s fine: you’re confirmed), then come back and tap Sign in.',
           )
         }
       />
