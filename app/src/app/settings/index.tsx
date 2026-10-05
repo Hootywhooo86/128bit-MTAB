@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Linking } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { IS_TV } from '@/constants/tv';
@@ -77,6 +78,12 @@ export default function SettingsScreen() {
           title="About 128bit"
           subtitle="Version, check for updates, data sources"
           onPress={() => router.push('/settings/about')}
+        />
+        <Row
+          icon="cafe"
+          title="Buy me a Ko-fi"
+          subtitle="Enjoying 128bitPlay? Support it at ko-fi.com/128bit"
+          onPress={() => Linking.openURL('https://ko-fi.com/128bit')}
         />
       </Group>
     </SettingsPage>
