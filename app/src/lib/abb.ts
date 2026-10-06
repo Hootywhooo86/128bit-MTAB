@@ -24,19 +24,41 @@ export type AbbResult = FeedItem & {
 const text = (html?: string) =>
   html ? decodeEntities(html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim() : undefined;
 
-/** The main address, then the mirrors if it can't be reached at all. */
+/** A request that gives up after `ms` (a slow site must never hang the search). */
+async function fetchWithTimeout(url: string, ms: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (e) {
+    throw controller.signal.aborted ? new Error('AudiobookBay is slow to answer right now') : e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Set when AudiobookBay just failed us, so the rest of that search stops waiting on it. */
+let downUntil = 0;
+
+/**
+ * The main address, then the mirrors only if it can't be reached at all (a blocked or
+ * unknown address fails fast). A slow answer just times out: the mirrors are the same site.
+ */
 async function fetchMirror(path: string) {
+  if (Date.now() < downUntil) throw new Error('AudiobookBay is slow to answer right now. Try again in a moment.');
   let last: unknown;
   for (const host of [workingHost, ...MIRRORS.filter((h) => h !== workingHost)]) {
     try {
-      const res = await fetch(`https://${host}${path}`);
+      const res = await fetchWithTimeout(`https://${host}${path}`, 7000);
       if (res.status >= 500 && res.status !== 503) throw new Error(`AudiobookBay answered ${res.status}`);
       workingHost = host;
       return res;
     } catch (e) {
       last = e;
+      if (e instanceof Error && /slow to answer/.test(e.message)) break;
     }
   }
+  downUntil = Date.now() + 20_000;
   throw last instanceof Error ? last : new Error('Couldn’t reach AudiobookBay');
 }
 
@@ -148,7 +170,11 @@ export type AbbSearch = {
  * Searches AudiobookBay the smart way: several questions (see abbQueries), two pages
  * each, merged and ranked against everything you typed.
  */
-export async function searchAbbSmart(query: string): Promise<AbbSearch> {
+export async function searchAbbSmart(
+  query: string,
+  /** Called with the results so far each time an answer comes in, so the list fills as it goes. */
+  onUpdate?: (s: AbbSearch) => void,
+): Promise<AbbSearch> {
   const queries = abbQueries(query);
   if (!queries.length) return { results: [], more: false, loadMore: async () => searchAbbSmart(query) };
   const seen = new Map<string, AbbResult>();
@@ -167,41 +193,44 @@ export async function searchAbbSmart(query: string): Promise<AbbSearch> {
   const open = new Set(queries);
   let firstError: unknown = null;
 
-  async function fetchRound(count: number) {
-    const jobs = [...open].flatMap((q) =>
-      Array.from({ length: count }, (_, i) => ({ q, page: pages.get(q)! + i + 1 })),
-    );
-    const answers = await Promise.all(
-      jobs.map(({ q, page }) =>
-        searchAbb(q, page).then(
-          (r) => ({ q, page, r }),
-          (e) => {
-            firstError ??= e;
-            return { q, page, r: { results: [] as AbbResult[], more: false } };
-          },
-        ),
-      ),
-    );
-    for (const { q, page, r } of answers) {
-      pages.set(q, Math.max(pages.get(q)!, page));
-      if (!r.more) open.delete(q);
-      for (const item of r.results) if (!seen.has(item.link)) seen.set(item.link, { ...item, score: rank(item) });
-    }
-  }
-
-  const snapshot = (): AbbSearch => {
+  const snapshot = (): AbbSearch => ({
+    results: [...seen.values()].sort((a, b) => b.score - a.score),
+    more: open.size > 0,
+    loadMore: async () => {
+      await fetchRound([...open], 1);
+      return finish();
+    },
+  });
+  const finish = () => {
     if (!seen.size && firstError) throw firstError;
-    return {
-      results: [...seen.values()].sort((a, b) => b.score - a.score),
-      more: open.size > 0,
-      loadMore: async () => {
-        await fetchRound(1);
-        return snapshot();
-      },
-    };
+    return snapshot();
   };
 
-  await fetchRound(2);
+  /** Next page of each question, at most 3 at a time; results show as each one answers. */
+  async function fetchRound(qs: string[], count: number) {
+    const jobs = qs.flatMap((q) => Array.from({ length: count }, (_, i) => ({ q, page: pages.get(q)! + i + 1 })));
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length) {
+        const { q, page } = jobs[next++];
+        try {
+          const r = await searchAbb(q, page);
+          pages.set(q, Math.max(pages.get(q)!, page));
+          if (!r.more) open.delete(q);
+          for (const item of r.results) if (!seen.has(item.link)) seen.set(item.link, { ...item, score: rank(item) });
+          onUpdate?.(snapshot());
+        } catch (e) {
+          firstError ??= e;
+          open.delete(q);
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  }
+
+  // First page of each question (the best ones first), then a second page of the main one.
+  await fetchRound(queries, 1);
+  if (seen.size < 15 && open.has(queries[0])) await fetchRound([queries[0]], 1);
   // Searched a series or a title? Also ask for the author of the best matches: ABB often
   // lists a book under the author but not under every way of writing the series name.
   const best = [...seen.values()].filter((r) => r.score >= 1 && r.author);
@@ -212,10 +241,7 @@ export async function searchAbbSmart(query: string): Promise<AbbSearch> {
   if (authorQ && !pages.has(authorQ) && seen.size < 60) {
     pages.set(authorQ, 0);
     open.add(authorQ);
-    const others = [...open].filter((q) => q !== authorQ);
-    others.forEach((q) => open.delete(q));
-    await fetchRound(2);
-    others.forEach((q) => open.add(q));
+    await fetchRound([authorQ], 1);
   }
-  return snapshot();
+  return finish();
 }

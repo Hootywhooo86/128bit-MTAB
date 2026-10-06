@@ -26,7 +26,12 @@ export function AbbResults({
   useEffect(() => {
     let cancelled = false;
     // Several simpler questions to AudiobookBay, merged and ranked (see searchAbbSmart).
-    searchAbbSmart(query)
+    // Results appear as each answer comes in; the spinner stays until the last one.
+    searchAbbSmart(query, (partial) => {
+      if (cancelled) return;
+      setSearch(partial);
+      setResults(partial.results);
+    })
       .then((s) => {
         if (cancelled) return;
         setSearch(s);
