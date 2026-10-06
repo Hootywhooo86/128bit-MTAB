@@ -5,7 +5,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { searchAbb } from './abb';
+import { searchAbbSmart } from './abb';
 import { resolveTorrent } from './feeds';
 import { getHardcoverToken, hardcoverWantList, hardcoverWantToRead } from './hardcover';
 import { cleanTitle, getSources, isCatalog, matchScore, searchSource } from './sources';
@@ -285,7 +285,7 @@ async function search(book: Wanted): Promise<Match[]> {
   const title = cleanTitle(book.title);
   const fits = (name: string, score: number) => score >= 0.75 && authorFits(name, book.author);
 
-  const abb = withTimeout(searchAbb(title), SOURCE_TIMEOUT_MS).then(({ results }) =>
+  const abb = withTimeout(searchAbbSmart(book.author ? `${title} - ${book.author}` : title), SOURCE_TIMEOUT_MS).then(({ results }) =>
     results
       .filter((r) => fits(r.title, r.score))
       .map<Match>((r) => ({

@@ -7,6 +7,9 @@ import { decodeEntities, type FeedItem } from './feeds';
 import { matchScore } from './sources';
 
 export const ABB_HOST = 'audiobookbay.lu';
+/** Other addresses AudiobookBay uses, tried when the main one can't be reached. */
+const MIRRORS = [ABB_HOST, 'audiobookbay.is', 'audiobookbay.fi'];
+let workingHost = ABB_HOST;
 
 export type AbbResult = FeedItem & {
   link: string;
@@ -21,13 +24,29 @@ export type AbbResult = FeedItem & {
 const text = (html?: string) =>
   html ? decodeEntities(html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim() : undefined;
 
+/** The main address, then the mirrors if it can't be reached at all. */
+async function fetchMirror(path: string) {
+  let last: unknown;
+  for (const host of [workingHost, ...MIRRORS.filter((h) => h !== workingHost)]) {
+    try {
+      const res = await fetch(`https://${host}${path}`);
+      if (res.status >= 500 && res.status !== 503) throw new Error(`AudiobookBay answered ${res.status}`);
+      workingHost = host;
+      return res;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last instanceof Error ? last : new Error('Couldn’t reach AudiobookBay');
+}
+
 /** One page of results (about 9). `more` is true when there's probably another page. */
 export async function searchAbb(
   query: string,
   page = 1,
 ): Promise<{ results: AbbResult[]; more: boolean }> {
   const q = encodeURIComponent(query.trim().toLowerCase()).replace(/%20/g, '+');
-  const res = await fetch(`https://${ABB_HOST}/page/${page}/?s=${q}`);
+  const res = await fetchMirror(`/page/${page}/?s=${q}`);
   // Past the last page the site answers 404.
   if (res.status === 404) return { results: [], more: false };
   if (!res.ok) throw new Error(`AudiobookBay answered ${res.status}`);
@@ -36,7 +55,7 @@ export async function searchAbb(
   const results = posts.flatMap<AbbResult>((post) => {
     const a = post.match(/class="postTitle"><h2><a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
     if (!a) return [];
-    const href = a[1].startsWith('http') ? a[1] : `https://${ABB_HOST}${a[1]}`;
+    const href = a[1].startsWith('http') ? a[1] : `https://${workingHost}${a[1]}`;
     const title = text(a[2]) ?? 'Untitled';
     const info = text(post.match(/class="postInfo">([\s\S]*?)<\/div>/)?.[1]) ?? '';
     const details = post.match(/text-align:center;'>([\s\S]*?)<\/p>/)?.[1] ?? '';
@@ -64,4 +83,139 @@ export async function searchAbb(
     ];
   });
   return { results, more: posts.length >= 9 };
+}
+
+// --- Smart search ---------------------------------------------------------------------
+//
+// AudiobookBay's own search is very literal: the full title "The Delves: Book 5 of Ajax's
+// Ascension" finds nothing, "the delves" drowns in other books ("the" matches everything),
+// and "ajaxs" without the apostrophe finds nothing. So we ask it several simpler questions
+// (the key words, the series, the author, the most distinctive words) and merge the answers,
+// best match first.
+
+const NOISE = new Set([
+  'the', 'a', 'an', 'of', 'and', 'in', 'on', 'to', 'for', 'by', 'at', 'from', 'with',
+  'book', 'books', 'vol', 'volume', 'part', 'audiobook', 'audiobooks', 'audio', 'm4b', 'mp3',
+  'unabridged', 'abridged', 'series', 'edition', 'novel',
+]);
+
+/** Lower-case words, curly apostrophes made straight, punctuation dropped (apostrophes kept). */
+function wordsOf(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02bc`]/g, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, ' ')
+    .split(' ')
+    .map((w) => w.replace(/^'+|'+$/g, ''))
+    .filter(Boolean);
+}
+
+const keyWords = (s: string) => wordsOf(s).filter((w) => !NOISE.has(w) && !/^\d+$/.test(w) && w.length > 1);
+
+/** The questions to ask AudiobookBay for one search, most specific first (at most 5). */
+export function abbQueries(query: string): string[] {
+  const out: string[] = [];
+  const add = (words: string[]) => {
+    const q = words.join(' ').trim();
+    if (q && !out.includes(q)) out.push(q);
+  };
+  // "Title - Author" (how ABB and most sites write it).
+  const dash = query.split(/\s+[-–—]\s+/);
+  const author = dash.length > 1 ? keyWords(dash[dash.length - 1]) : [];
+  const titlePart = dash.length > 1 ? dash.slice(0, -1).join(' ') : query;
+  const key = keyWords(titlePart);
+  // "Book 5 of Ajax's Ascension" / "Ajax's Ascension, Book 5": the series on its own.
+  const series = titlePart.match(/\bbook\s+\d+\s+of\s+(.+)$/i)?.[1] ?? titlePart.match(/^(.+?),?\s+book\s+\d+/i)?.[1];
+  add(key.slice(0, 4));
+  if (author.length) add([...key.slice(0, 2), ...author.slice(0, 1)]);
+  if (series) add(keyWords(series));
+  // The most distinctive words on their own (longest first).
+  const distinctive = [...key].sort((a, b) => b.length - a.length);
+  add(distinctive.slice(0, 2));
+  add(distinctive.slice(0, 1));
+  if (author.length) add(author);
+  return out.slice(0, 5);
+}
+
+export type AbbSearch = {
+  results: AbbResult[];
+  more: boolean;
+  /** Next page for every question that still had full pages. */
+  loadMore: () => Promise<AbbSearch>;
+};
+
+/**
+ * Searches AudiobookBay the smart way: several questions (see abbQueries), two pages
+ * each, merged and ranked against everything you typed.
+ */
+export async function searchAbbSmart(query: string): Promise<AbbSearch> {
+  const queries = abbQueries(query);
+  if (!queries.length) return { results: [], more: false, loadMore: async () => searchAbbSmart(query) };
+  const seen = new Map<string, AbbResult>();
+  // Compare words without possessives ("ajax" = "ajax's").
+  const stem = (w: string) => w.replace(/'s$/, '').replace(/'/g, '');
+  const want = keyWords(query).map(stem);
+  // A book number in the search ("… Monsters 10", "book 5") lifts the release with that number.
+  const nums = wordsOf(query).filter((w) => /^\d+$/.test(w));
+  const rank = (r: AbbResult) => {
+    const have = new Set(keyWords(r.title).map(stem));
+    const hit = want.length ? want.filter((w) => have.has(w)).length / want.length : 1;
+    const numbered = nums.length && nums.every((n) => wordsOf(r.title).includes(n)) ? 0.1 : 0;
+    return hit + numbered;
+  };
+  const pages = new Map(queries.map((q) => [q, 0]));
+  const open = new Set(queries);
+  let firstError: unknown = null;
+
+  async function fetchRound(count: number) {
+    const jobs = [...open].flatMap((q) =>
+      Array.from({ length: count }, (_, i) => ({ q, page: pages.get(q)! + i + 1 })),
+    );
+    const answers = await Promise.all(
+      jobs.map(({ q, page }) =>
+        searchAbb(q, page).then(
+          (r) => ({ q, page, r }),
+          (e) => {
+            firstError ??= e;
+            return { q, page, r: { results: [] as AbbResult[], more: false } };
+          },
+        ),
+      ),
+    );
+    for (const { q, page, r } of answers) {
+      pages.set(q, Math.max(pages.get(q)!, page));
+      if (!r.more) open.delete(q);
+      for (const item of r.results) if (!seen.has(item.link)) seen.set(item.link, { ...item, score: rank(item) });
+    }
+  }
+
+  const snapshot = (): AbbSearch => {
+    if (!seen.size && firstError) throw firstError;
+    return {
+      results: [...seen.values()].sort((a, b) => b.score - a.score),
+      more: open.size > 0,
+      loadMore: async () => {
+        await fetchRound(1);
+        return snapshot();
+      },
+    };
+  };
+
+  await fetchRound(2);
+  // Searched a series or a title? Also ask for the author of the best matches: ABB often
+  // lists a book under the author but not under every way of writing the series name.
+  const best = [...seen.values()].filter((r) => r.score >= 1 && r.author);
+  const counts = new Map<string, number>();
+  for (const r of best) for (const a of r.author!.split(/,\s*/)) counts.set(a, (counts.get(a) ?? 0) + 1);
+  const topAuthor = [...counts.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
+  const authorQ = topAuthor ? keyWords(topAuthor).join(' ') : '';
+  if (authorQ && !pages.has(authorQ) && seen.size < 60) {
+    pages.set(authorQ, 0);
+    open.add(authorQ);
+    const others = [...open].filter((q) => q !== authorQ);
+    others.forEach((q) => open.delete(q));
+    await fetchRound(2);
+    others.forEach((q) => open.add(q));
+  }
+  return snapshot();
 }

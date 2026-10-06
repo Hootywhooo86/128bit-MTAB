@@ -4,7 +4,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { TorboxButton } from '@/components/torbox-button';
 import { Body, Cover, Heading } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { searchAbb, type AbbResult } from '@/lib/abb';
+import { searchAbbSmart, type AbbResult, type AbbSearch } from '@/lib/abb';
 import { resolveTorrent } from '@/lib/feeds';
 import { Pressable } from '@/components/focusable';
 
@@ -19,20 +19,18 @@ export function AbbResults({
   const Colors = useColors();
   const styles = useStyles();
   const [results, setResults] = useState<AbbResult[]>([]);
-  const [page, setPage] = useState(0);
-  const [more, setMore] = useState(true);
+  const [search, setSearch] = useState<AbbSearch | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    // First two pages together: the site lists newest first, not best match.
-    Promise.all([searchAbb(query, 1), searchAbb(query, 2)])
-      .then(([a, b]) => {
+    // Several simpler questions to AudiobookBay, merged and ranked (see searchAbbSmart).
+    searchAbbSmart(query)
+      .then((s) => {
         if (cancelled) return;
-        setResults([...a.results, ...b.results]);
-        setPage(2);
-        setMore(a.more && b.more);
+        setSearch(s);
+        setResults(s.results);
       })
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setBusy(false));
@@ -42,20 +40,21 @@ export function AbbResults({
   }, [query]);
 
   async function loadMore() {
+    if (!search) return;
     setBusy(true);
     try {
-      const next = await searchAbb(query, page + 1);
-      setResults((r) => [...r, ...next.results]);
-      setPage(page + 1);
-      setMore(next.more);
+      const next = await search.loadMore();
+      setSearch(next);
+      setResults(next.results);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
+  const more = !!search?.more;
 
-  const sorted = [...results].sort((a, b) => b.score - a.score);
+  const sorted = results;
 
   return (
     <View style={{ gap: Spacing.two, paddingHorizontal: Spacing.three }}>
