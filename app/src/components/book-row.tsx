@@ -24,6 +24,8 @@ type Props = {
   onLongPress?: () => void;
   onToggleFavorite: () => void;
   extra?: string;
+  /** Downloading: a download bar (with "123 MB of 565 MB · 4.2 MB/s") instead of listening progress. */
+  download?: { fraction: number; text: string };
 };
 
 /** One book in the Audiobooks library: cover, title, author · narrator, length and progress. */
@@ -35,6 +37,7 @@ export function BookRow({
   onLongPress,
   onToggleFavorite,
   extra,
+  download,
 }: Props) {
   const Colors = useColors();
   const styles = useStyles();
@@ -58,7 +61,19 @@ export function BookRow({
           </Text>
         ) : null}
         <Text style={styles.sub}>{[length, extra].filter(Boolean).join(' · ')}</Text>
-        {progress?.finished ? (
+        {download ? (
+          <>
+            <View style={styles.progressRow}>
+              <View style={{ flex: 1 }}>
+                <ProgressBar value={download.fraction} />
+              </View>
+              <Text style={styles.percent}>{Math.floor(download.fraction * 100)}%</Text>
+            </View>
+            <Text style={styles.sub} numberOfLines={1}>
+              {download.text}
+            </Text>
+          </>
+        ) : progress?.finished ? (
           <Text style={styles.complete}>Complete</Text>
         ) : started ? (
           <View style={styles.progressRow}>

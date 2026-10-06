@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useNavigation } from 'expo-router';
-import { useCallback, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -14,9 +14,19 @@ import { AudiobookSearch } from '@/components/audiobook-search';
 import { BookRow } from '@/components/book-row';
 import { HeaderButtons } from '@/components/header-buttons';
 import { WantedList } from '@/components/wanted-list';
-import { Button, EmptyState } from '@/components/ui';
+import { Button, EmptyState, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { deleteDownload, getDownloadedBooks, offlineSupported } from '@/lib/downloads';
+import {
+  bookDownloads,
+  cancelBookDownload,
+  deleteDownload,
+  downloadBook,
+  getDownloadedBooks,
+  isBookDownloaded,
+  offlineSupported,
+  onBookDownloads,
+  type BookDownload,
+} from '@/lib/downloads';
 import { usePlayer } from '@/lib/player';
 import {
   getFavorites,
@@ -42,6 +52,15 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 const plural = (n: number) => `${n} book${n === 1 ? '' : 's'}`;
 
+/** "123 MB of 565 MB · 4.2 MB/s" for a download row (or "Paused" when it isn't running). */
+function downloadInfo(d?: BookDownload) {
+  if (!d) return { fraction: 0, text: 'Paused · tap to carry on · hold to cancel' };
+  const size = d.total ? `${formatBytes(d.bytes)} of ${formatBytes(d.total)}` : formatBytes(d.bytes);
+  const parts = [size, d.speed ? `${formatBytes(d.speed)}/s` : ''];
+  if (d.chapters > 1) parts.push(`chapter ${Math.min(d.chapter + 1, d.chapters)} of ${d.chapters}`);
+  return { fraction: d.fraction, text: parts.filter(Boolean).join(' · ') };
+}
+
 function confirm(title: string, message: string, action: string, onConfirm: () => void) {
   if (Platform.OS === 'web') {
     if (window.confirm(`${title}\n\n${message}`)) onConfirm();
@@ -66,6 +85,8 @@ export default function AudiobooksScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wantedCount, setWantedCount] = useState(0);
   const [searching, setSearching] = useState(false);
+  // Books downloading right now (live bytes / speed).
+  const [live, setLive] = useState<Map<string, BookDownload>>(() => bookDownloads());
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -97,6 +118,17 @@ export default function AudiobooksScreen() {
     setProgress(await getProgressMany([...new Set([...lib, ...dl].map((b) => b.key))]));
   }, []);
 
+  useEffect(() => {
+    let count = bookDownloads().size;
+    return onBookDownloads(() => {
+      const now = bookDownloads();
+      setLive(now);
+      // A book that just finished moves over to the Library.
+      if (now.size < count) load();
+      count = now.size;
+    });
+  }, [load]);
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -120,7 +152,10 @@ export default function AudiobooksScreen() {
           load();
         });
 
-  const source = tab === 'library' ? library : downloads;
+  // Downloads = only books still coming down; finished ones are in the Library.
+  const downloading = downloads.filter((b) => live.has(b.key) || !isBookDownloaded(b));
+  const shelf = [...library, ...downloads.filter((b) => !library.some((l) => l.key === b.key) && !downloading.includes(b))];
+  const source = tab === 'library' ? shelf : downloading;
   const books =
     tab === 'downloads'
       ? source
@@ -145,7 +180,7 @@ export default function AudiobooksScreen() {
             </Text>
             <Text style={styles.segmentCount}>
               {plural(
-                t === 'library' ? library.length : t === 'downloads' ? downloads.length : wantedCount,
+                t === 'library' ? shelf.length : t === 'downloads' ? downloading.length : wantedCount,
               )}
             </Text>
             <View style={[styles.underline, tab === t && { backgroundColor: Colors.accent }]} />
@@ -184,7 +219,7 @@ export default function AudiobooksScreen() {
         }}
         ListEmptyComponent={
           tab === 'library' ? (
-            library.length ? (
+            shelf.length ? (
               <EmptyState title="Nothing here" body="No books match this filter." />
             ) : (
               <EmptyState
@@ -195,10 +230,10 @@ export default function AudiobooksScreen() {
             )
           ) : (
             <EmptyState
-              title="No downloads"
+              title="Nothing downloading"
               body={
                 offlineSupported
-                  ? 'Open a book and tap “Download to phone” to listen offline.'
+                  ? 'Books you download show here while they come down, then move to your Library.'
                   : 'Offline downloads work in the iOS and Android app.'
               }
             />
@@ -209,10 +244,22 @@ export default function AudiobooksScreen() {
             book={item}
             progress={progress[item.key]}
             favorite={favorites.includes(item.key)}
-            onPress={() => open(item)}
-            onLongPress={() => onLongPress(item)}
+            onPress={() =>
+              tab === 'downloads' && !live.has(item.key)
+                ? // Stopped part-way (e.g. the app was closed): carry on.
+                  downloadBook(item).catch(() => {}).finally(load)
+                : open(item)
+            }
+            onLongPress={() =>
+              tab === 'downloads'
+                ? confirm('Cancel download', `Stop downloading ${item.title} and delete what came down?`, 'Cancel download', async () => {
+                    await cancelBookDownload(item.key);
+                    load();
+                  })
+                : onLongPress(item)
+            }
             onToggleFavorite={async () => setFavorites(await toggleFavorite(item.key))}
-            extra={tab === 'downloads' ? 'On this phone' : undefined}
+            download={tab === 'downloads' ? downloadInfo(live.get(item.key)) : undefined}
           />
         )}
       />

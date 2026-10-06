@@ -3,7 +3,7 @@
  * Files live in <documents>/audiobooks/<book>/<chapter>.<ext>.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, DownloadTask, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { absFileUrl } from './audiobookshelf';
@@ -53,24 +53,119 @@ async function setIndex(books: PlayableBook[]) {
   await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(books));
 }
 
-export async function downloadBook(
+// --- Live progress (the Downloads tab shows books while they download) -----------------
+
+export type BookDownload = {
+  /** 0..1 over the whole book. */
+  fraction: number;
+  bytes: number;
+  /** Known when every chapter's size is (else the current chapter's). */
+  total?: number;
+  /** Bytes per second. */
+  speed: number;
+  chapter: number;
+  chapters: number;
+};
+
+const live = new Map<string, BookDownload>();
+const tasks = new Map<string, DownloadTask>();
+const running = new Map<string, Promise<void>>();
+const liveListeners = new Set<() => void>();
+
+/** Books downloading right now, by key. */
+export const bookDownloads = () => new Map(live);
+
+export function onBookDownloads(fn: () => void) {
+  liveListeners.add(fn);
+  return () => {
+    liveListeners.delete(fn);
+  };
+}
+const emit = () => liveListeners.forEach((l) => l());
+
+/** Downloads a book's chapters (skipping ones already here). Calling again while it runs joins it. */
+export function downloadBook(
   book: PlayableBook,
   onProgress?: (done: number, total: number) => void,
-) {
+): Promise<void> {
+  const already = running.get(book.key);
+  if (already) return already;
+  const job = runDownload(book, onProgress).finally(() => {
+    running.delete(book.key);
+    live.delete(book.key);
+    tasks.delete(book.key);
+    emit();
+  });
+  running.set(book.key, job);
+  return job;
+}
+
+async function runDownload(book: PlayableBook, onProgress?: (done: number, total: number) => void) {
   if (!offlineSupported) throw new Error('Offline downloads are only available on iOS and Android');
   bookDir(book.key).create({ intermediates: true, idempotent: true });
   const books = await getDownloadedBooks();
   await setIndex([book, ...books.filter((b) => b.key !== book.key)]);
 
-  for (let i = 0; i < book.chapters.length; i++) {
+  const n = book.chapters.length;
+  const sizes = book.chapters.map((c) => c.size ?? 0);
+  const allSized = sizes.every((s) => s > 0);
+  const total = allSized ? sizes.reduce((a, b) => a + b, 0) : undefined;
+  let before = 0; // bytes of the chapters already done
+  let last = { at: Date.now(), bytes: 0 };
+  let speed = 0;
+  const report = (i: number, current: number, currentTotal: number) => {
+    const now = Date.now();
+    const bytes = before + current;
+    if (now - last.at >= 1000) {
+      const s = ((bytes - last.bytes) * 1000) / (now - last.at);
+      speed = speed ? speed * 0.6 + s * 0.4 : s;
+      last = { at: now, bytes };
+    }
+    const fraction = total
+      ? bytes / total
+      : (i + (currentTotal > 0 ? current / currentTotal : 0)) / Math.max(1, n);
+    live.set(book.key, {
+      fraction: Math.min(1, fraction),
+      bytes,
+      total: total ?? (n === 1 && currentTotal > 0 ? currentTotal : undefined),
+      speed,
+      chapter: i,
+      chapters: n,
+    });
+    emit();
+  };
+
+  for (let i = 0; i < n; i++) {
     const chapter = book.chapters[i];
-    onProgress?.(i, book.chapters.length);
+    onProgress?.(i, n);
     const file = chapterFile(book.key, chapter);
-    if (file.exists) continue;
+    if (file.exists) {
+      before += file.size ?? sizes[i];
+      report(i + 1 === n ? i : i + 1, 0, 0);
+      continue;
+    }
+    report(i, 0, 0);
     const url = await chapterUrl(book.key, chapter);
-    await File.downloadFileAsync(url, file, { idempotent: true });
+    const partial = new File(bookDir(book.key), `${file.name}.part`);
+    if (partial.exists) partial.delete();
+    const task = new DownloadTask(url, partial, {
+      onProgress: ({ bytesWritten, totalBytes }) => report(i, bytesWritten, totalBytes),
+    });
+    tasks.set(book.key, task);
+    const done = await task.downloadAsync();
+    if (!done) throw new Error('Download cancelled');
+    // Only a whole chapter counts as downloaded.
+    partial.move(file);
+    before += file.size ?? sizes[i];
   }
-  onProgress?.(book.chapters.length, book.chapters.length);
+  onProgress?.(n, n);
+}
+
+/** ✕ on a download: stop it and remove what came down. */
+export async function cancelBookDownload(bookKey: string) {
+  tasks.get(bookKey)?.cancel();
+  await running.get(bookKey)?.catch(() => {});
+  await deleteDownload(bookKey);
 }
 
 export async function deleteDownload(bookKey: string) {
