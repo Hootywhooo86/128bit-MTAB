@@ -258,7 +258,7 @@ async function detectMarks(target: PlayableBook, index: number, uri: string) {
   updateDownloadedBook(updated);
 }
 
-async function loadChapter(target: PlayableBook, index: number, startAt = 0) {
+async function loadChapter(target: PlayableBook, index: number, startAt = 0, autoPlay = true) {
   const chapter = target.chapters[index];
   if (!chapter) return;
   const p = getAudio();
@@ -268,7 +268,8 @@ async function loadChapter(target: PlayableBook, index: number, startAt = 0) {
     pendingSeek = startAt > 0 ? startAt : null;
     p.replace({ uri });
     p.setPlaybackRate(state.rate);
-    p.play();
+    // Opening a book from the library just shows where you are; it plays when you tap Play.
+    if (autoPlay) p.play();
     lastLockKey = '';
     p.setActiveForLockScreen(true, lockScreenInfo(target, index, null), {
       showSeekForward: true,
@@ -289,7 +290,7 @@ async function loadChapter(target: PlayableBook, index: number, startAt = 0) {
   }
 }
 
-async function playBook(nextBook: PlayableBook, chapter?: number) {
+async function playBook(nextBook: PlayableBook, chapter?: number, autoPlay = true) {
   // No cover (e.g. a TorBox download)? Find one, for the app and the lock screen.
   if (!nextBook.cover) {
     const cover = await Promise.race([
@@ -300,7 +301,7 @@ async function playBook(nextBook: PlayableBook, chapter?: number) {
   }
   update({ book: nextBook });
   addToLibrary(nextBook);
-  if (chapter !== undefined) return loadChapter(nextBook, chapter);
+  if (chapter !== undefined) return loadChapter(nextBook, chapter, 0, autoPlay);
   const saved = await getProgress(nextBook.key);
   let index = saved && saved.chapter < nextBook.chapters.length ? saved.chapter : 0;
   let position = saved?.position ?? 0;
@@ -312,7 +313,13 @@ async function playBook(nextBook: PlayableBook, chapter?: number) {
       position = remote.position;
     }
   }
-  return loadChapter(nextBook, index, position);
+  return loadChapter(nextBook, index, position, autoPlay);
+}
+
+/** Opens a book at your saved spot without playing (already open? leaves it as it is). */
+async function openBook(nextBook: PlayableBook) {
+  if (state.book?.key === nextBook.key && getAudio().isLoaded) return;
+  return playBook(nextBook, undefined, false);
 }
 
 async function jumpTo(index: number, position: number) {
@@ -387,6 +394,8 @@ type PlayerContextValue = {
   rate: number;
   sleep: Sleep;
   playBook: (book: PlayableBook, chapter?: number) => Promise<void>;
+  /** Loads a book at your saved spot, paused (play with the Play button). */
+  openBook: (book: PlayableBook) => Promise<void>;
   playChapter: (index: number) => Promise<void>;
   jumpTo: (chapter: number, position: number) => Promise<void>;
   next: () => void;
@@ -444,6 +453,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     rate: engine.rate,
     sleep: engine.sleep,
     playBook,
+    openBook,
     playChapter: async (index: number) => {
       if (state.book) await loadChapter(state.book, index);
     },

@@ -57,7 +57,7 @@ export default function AudiobooksScreen() {
   const Colors = useColors();
   const styles = useStyles();
   const navigation = useNavigation();
-  const { playBook } = usePlayer();
+  const { openBook } = usePlayer();
   const [tab, setTab] = useState<Tab>('library');
   const [filter, setFilter] = useState<Filter>('all');
   const [library, setLibrary] = useState<PlayableBook[]>([]);
@@ -103,8 +103,9 @@ export default function AudiobooksScreen() {
     }, [load]),
   );
 
+  // Tapping a book shows it in the player at your spot; it starts when you tap Play.
   const open = async (book: PlayableBook) => {
-    await playBook(book);
+    await openBook(book);
     router.push('/player');
   };
 
