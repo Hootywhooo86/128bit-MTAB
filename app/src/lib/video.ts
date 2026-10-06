@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchStreams } from './addons';
 import { getActiveAddons, getTorboxKey } from './storage';
 import * as torbox from './torbox';
+import { deviceSetFiles, isDeviceId } from './torrent-device';
 import type { Stream } from './types';
 
 // --- What to play -----------------------------------------------------------
@@ -86,6 +87,15 @@ function pickFile(item: torbox.TorboxItem, stream: Stream) {
 
 export async function checkTorboxStream(itemId: number, stream: Stream): Promise<StreamResult> {
   const item = await torbox.getItem('torrent', itemId);
+  if (isDeviceId(itemId)) {
+    // On this device: it plays as soon as the file list is in (the video downloads in order
+    // while you watch). Only the chosen episode/movie file is downloaded, not the whole pack.
+    if (!item.files.length) return { status: 'downloading', itemId, progress: 0 };
+    const file = pickFile(item, stream);
+    if (!file) throw new Error('There is no video file in this torrent');
+    await deviceSetFiles(itemId, [file.id]);
+    return { status: 'ready', uri: await torbox.requestLink('torrent', itemId, file.id) };
+  }
   if (!item.download_finished) return { status: 'downloading', itemId, progress: item.progress };
   const file = pickFile(item, stream);
   if (!file) throw new Error('TorBox finished, but there is no video file in this torrent');
@@ -104,7 +114,7 @@ export async function resolveStream(stream: Stream, name: string): Promise<Strea
     };
   }
   if (stream.infoHash) {
-    const { id } = await torbox.addMagnet(torbox.magnetFromHash(stream.infoHash, name), name);
+    const { id } = await torbox.addMagnet(torbox.magnetFromHash(stream.infoHash, name), name, 'video');
     return checkTorboxStream(id, stream);
   }
   if (stream.externalUrl) return { status: 'external', url: stream.externalUrl };

@@ -1,0 +1,6 @@
+{
+  "name": "torrent-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Downloads torrents on the device (libtorrent via jlibtorrent) and streams their files over 127.0.0.1, for when there is no TorBox account."
+}

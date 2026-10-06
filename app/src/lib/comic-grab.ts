@@ -19,6 +19,7 @@ import { Platform } from 'react-native';
 import { canOpenRar } from './comic-archive';
 import { importComicFiles, setSeriesCover } from './comic-downloads';
 import { addMagnet, deleteTorrent, getItem, magnetFromHash, requestLink, type TorboxFile } from './torbox';
+import { deviceSetFiles, isDeviceId } from './torrent-device';
 
 const WANTED_KEY = '128bit.comicWanted';
 const FOLLOW_KEY = '128bit.comicFollows';
@@ -221,6 +222,8 @@ export type WantedComic = {
   phase?: string;
   error?: string;
   torboxId?: number;
+  /** Device torrent: the comic files have been picked (the rest isn't downloaded). */
+  deviceFilesSet?: boolean;
   /** The series on the phone once it's imported. */
   seriesId?: string;
   addedAt: number;
@@ -480,8 +483,20 @@ async function step(w: WantedComic) {
     await patchWanted(w.id, { state: 'torbox', torboxId });
   }
   const item = await getItem('torrent', torboxId);
+  const onDevice = isDeviceId(torboxId);
+  if (onDevice && item.files.length && !w.deviceFilesSet) {
+    // On this device: only fetch the comic files (not covers, nfo, extras).
+    const want = item.files.filter((f: TorboxFile) => comicFile(f.short_name ?? f.name)).map((f) => f.id);
+    if (want.length) await deviceSetFiles(torboxId, want);
+    await patchWanted(w.id, { deviceFilesSet: true });
+    return; // Next run checks progress with the right files.
+  }
   if (!item.download_finished) {
-    await patchWanted(w.id, { state: 'torbox', progress: item.progress ?? 0, phase: 'TorBox is downloading it' });
+    await patchWanted(w.id, {
+      state: 'torbox',
+      progress: item.progress ?? 0,
+      phase: onDevice ? item.download_state ?? 'Downloading on this device' : 'TorBox is downloading it',
+    });
     return; // Next run checks again.
   }
   const files = item.files.filter((f: TorboxFile) => comicFile(f.short_name ?? f.name));
@@ -506,6 +521,8 @@ async function step(w: WantedComic) {
     const series = await importComicFiles(local, cbz.length > 1 ? cleanPackName(r.title) : undefined, true);
     await addCover(series.comic.id, r);
     await patchWanted(w.id, { state: 'done', progress: 1, seriesId: series.comic.id });
+    // Downloaded on this device: the torrent's copy isn't needed any more.
+    if (onDevice) await deleteTorrent(torboxId).catch(() => {});
   } finally {
     local.forEach((f) => f.exists && f.delete());
   }

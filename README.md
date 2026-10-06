@@ -125,6 +125,10 @@ Mihon/Tachiyomi extensions are Android plug-ins only Mihon-style apps can run, s
 
 Mihon extensions themselves only run inside Mihon-style apps, so for those sources Suwayomi is still needed.
 
+### AudiobookBay search
+
+AudiobookBay's own search is very literal (the full title "The Delves: Book 5 of Ajax's Ascension" finds nothing there), so the app asks it several simpler questions: the key words, title + author, the series, the most distinctive words and the author, two pages each, plus the author of the best matches. It merges and ranks the results against everything you typed (a book number lifts that release), and falls back to AudiobookBay's other addresses if the main one is down.
+
 ### Comics like audiobooks: GetComics and The Pirate Bay
 
 Comics tab → **Find**: one search covers GetComics and The Pirate Bay's Comics category. **CBZ and CBR both open** in the Android app (CBR = RAR4 and RAR5, also CB7/CBT), unpacked by the app's own native module (`app/modules/comic-archive`, libarchive) straight to files, so even 500 MB volumes don't need to fit in memory. The downloaded archive is deleted once unpacked. PDF comics aren't supported.
@@ -199,6 +203,17 @@ Two kinds, both added in **Settings → Content & Discovery → Audiobook downlo
 ### Android TV app ("128bitPlay TV")
 
 Every build also makes `128bit-tv-<version>-build<N>.apk`: the same app for Android TV with **Shows, Movies, Anime and Live TV** only (no Books or Comics). It has its own name and package (`app.bit128.mtab.tv`), so it installs next to the phone app, and it shows in the TV's launcher with a banner. Everything works with the remote: the focused item gets a ring in your accent colour. Live TV has big channel rows and **CH ▲ / CH ▼** buttons in the player to flip through the list you opened. Sideload it with e.g. *Downloader* or *Send Files to TV*. (The phone APK also switches to this layout if it's installed on a TV.)
+
+### Torrents without TorBox (on this device)
+
+No TorBox key? The phone and TV apps download torrents themselves with a built-in engine (libtorrent, via FrostWire's MIT-licensed jlibtorrent, in `app/modules/torrent-engine`). Everything that used TorBox works the same:
+
+- **Movies & shows**: tap a torrent stream and it starts playing as soon as peers send the file list. Only that episode's file is fetched, in order, from a small server inside the app (`127.0.0.1`), so you can watch while it downloads and skip around. Streamed videos are cleared off the device two days after you last watched them.
+- **Audiobooks** (AudiobookBay, Wanted) download to the device and play from it, screen off included.
+- **Comics** (Pirate Bay) fetch only the comic files, unpack into your library, then the torrent copy is deleted.
+- Downloads keep going in the background with a notification ("Downloading 2 · 4.2 MB/s").
+
+**Settings → Integrations → Torrents on this device**: where torrents go (Automatic = TorBox when you have a key, otherwise this device; or always one of them), **Only on Wi-Fi**, **Only with a VPN on**, how much to share back after downloading (off by default), and the list of device torrents (tap to delete). The first time you use it the app reminds you that, unlike TorBox, downloading torrents directly shows your IP address to other people sharing them, so a VPN is a good idea.
 
 ### Account & sync (your own Supabase project)
 

@@ -15,6 +15,7 @@ import { fetchFeed, resolveTorrent, type FeedItem, type Torrent } from '@/lib/fe
 import { getTorboxKey } from '@/lib/storage';
 import { addMagnet, checkCached } from '@/lib/torbox';
 import { Pressable } from '@/components/focusable';
+import { canGetTorrents } from '@/lib/torrent-device';
 
 /** The newest posts in an RSS feed; send any of them to TorBox. */
 export default function FeedScreen() {
@@ -120,7 +121,8 @@ function FeedRow({ item }: { item: FeedItem }) {
   }
 
   async function send() {
-    if (!(await getTorboxKey())) {
+    // TorBox, or this device when there's no TorBox key.
+    if (!(await canGetTorrents())) {
       router.push('/settings/integrations');
       return;
     }

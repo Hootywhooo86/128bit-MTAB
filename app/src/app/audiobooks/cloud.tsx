@@ -4,9 +4,9 @@ import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-n
 
 import { Button, Cover, EmptyState, ProgressBar, formatBytes } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
-import { getTorboxKey } from '@/lib/storage';
 import { listAudioItems, type TorboxItem } from '@/lib/torbox';
 import { Pressable } from '@/components/focusable';
+import { canGetTorrents } from '@/lib/torrent-device';
 
 /** Everything with audio files in the user's TorBox account. */
 export default function TorboxCloudScreen() {
@@ -18,7 +18,7 @@ export default function TorboxCloudScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    if (!(await getTorboxKey())) {
+    if (!(await canGetTorrents())) {
       setNeedsKey(true);
       return;
     }

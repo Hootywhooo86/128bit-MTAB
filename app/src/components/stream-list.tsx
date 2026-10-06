@@ -17,6 +17,7 @@ import { usePrefs } from '@/lib/prefs';
 import { getActiveAddons, getTorboxKey } from '@/lib/storage';
 import { parseStream, qualityRank, type Quality } from '@/lib/stream-info';
 import { checkCached } from '@/lib/torbox';
+import { isDeviceId, torrentsOnDevice } from '@/lib/torrent-device';
 import type { Stream } from '@/lib/types';
 import { downloadVideo } from '@/lib/video-downloads';
 import {
@@ -62,6 +63,11 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   const [pending, setPending] = useState<{ id: string; name: string }[]>([]);
   const [provider, setProvider] = useState<string>('all');
   const [anime, setAnime] = useState(false);
+  // No TorBox: torrent streams play from this device.
+  const [onDevice, setOnDevice] = useState(false);
+  useEffect(() => {
+    torrentsOnDevice().then(setOnDevice, () => {});
+  }, []);
   useEffect(() => {
     let cancelled = false;
     isAnime({ type: link.type, id: link.id }).then((yes) => !cancelled && setAnime(yes));
@@ -240,7 +246,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     <View style={{ gap: Spacing.three }}>
       {waiting ? (
         <Card>
-          <Heading>TorBox is fetching this</Heading>
+          <Heading>{isDeviceId(waiting.result.itemId) ? 'Finding people sharing this torrent…' : 'TorBox is fetching this'}</Heading>
           <Body muted>It plays automatically when it’s ready.</Body>
           <ProgressBar value={waiting.result.progress} />
           <Body muted>{Math.round(waiting.result.progress * 100)}%</Body>
@@ -360,7 +366,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                       {s.url ? <Badge label="Direct" /> : null}
                       {s.infoHash ? (
                         <Badge
-                          label={cachedHere ? '⚡ Cached' : 'Torrent → TorBox'}
+                          label={cachedHere ? '⚡ Cached' : onDevice ? 'Torrent → this device' : 'Torrent → TorBox'}
                           strong={cachedHere}
                         />
                       ) : null}

@@ -3,6 +3,15 @@
  * Spec: https://api.torbox.app/docs (OpenAPI at https://api.torbox.app/openapi.json)
  */
 import { getTorboxKey } from './storage';
+import {
+  deviceAddMagnet,
+  deviceFileUrl,
+  deviceItem,
+  deviceList,
+  deviceRemove,
+  isDeviceId,
+  torrentsOnDevice,
+} from './torrent-device';
 
 const BASE = 'https://api.torbox.app/v1/api';
 
@@ -105,16 +114,20 @@ function normalize(raw: any, kind: TorboxItem['kind']): TorboxItem {
 }
 
 export async function listTorrents(): Promise<TorboxItem[]> {
+  // No TorBox: the torrents on this device.
+  if (await torrentsOnDevice()) return deviceList();
   const data = await call<any[]>('/torrents/mylist?bypass_cache=true');
   return (data ?? []).map((t) => normalize(t, 'torrent'));
 }
 
 export async function listWebDownloads(): Promise<TorboxItem[]> {
+  if (await torrentsOnDevice()) return [];
   const data = await call<any[]>('/webdl/mylist?bypass_cache=true');
   return (data ?? []).map((t) => normalize(t, 'webdl'));
 }
 
 export async function getItem(kind: TorboxItem['kind'], id: number): Promise<TorboxItem> {
+  if (isDeviceId(id)) return deviceItem(id);
   const path = kind === 'torrent' ? '/torrents/mylist' : '/webdl/mylist';
   const data = await call<any>(`${path}?bypass_cache=true&id=${id}`);
   return normalize(data, kind);
@@ -147,7 +160,13 @@ function hashFromMagnet(magnet: string) {
 // one doesn't re-list the whole account first.
 const sent = new Map<string, number>();
 
-export async function addMagnet(magnet: string, name?: string): Promise<{ id: number }> {
+export async function addMagnet(
+  magnet: string,
+  name?: string,
+  /** 'video': a streamed video, cleaned off the device a couple of days after watching. */
+  purpose?: 'video' | 'keep',
+): Promise<{ id: number }> {
+  if (await torrentsOnDevice()) return deviceAddMagnet(magnet, name, purpose);
   const hash = hashFromMagnet(magnet);
   if (hash && sent.has(hash)) return { id: sent.get(hash)! };
   const form = new FormData();
@@ -174,6 +193,7 @@ export async function addMagnet(magnet: string, name?: string): Promise<{ id: nu
 }
 
 export async function addWebDownload(link: string, name?: string): Promise<{ id: number }> {
+  if (await torrentsOnDevice()) throw new Error('This one is a web download, which needs TorBox (Settings → Integrations).');
   const body = new URLSearchParams({ link, ...(name ? { name } : {}) });
   const data = await call<{ webdownload_id: number }>('/webdl/createwebdownload', {
     method: 'POST',
@@ -185,7 +205,7 @@ export async function addWebDownload(link: string, name?: string): Promise<{ id:
 
 /** Which of these torrent hashes TorBox already has cached (they start instantly). */
 export async function checkCached(hashes: string[]): Promise<Set<string>> {
-  if (!hashes.length) return new Set();
+  if (!hashes.length || (await torrentsOnDevice())) return new Set();
   const unique = [...new Set(hashes.map((h) => h.toLowerCase()))];
   const data = await call<Record<string, unknown> | null>(
     `/torrents/checkcached?format=object&hash=${unique.join(',')}`,
@@ -195,6 +215,7 @@ export async function checkCached(hashes: string[]): Promise<Set<string>> {
 
 /** Removes a torrent from the TorBox cloud. */
 export async function deleteTorrent(id: number) {
+  if (isDeviceId(id)) return deviceRemove(id);
   await call('/torrents/controltorrent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -210,6 +231,8 @@ export async function requestLink(
   itemId: number,
   fileId: number,
 ): Promise<string> {
+  // A device torrent: its file from the app's own local server (fetched first, in order).
+  if (isDeviceId(itemId)) return deviceFileUrl(itemId, fileId);
   const key = await requireKey();
   const qs =
     kind === 'torrent'

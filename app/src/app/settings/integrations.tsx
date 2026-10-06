@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Linking, Text, View } from 'react-native';
 
+import { DeviceTorrentSettings } from '@/components/device-torrents';
 import { MdblistCard, TmdbCard } from '@/components/metadata-cards';
 import { SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
@@ -90,6 +91,8 @@ export default function IntegrationsSettings() {
           onPress={() => Linking.openURL('https://torbox.app/settings')}
         />
       </View>
+
+      <DeviceTorrentSettings />
 
       <SectionTitle>Metadata & ratings</SectionTitle>
       <View style={{ gap: Spacing.three }}>

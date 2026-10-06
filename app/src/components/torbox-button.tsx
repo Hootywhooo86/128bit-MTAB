@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { getTorboxKey } from '@/lib/storage';
 import { addMagnet } from '@/lib/torbox';
 import { Pressable } from '@/components/focusable';
+import { canGetTorrents } from '@/lib/torrent-device';
 
 type State = 'idle' | 'sending' | 'sent' | { error: string };
 
@@ -26,7 +26,8 @@ export function TorboxButton({
   const [state, setState] = useState<State>('idle');
 
   async function send() {
-    if (!(await getTorboxKey())) {
+    // TorBox, or this device when there's no TorBox key.
+    if (!(await canGetTorrents())) {
       router.push('/settings/integrations');
       return;
     }

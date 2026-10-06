@@ -48,6 +48,13 @@ export type Prefs = {
   englishFirst: boolean;
   /** Jump over openings and recaps by themselves (otherwise a Skip button shows). */
   autoSkipIntro: boolean;
+  /** Torrents: TorBox when there's a key, else this device ('auto'); or always one of them. */
+  torrentMode: 'auto' | 'device' | 'torbox';
+  /** Device torrents only download on Wi-Fi / only with a VPN on. */
+  torrentWifiOnly: boolean;
+  torrentVpnOnly: boolean;
+  /** Share back (seed) this many times the download before stopping; 0 = stop when done. */
+  torrentSeedRatio: number;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -71,6 +78,10 @@ export const DEFAULT_PREFS: Prefs = {
   comicDeleteRead: false,
   englishFirst: true,
   autoSkipIntro: false,
+  torrentMode: 'auto',
+  torrentWifiOnly: false,
+  torrentVpnOnly: false,
+  torrentSeedRatio: 0,
 };
 
 const KEY = '128bit.prefs';

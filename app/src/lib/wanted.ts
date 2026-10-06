@@ -11,8 +11,9 @@ import { getHardcoverToken, hardcoverWantList, hardcoverWantToRead } from './har
 import { cleanTitle, getSources, isCatalog, matchScore, searchSource } from './sources';
 import { downloadBook } from './downloads';
 import { bookFromTorboxItem } from './resolve';
-import { addToLibrary, getTorboxKey } from './storage';
+import { addToLibrary } from './storage';
 import { addMagnet, getItem, magnetFromHash, type TorboxItem } from './torbox';
+import { canGetTorrents } from './torrent-device';
 import type { PlayableBook } from './types';
 
 const KEY = '128bit.wanted';
@@ -118,7 +119,7 @@ export async function markSent(id: string, sentName: string, torboxId?: number) 
  */
 export async function grabBook(book: WantedInput): Promise<WantedBook> {
   const entry = await addWanted(book);
-  if (!(await getTorboxKey())) {
+  if (!(await canGetTorrents())) {
     throw new Error('Add your TorBox API key in Settings → Integrations first. The book is on your Wanted list.');
   }
   const [best] = await findMatches(entry, true);

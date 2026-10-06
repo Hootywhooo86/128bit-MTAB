@@ -131,7 +131,7 @@ async function begin(d: VideoDownload) {
     let torboxId = d.torboxId;
     if (!torboxId) {
       const name = d.subtitle ? `${d.title} ${d.subtitle}` : d.title;
-      torboxId = (await torbox.addMagnet(torbox.magnetFromHash(s.infoHash, name), name)).id;
+      torboxId = (await torbox.addMagnet(torbox.magnetFromHash(s.infoHash, name), name, 'video')).id;
       await patch(d.key, { torboxId });
     }
     const r = await checkTorboxStream(torboxId, s);

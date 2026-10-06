@@ -8,6 +8,7 @@ import { AppState } from 'react-native';
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
 import { startAccountSync } from '@/lib/account';
+import { applyDeviceTorrentPrefs, cleanUpDeviceTorrents } from '@/lib/torrent-device';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
@@ -46,6 +47,9 @@ function AppNavigator() {
     installDefaultAddons().catch(() => {});
     // Account sync (Settings → Account): pull from your other devices, push changes made here.
     startAccountSync();
+    // Torrents on this device: apply Wi-Fi/VPN rules, clear streamed videos after a while.
+    applyDeviceTorrentPrefs().catch(() => {});
+    cleanUpDeviceTorrents().catch(() => {});
     // Audiobook sources/feeds and comics aren't part of the TV app.
     if (IS_TV) return;
     installDefaultSources().catch(() => {});

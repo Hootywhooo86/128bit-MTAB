@@ -1,0 +1,32 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.bit128'
+version = '1.0.0'
+
+// libtorrent for Android (FrostWire's jlibtorrent, MIT): the engine for downloading torrents
+// on the device when there's no TorBox account. Native libraries only for the ABIs we build.
+def jlibtorrentVersion = '2.0.12.9'
+def abis = (findProperty('reactNativeArchitectures') ?: 'armeabi-v7a,arm64-v8a').toString().split(',')
+
+repositories {
+  maven { url 'https://dl.frostwire.com/maven' }
+}
+
+android {
+  namespace "expo.modules.torrentengine"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+    consumerProguardFiles 'proguard-rules.pro'
+  }
+}
+
+dependencies {
+  implementation "com.frostwire:jlibtorrent:${jlibtorrentVersion}"
+  if (abis.contains('arm64-v8a')) implementation "com.frostwire:jlibtorrent-android-arm64:${jlibtorrentVersion}"
+  if (abis.contains('armeabi-v7a')) implementation "com.frostwire:jlibtorrent-android-arm:${jlibtorrentVersion}"
+  if (abis.contains('x86_64')) implementation "com.frostwire:jlibtorrent-android-x86_64:${jlibtorrentVersion}"
+}

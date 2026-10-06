@@ -16,6 +16,7 @@ import {
 import { getTorboxKey } from '@/lib/storage';
 import { addMagnet, checkCached, magnetFromHash } from '@/lib/torbox';
 import { Pressable } from '@/components/focusable';
+import { canGetTorrents } from '@/lib/torrent-device';
 
 type Sent = 'sending' | 'sent' | { error: string };
 
@@ -85,7 +86,8 @@ export function SourceResults({
 
   async function send(r: SourceResult) {
     const key = resultHash(r) ?? r.title;
-    if (!(await getTorboxKey())) {
+    // TorBox, or this device when there's no TorBox key.
+    if (!(await canGetTorrents())) {
       router.push('/settings/integrations');
       return;
     }
