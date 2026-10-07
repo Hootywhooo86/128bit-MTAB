@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
 import { useTraktConnected } from '@/components/trakt-actions';
-import { Heading } from '@/components/ui';
+import { Body, Heading } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePrefs } from '@/lib/prefs';
-import { TRAKT_ROWS, getLists, getTraktRow, poster, type TraktItem } from '@/lib/trakt-library';
+import { TRAKT_ROWS, getLists, getTraktRow, poster, searchTrakt, type TraktItem } from '@/lib/trakt-library';
 import type { MetaPreview } from '@/lib/types';
 
 import { PosterTile } from './video-browse';
@@ -37,7 +37,33 @@ export function TraktRows({ type }: { type: 'movie' | 'series' }) {
   );
 }
 
-function Row({ title, load, type }: { title: string; load: () => Promise<TraktItem[]>; type: string }) {
+/** Search results from Trakt itself, as one more row under the addon searches. */
+export function TraktSearchRow({ type, query }: { type: 'movie' | 'series'; query: string }) {
+  const connected = useTraktConnected();
+  if (!connected) return null;
+  return (
+    <Row
+      key={query}
+      title={`“${query}” · Trakt`}
+      load={() => searchTrakt(type === 'movie' ? 'movie' : 'show', query)}
+      type={type}
+      always
+    />
+  );
+}
+
+function Row({
+  title,
+  load,
+  type,
+  always,
+}: {
+  title: string;
+  load: () => Promise<TraktItem[]>;
+  type: string;
+  /** Keep the row (saying "No matches") instead of hiding it when empty. */
+  always?: boolean;
+}) {
   const Colors = useColors();
   const styles = useStyles();
   const [items, setItems] = useState<TraktItem[] | null>(null);
@@ -50,7 +76,7 @@ function Row({ title, load, type }: { title: string; load: () => Promise<TraktIt
     // Loads once per screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (!items?.length) return null;
+  if (!items?.length && !always) return null;
   return (
     <View style={{ gap: Spacing.two }}>
       <View style={styles.head}>
@@ -59,13 +85,14 @@ function Row({ title, load, type }: { title: string; load: () => Promise<TraktIt
           <Text style={{ color: Colors.accent, fontWeight: '700' }}>Trakt library</Text>
         </Pressable>
       </View>
+      {items && !items.length ? <Body muted style={{ paddingHorizontal: Spacing.three }}>No matches.</Body> : null}
       <FlatList
         horizontal
         // Rows of posters: only keep the visible ones (and a little either side) mounted.
         initialNumToRender={6}
         maxToRenderPerBatch={6}
         windowSize={5}
-        data={items.slice(0, 30)}
+        data={(items ?? []).slice(0, 30)}
         keyExtractor={(i) => `${i.imdb}:${i.subtitle ?? ''}`}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}

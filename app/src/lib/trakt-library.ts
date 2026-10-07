@@ -358,6 +358,12 @@ export function getTraktRow(row: string, kind: Kind): Promise<TraktItem[]> {
   }
 }
 
+/** Trakt's own title search (finds things your addons' catalogs miss). */
+export const searchTrakt = (kind: Kind, query: string) =>
+  cached(`search:${kind}:${query}`, async () =>
+    items(await traktApi<Raw[]>('GET', `/search/${kind}?query=${encodeURIComponent(query)}&limit=20`)),
+  );
+
 /** "Not interested": hides it from your recommendations. */
 export async function hideRecommendation(kind: Kind, traktId: number) {
   await traktApi('DELETE', `/recommendations/${plural(kind)}/${traktId}`);

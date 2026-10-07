@@ -1,7 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  BackHandler,
   ActivityIndicator,
   Alert,
   FlatList,
@@ -30,24 +32,38 @@ import {
   type WatchProgress,
 } from '@/lib/video';
 
-import { TraktRows } from './trakt-rows';
+import { TraktRows, TraktSearchRow } from './trakt-rows';
 import { Pressable } from '@/components/focusable';
 
 type Props = { type: 'movie' | 'series' | 'anime'; noun: string };
 
 /** Home screen for Shows and Movies: search, continue watching, then every addon catalog as a row. */
 export function VideoBrowse({ type, noun }: Props) {
+  const Colors = useColors();
   const styles = useStyles();
   const { addons, loaded } = useAddons();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
+  // Searching Shows also searches the anime catalogs (anime are shows too).
+  const inTab = (tab: string) => tab === type || (!!submitted && type === 'series' && tab === 'anime');
   const rows = addons.flatMap((addon) =>
     addon.manifest.catalogs
-      .filter(
-        (c) => catalogTab(addon, c) === type && (submitted ? supportsSearch(c) : isBrowsable(c)),
-      )
+      .filter((c) => inTab(catalogTab(addon, c)) && (submitted ? supportsSearch(c) : isBrowsable(c)))
       .map((catalog) => ({ addon, catalog })),
   );
+  const clear = () => {
+    setQuery('');
+    setSubmitted('');
+  };
+  // Android back while showing results: back to the rows, not out of the tab.
+  useEffect(() => {
+    if (!submitted) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      clear();
+      return true;
+    });
+    return () => sub.remove();
+  }, [submitted]);
 
   if (loaded && !addons.some((a) => a.manifest.catalogs.some((c) => catalogTab(a, c) === type))) {
     return (
@@ -72,15 +88,21 @@ export function VideoBrowse({ type, noun }: Props) {
         paddingVertical: Spacing.three,
         gap: Spacing.four,
       }}>
-      <View style={{ paddingHorizontal: Spacing.three }}>
-        <Input
-          placeholder={`Search ${noun}`}
-          value={query}
-          onChangeText={setQuery}
-          returnKeyType="search"
-          onSubmitEditing={() => setSubmitted(query.trim())}
-          clearButtonMode="while-editing"
-        />
+      <View style={styles.searchRow}>
+        <View style={{ flex: 1 }}>
+          <Input
+            placeholder={`Search ${noun}`}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            onSubmitEditing={() => setSubmitted(query.trim())}
+          />
+        </View>
+        {query || submitted ? (
+          <Pressable onPress={clear} hitSlop={10} accessibilityLabel="Clear search">
+            <Ionicons name="close-circle" size={28} color={Colors.textSecondary} />
+          </Pressable>
+        ) : null}
       </View>
 
       {!submitted ? <ContinueWatchingRow type={type} /> : null}
@@ -89,6 +111,7 @@ export function VideoBrowse({ type, noun }: Props) {
       {submitted && rows.length === 0 ? (
         <EmptyState title="Nothing to search" body={`None of your addons can search ${noun}.`} />
       ) : null}
+      {submitted && type !== 'anime' ? <TraktSearchRow type={type} query={submitted} /> : null}
       {rows.map(({ addon, catalog }) => (
         <CatalogRow
           key={`${addon.manifest.id}/${catalog.id}/${submitted}`}
@@ -250,7 +273,6 @@ export function CatalogRow({
     };
   }, [addon, catalog, search]);
 
-  if (metas && metas.length === 0 && search) return null;
 
   return (
     <View style={{ gap: Spacing.two }}>
@@ -262,6 +284,10 @@ export function CatalogRow({
       </View>
       {error ? (
         <Body style={{ paddingHorizontal: Spacing.three, color: Colors.danger }}>{error}</Body>
+      ) : metas && !metas.length ? (
+        <Body muted style={{ paddingHorizontal: Spacing.three }}>
+          No matches.
+        </Body>
       ) : !metas ? (
         <ActivityIndicator
           color={Colors.accent}
@@ -340,6 +366,7 @@ export function PosterTile({
 const useStyles = makeStyles((Colors) => ({
   starting: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
   screen: { flex: 1, backgroundColor: Colors.background },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three },
   poster: {
     width: 112,
     height: 168,
