@@ -40,12 +40,17 @@ async function fetchWithTimeout(url: string, ms: number) {
 /** Set when AudiobookBay just failed us, so the rest of that search stops waiting on it. */
 let downUntil = 0;
 
+/** "Try again": ask AudiobookBay straight away, even if it just failed. */
+export const retryAbbNow = () => {
+  downUntil = 0;
+};
+
 /**
  * The main address, then the mirrors only if it can't be reached at all (a blocked or
  * unknown address fails fast). A slow answer just times out: the mirrors are the same site.
  */
 async function fetchMirror(path: string) {
-  if (Date.now() < downUntil) throw new Error('AudiobookBay is slow to answer right now. Try again in a moment.');
+  if (Date.now() < downUntil) throw new Error('AudiobookBay is slow to answer right now.');
   let last: unknown;
   for (const host of [workingHost, ...MIRRORS.filter((h) => h !== workingHost)]) {
     try {

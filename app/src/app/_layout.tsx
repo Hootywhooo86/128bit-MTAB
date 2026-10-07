@@ -8,7 +8,7 @@ import { AppState } from 'react-native';
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
 import { startAccountSync } from '@/lib/account';
-import { applyDeviceTorrentPrefs, cleanUpDeviceTorrents } from '@/lib/torrent-device';
+import { applyDeviceTorrentPrefs, cleanUpDeviceTorrents, wakeDeviceTorrents } from '@/lib/torrent-device';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
@@ -56,6 +56,15 @@ function AppNavigator() {
     installDefaultFeeds().catch(() => {});
     // Load the Suwayomi server early so comic images get their sign-in headers.
     getSuwayomi().catch(() => {});
+  }, []);
+
+  // Device torrents: pick up again each time the app is opened.
+  useEffect(() => {
+    wakeDeviceTorrents().catch(() => {});
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') wakeDeviceTorrents().catch(() => {});
+    });
+    return () => sub.remove();
   }, []);
 
   // Hardcover: bring audiobook progress in line both ways each time the app is opened.

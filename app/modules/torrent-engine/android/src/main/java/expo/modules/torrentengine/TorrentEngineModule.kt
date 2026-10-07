@@ -59,6 +59,14 @@ class TorrentEngineModule : Module() {
       Unit
     }
 
+    /** App opened: carry on with saved torrents in the background (Android 15 may have paused that). */
+    AsyncFunction("wake") {
+      if (TorrentHolder.hasSaved(context)) {
+        core()
+        TorrentService.ensure(context)
+      }
+    }
+
     /** Wi-Fi only, VPN only, and how much to upload back before stopping (ratio × 100). */
     AsyncFunction("setOptions") { wifiOnly: Boolean?, vpnOnly: Boolean?, seedRatioPct: Int? ->
       TorrentHolder.setOptions(context, wifiOnly, vpnOnly, seedRatioPct)

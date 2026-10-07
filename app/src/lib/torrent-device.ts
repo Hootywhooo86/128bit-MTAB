@@ -9,7 +9,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo';
-import { Alert } from 'react-native';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 
 import { readPrefs } from './prefs';
 import { getTorboxKey } from './storage';
@@ -44,6 +44,7 @@ type Engine = {
   pause(id: number): Promise<void>;
   resume(id: number): Promise<void>;
   remove(id: number, deleteFiles: boolean): Promise<void>;
+  wake(): Promise<void>;
   setOptions(wifiOnly: boolean | null, vpnOnly: boolean | null, seedRatioPct: number | null): Promise<{ blocked: string | null }>;
 };
 
@@ -124,9 +125,22 @@ async function noticeOnce() {
 
 // --- The TorBox-shaped calls ------------------------------------------------------------
 
+/** Android 13+: ask once so the "Downloading…" notification can show. */
+async function askNotifications() {
+  if (Platform.OS !== 'android' || Number(Platform.Version) < 33) return;
+  const perm = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+  if (!(await PermissionsAndroid.check(perm))) await PermissionsAndroid.request(perm);
+}
+
+/** App opened: carry on with saved torrents (Android 15 limits background time per day). */
+export async function wakeDeviceTorrents() {
+  await engine?.wake();
+}
+
 export async function deviceAddMagnet(magnet: string, name?: string, purpose?: Purpose): Promise<{ id: number }> {
   const s = await need().add(magnet, name ?? null);
   noticeOnce().catch(() => {});
+  askNotifications().catch(() => {});
   await touch(s.id, purpose);
   return { id: -s.id };
 }

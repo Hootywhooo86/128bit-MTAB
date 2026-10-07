@@ -6,6 +6,7 @@ import { Image, View, type ColorValue } from 'react-native';
 import { Pressable } from '@/components/focusable';
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
+import { UpdateBanner } from '@/components/update-banner';
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
 import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-grab';
@@ -51,9 +52,13 @@ export default function TabLayout() {
       tabBar={(props) =>
         // The TV app is video only: no audiobook mini player.
         IS_TV ? (
-          <BottomTabBar {...props} />
+          <>
+            <UpdateBanner />
+            <BottomTabBar {...props} />
+          </>
         ) : (
           <>
+            <UpdateBanner />
             <MiniPlayer />
             <BottomTabBar {...props} />
           </>

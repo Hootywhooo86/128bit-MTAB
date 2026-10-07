@@ -35,8 +35,7 @@ object TorrentHolder {
     val prefs = appContext.getSharedPreferences("torrent-engine", Context.MODE_PRIVATE)
     wifiOnly = prefs.getBoolean("wifiOnly", false)
     vpnOnly = prefs.getBoolean("vpnOnly", false)
-    val dir = appContext.getExternalFilesDir("torrents") ?: File(appContext.filesDir, "torrents")
-    val c = TorrentCore(dir)
+    val c = TorrentCore(dir(appContext))
     c.setSeedRatio(prefs.getInt("seedRatioPct", 0))
     c.start(null)
     core = c
@@ -44,6 +43,12 @@ object TorrentHolder {
     applyGate()
     return c
   }
+
+  private fun dir(context: Context) =
+    context.getExternalFilesDir("torrents") ?: File(context.filesDir, "torrents")
+
+  /** There are torrents saved from before (so starting the engine has something to do). */
+  fun hasSaved(context: Context) = core != null || File(dir(context.applicationContext), "torrents.tsv").length() > 0
 
   /** Saves the rules; applies them now if the engine is running (doesn't start it). */
   @Synchronized

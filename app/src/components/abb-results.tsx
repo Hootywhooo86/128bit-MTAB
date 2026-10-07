@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Animated, Text, View } from 'react-native';
 
 import { TorboxButton } from '@/components/torbox-button';
 import { Body, Cover, Heading } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { searchAbbSmart, type AbbResult, type AbbSearch } from '@/lib/abb';
+import { retryAbbNow, searchAbbSmart, type AbbResult, type AbbSearch } from '@/lib/abb';
 import { resolveTorrent } from '@/lib/feeds';
 import { Pressable } from '@/components/focusable';
 
@@ -22,6 +22,7 @@ export function AbbResults({
   const [search, setSearch] = useState<AbbSearch | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +43,14 @@ export function AbbResults({
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, attempt]);
+
+  function retry() {
+    retryAbbNow();
+    setError(null);
+    setBusy(true);
+    setAttempt((n) => n + 1);
+  }
 
   async function loadMore() {
     if (!search) return;
@@ -59,18 +67,25 @@ export function AbbResults({
   }
   const more = !!search?.more;
 
-  const sorted = results;
-
   return (
     <View style={{ gap: Spacing.two, paddingHorizontal: Spacing.three }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
         <Heading style={{ flex: 1 }}>AudiobookBay</Heading>
         {busy ? <ActivityIndicator color={Colors.accent} /> : null}
       </View>
-      {error ? <Body style={{ color: Colors.danger, fontSize: 12 }}>{error}</Body> : null}
+      {error ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+          <Body style={{ flex: 1, color: Colors.danger, fontSize: 12 }}>{error}</Body>
+          {busy ? null : (
+            <Pressable style={styles.more} onPress={retry}>
+              <Text style={styles.moreText}>Try again</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
       {!busy && !error && results.length === 0 ? <Body muted>No results.</Body> : null}
-      {sorted.map((r) => (
-        <View key={r.link} style={styles.row}>
+      {results.map((r, i) => (
+        <FadeIn key={r.link} delay={Math.min(i, 6) * 60} style={styles.row}>
           <Cover uri={r.cover} size={64} title={r.title} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.title} numberOfLines={3}>
@@ -85,7 +100,7 @@ export function AbbResults({
             getMagnet={async () => (await resolveTorrent(r)).magnet}
             onSent={onSent}
           />
-        </View>
+        </FadeIn>
       ))}
       {more && results.length > 0 && !busy ? (
         <Pressable style={styles.more} onPress={loadMore}>
@@ -94,6 +109,19 @@ export function AbbResults({
       ) : null}
     </View>
   );
+}
+
+/** Each book fades and slides in as it arrives (only on first appearance, not on re-rank). */
+function FadeIn({ delay, style, children }: { delay: number; style: object; children: ReactNode }) {
+  const [v] = useState(() => new Animated.Value(0));
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    Animated.timing(v, { toValue: 1, duration: 250, delay, useNativeDriver: true }).start();
+  }, [v, delay]);
+  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  return <Animated.View style={[style, { opacity: v, transform: [{ translateY }] }]}>{children}</Animated.View>;
 }
 
 const useStyles = makeStyles((Colors) => ({

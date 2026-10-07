@@ -23,14 +23,10 @@ class TorrentService : Service() {
 
   private val tick = object : Runnable {
     override fun run() {
-      val core = TorrentHolder.get(this@TorrentService)
+      val core = try { TorrentHolder.get(this@TorrentService) } catch (e: Exception) { return stop() }
       val active = try { core.tick() } catch (e: Exception) { 0 }
       if (active == 0) idleTicks++ else idleTicks = 0
-      if (idleTicks >= 5) {
-        stopForegroundCompat()
-        stopSelf()
-        return
-      }
+      if (idleTicks >= 5) return stop()
       val (down, _) = core.rates().let { it[0] to it[1] }
       val text = TorrentHolder.blockedReason
         ?: "Downloading $active · ${formatRate(down)}"
@@ -43,15 +39,30 @@ class TorrentService : Service() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     val n = notification("Starting downloads…")
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-    } else {
-      startForeground(ID, n)
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+      } else {
+        startForeground(ID, n)
+      }
+    } catch (e: Exception) {
+      // Android 15 allows ~6 h of background downloading a day; it's back once the app is opened.
+      stop()
+      return START_NOT_STICKY
     }
     handler.removeCallbacks(tick)
     idleTicks = 0
     handler.post(tick)
     return START_STICKY
+  }
+
+  /** Android 15: the day's background time is used up. Stop cleanly instead of being killed. */
+  override fun onTimeout(startId: Int, fgsType: Int) = stop()
+
+  private fun stop() {
+    handler.removeCallbacks(tick)
+    stopForegroundCompat()
+    stopSelf()
   }
 
   override fun onDestroy() {
