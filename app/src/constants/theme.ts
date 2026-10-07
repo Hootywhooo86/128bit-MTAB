@@ -17,8 +17,11 @@ export type Palette = {
 };
 
 /** Builds the colour palette from the chosen accent and whether AMOLED black is on. */
-export function buildPalette(accent: AccentId, amoled: boolean): Palette {
-  const a = ACCENTS[accent] ?? ACCENTS.amber;
+export function buildPalette(accent: AccentId, amoled: boolean, custom?: string): Palette {
+  const a =
+    accent === 'custom' && custom && /^#[0-9a-f]{6}$/i.test(custom)
+      ? { color: custom, onAccent: textOn(custom) }
+      : (ACCENTS[accent as keyof typeof ACCENTS] ?? ACCENTS.amber);
   const base = amoled
     ? {
         background: '#000000',
@@ -43,10 +46,19 @@ export function buildPalette(accent: AccentId, amoled: boolean): Palette {
   };
 }
 
+/** Black or white, whichever reads better on `hex`. */
+export function textOn(hex: string) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 0.6 ? '#000000' : '#FFFFFF';
+}
+
 /** The current palette. Re-renders when the user changes theme. */
 export function useColors(): Palette {
   const { prefs } = usePrefs();
-  return useMemo(() => buildPalette(prefs.accent, prefs.amoled), [prefs.accent, prefs.amoled]);
+  return useMemo(
+    () => buildPalette(prefs.accent, prefs.amoled, prefs.customAccent),
+    [prefs.accent, prefs.amoled, prefs.customAccent],
+  );
 }
 
 /**

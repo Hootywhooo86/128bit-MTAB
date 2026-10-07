@@ -14,12 +14,20 @@ export const ACCENTS = {
   emerald: { name: 'Emerald', color: '#43A047', onAccent: '#FFFFFF' },
   amber: { name: 'Amber', color: '#FF8A2B', onAccent: '#FFFFFF' },
   rose: { name: 'Rose', color: '#D81B60', onAccent: '#FFFFFF' },
+  teal: { name: 'Teal', color: '#00ACC1', onAccent: '#FFFFFF' },
+  lime: { name: 'Lime', color: '#9CCC65', onAccent: '#000000' },
+  gold: { name: 'Gold', color: '#FDD835', onAccent: '#000000' },
+  indigo: { name: 'Indigo', color: '#5C6BC0', onAccent: '#FFFFFF' },
+  coral: { name: 'Coral', color: '#FF7043', onAccent: '#FFFFFF' },
 } as const;
 
-export type AccentId = keyof typeof ACCENTS;
+/** A preset, or 'custom' (the colour in `customAccent`). */
+export type AccentId = keyof typeof ACCENTS | 'custom';
 
 export type Prefs = {
   accent: AccentId;
+  /** "#RRGGBB", used when accent is 'custom'. */
+  customAccent: string;
   amoled: boolean;
   /** Audiobook skip back / forward, in seconds. */
   skipBack: number;
@@ -61,6 +69,7 @@ export type Prefs = {
 
 export const DEFAULT_PREFS: Prefs = {
   accent: 'amber',
+  customAccent: '#00E5FF',
   amoled: true,
   skipBack: 30,
   skipForward: 30,

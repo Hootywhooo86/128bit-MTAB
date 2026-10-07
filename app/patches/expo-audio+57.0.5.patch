@@ -41,7 +41,7 @@ index c76a9fd..6f486f4 100644
    override fun setPlaybackRate(rate: Float) {
 diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/LevelTap.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/LevelTap.kt
 new file mode 100644
-index 0000000..353a7a8
+index 0000000..f4aea63
 --- /dev/null
 +++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/LevelTap.kt
 @@ -0,0 +1,98 @@
@@ -64,7 +64,7 @@ index 0000000..353a7a8
 +import kotlin.math.sqrt
 +
 +/**
-+ * 128bitPlay: loudness of 16 frequency bands of what's playing, ~20 times a second, read
++ * 128bitPlay: loudness of 16 frequency bands of what's playing, ~12 times a second, read
 + * from the decoded audio itself (no microphone permission, unlike Android's Visualizer).
 + */
 +@UnstableApi
@@ -108,7 +108,7 @@ index 0000000..353a7a8
 +      if (filled == window.size) {
 +        filled = 0
 +        val now = System.nanoTime()
-+        if (now - lastEmit >= 45_000_000L) {
++        if (now - lastEmit >= 80_000_000L) {
 +          lastEmit = now
 +          listener?.invoke(analyze())
 +        }

@@ -42,21 +42,23 @@ export function PixelFrame({ children, playing }: { children: ReactNode; playing
     return () => loop.stop();
   }, [playing, beat]);
 
-  // The real sound: each bar follows one frequency band.
-  const [levels] = useState(() => Array.from({ length: BARS }, () => new Animated.Value(0.25)));
-  const [live, setLive] = useState(false);
+  // The real sound: each bar follows one frequency band. Plain state, ~12 redraws a second:
+  // cheap enough that taps (like the back button) never wait behind it.
+  const [levels, setLevels] = useState<number[] | null>(null);
   useEffect(() => {
     if (!playing) return;
-    return onAudioLevels((l) => {
-      if (l.length < BARS) return;
-      setLive(true);
-      Animated.parallel(
-        levels.map((v, i) =>
-          Animated.timing(v, { toValue: 0.15 + 0.85 * l[i], duration: 60, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        ),
-      ).start();
+    let last = 0;
+    const off = onAudioLevels((l) => {
+      const now = Date.now();
+      if (l.length < BARS || now - last < 80) return;
+      last = now;
+      setLevels(l.slice(0, BARS));
     });
-  }, [playing, levels]);
+    return () => {
+      off();
+      setLevels(null);
+    };
+  }, [playing]);
 
   // Each bar gets its own bouncy pattern from the shared beat.
   const fake = useMemo(
@@ -68,7 +70,6 @@ export function PixelFrame({ children, playing }: { children: ReactNode; playing
       }),
     [beat],
   );
-  const bars = live ? levels : fake;
   const blink = beat.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.2, 1] });
 
   const corner = (pos: object) => (
@@ -111,17 +112,24 @@ export function PixelFrame({ children, playing }: { children: ReactNode; playing
           {children}
           {/* Equalizer of blocks along the bottom. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: B * 4, gap: B / 2, alignSelf: 'stretch' }}>
-            {bars.map((h, i) => (
-              <Animated.View
-                key={i}
-                style={{
-                  flex: 1,
-                  height: B * 4,
-                  backgroundColor: i % 2 ? Colors.accent : light,
-                  transform: [{ translateY: B * 2 }, { scaleY: playing ? h : 0.25 }, { translateY: -B * 2 }],
-                }}
-              />
-            ))}
+            {levels
+              ? levels.map((l, i) => (
+                  <View
+                    key={i}
+                    style={{ flex: 1, height: B * 4 * (0.15 + 0.85 * l), backgroundColor: i % 2 ? Colors.accent : light }}
+                  />
+                ))
+              : fake.map((h, i) => (
+                  <Animated.View
+                    key={i}
+                    style={{
+                      flex: 1,
+                      height: B * 4,
+                      backgroundColor: i % 2 ? Colors.accent : light,
+                      transform: [{ translateY: B * 2 }, { scaleY: playing ? h : 0.25 }, { translateY: -B * 2 }],
+                    }}
+                  />
+                ))}
           </View>
         </View>
         {rivet({ left: B * 2, top: B * 2 })}
