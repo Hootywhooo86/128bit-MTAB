@@ -19,9 +19,10 @@ const words = (s: string) =>
     .map((w) => (NUMBERS.includes(w) ? String(NUMBERS.indexOf(w)) : /^\d+$/.test(w) ? String(Number(w)) : w))
     .filter((w) => w && !SKIP.has(w));
 
-/** Share of the search's words found in `name` (0..1). */
+/** Share of the search's words found in `name` (0..1). Only the main title counts: the
+ * subtitle after ":" ("An Apocalyptic LitRPG…") is rarely in a torrent's name. */
 function overlap(query: string, name: string) {
-  const want = words(query);
+  const want = words(query.split(':')[0]);
   if (!want.length) return 0;
   const have = new Set(words(name));
   return want.filter((w) => have.has(w)).length / want.length;
@@ -34,11 +35,12 @@ function overlap(query: string, name: string) {
 export function TorboxMatches({ query, onPick }: { query: string; onPick?: (id: number, name: string) => void }) {
   const styles = useStyles();
   const [items, setItems] = useState<TorboxItem[] | null>(null);
+  const [off, setOff] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!(await canGetTorrents())) return;
+      if (!(await canGetTorrents())) return !cancelled && setOff(true);
       const all = await listAudioItems();
       if (!cancelled)
         setItems(
@@ -54,12 +56,14 @@ export function TorboxMatches({ query, onPick }: { query: string; onPick?: (id: 
     };
   }, [query]);
 
-  if (!items) return null;
+  // Always shown (fewer moving parts): checking, nothing, or the matches.
   return (
     <View style={{ gap: Spacing.two, paddingHorizontal: Spacing.three }}>
       <Heading>Already on your TorBox</Heading>
-      {!items.length ? <Body muted>Nothing matching yet.</Body> : null}
-      {items.map((item) => (
+      {off ? <Body muted>Add TorBox in Settings → Integrations to see it here.</Body> : null}
+      {!off && !items ? <Body muted>Checking…</Body> : null}
+      {items && !items.length ? <Body muted>Nothing matching yet.</Body> : null}
+      {items?.map((item) => (
         <Pressable
           key={`${item.kind}:${item.id}`}
           style={styles.row}
