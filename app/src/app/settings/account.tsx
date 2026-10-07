@@ -96,7 +96,7 @@ export default function AccountSettings() {
         Sign in on your phone, another phone or the TV app and your add-ons, settings, Live TV
         playlists, TorBox/Trakt/Simkl connections and Continue watching come with you
         {IS_TV ? '' : ' (plus books and comics on phones)'}. It all lives in your own free Supabase
-        project.
+        project. What you finish also goes to its family feed, for 128bit Tracker’s timeline.
       </Body>
 
       {!project ? (

@@ -188,7 +188,7 @@ async function token(): Promise<string | null> {
   }
 }
 
-async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
+export async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
   const p = await getProject();
   const t = await token();
   if (!p || !t) throw new Error('Not signed in.');
@@ -509,8 +509,42 @@ language sql stable security definer set search_path = public, auth as $$
    where d.device_id = auth.uid()
 $$;
 
+-- The 128bit family event feed: what you finish here, for 128bit Tracker's timeline.
+create table if not exists public.family_events (
+  user_id uuid not null references auth.users on delete cascade,
+  id text not null,
+  app text not null,
+  type text not null,
+  at timestamptz not null,
+  data jsonb not null default '{}',
+  primary key (user_id, id)
+);
+create index if not exists family_events_at on public.family_events (user_id, at desc);
+alter table public.family_events enable row level security;
+
+create or replace function public.log_events(events jsonb) returns void
+language sql security definer set search_path = public as $$
+  insert into family_events (user_id, id, app, type, at, data)
+  select settings_owner(), e ->> 'id', e ->> 'app', e ->> 'type',
+         to_timestamp((e ->> 'at')::bigint / 1000.0), coalesce(e -> 'data', '{}')
+    from jsonb_array_elements(events) e
+  on conflict do nothing
+$$;
+
+-- Newest first; before_ms (ms since 1970) pages back.
+create or replace function public.get_events(before_ms bigint default null, max_rows int default 200) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'app', app, 'type', type,
+           'at', (extract(epoch from at) * 1000)::bigint, 'data', data) order by at desc), '[]')
+    from (select * from family_events
+           where user_id = settings_owner() and (before_ms is null or at < to_timestamp(before_ms / 1000.0))
+           order by at desc limit least(max_rows, 1000)) e
+$$;
+
 revoke all on function public.settings_owner(), public.get_settings(), public.put_settings(jsonb),
-  public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() from public, anon;
+  public.start_tv_pairing(text), public.claim_tv(text), public.tv_status(),
+  public.log_events(jsonb), public.get_events(bigint, int) from public, anon;
 grant execute on function public.get_settings(), public.put_settings(jsonb),
-  public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() to authenticated;
+  public.start_tv_pairing(text), public.claim_tv(text), public.tv_status(),
+  public.log_events(jsonb), public.get_events(bigint, int) to authenticated;
 `;

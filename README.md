@@ -37,6 +37,7 @@ Anime catalogs that addons label as ordinary shows or movies (Kitsu, Crunchyroll
 | [`app/`](app) | The mobile app (Expo SDK 57, iOS, Android and web) |
 | [`addons/librivox/`](addons/librivox) | Example addon: free public-domain LibriVox audiobooks from archive.org |
 | [`docs/ADDON_PROTOCOL.md`](docs/ADDON_PROTOCOL.md) | The addon JSON format, if you want to write your own |
+| [`docs/FAMILY_EVENTS.md`](docs/FAMILY_EVENTS.md) | The 128bit family event feed that 128bit Tracker reads |
 
 ## How streams are played
 
@@ -228,6 +229,10 @@ Setup, once (free):
 5. On the phone: **Create account** (email + password). On the TV: Settings → Account & sync shows a code and a QR code; scan the QR with the phone (or enter the code under **Sign in a TV**) and the TV fills in.
 
 Your settings and keys are stored in your own project; the tables can only be reached through the setup functions, each account sees only its own row, and a paired TV sees only its owner's.
+
+### 128bit Tracker (family timeline)
+
+Signed in, 128bitPlay also posts what you finish to your account's **family feed**: books finished, movies and episodes watched, comic chapters read. [128bit Tracker](https://github.com/hootywhooo86/128bittracker) signs in to the same Supabase project and shows them on its timeline next to the other 128bit apps. Events wait on the phone until you're signed in. Already set up? Run the setup SQL again; it only adds the feed. Format: [`docs/FAMILY_EVENTS.md`](docs/FAMILY_EVENTS.md).
 
 ## Install on your phone
 
