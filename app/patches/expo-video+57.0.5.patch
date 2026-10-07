@@ -1,7 +1,8 @@
 diff --git a/node_modules/expo-video/android/build.gradle b/node_modules/expo-video/android/build.gradle
+index 317a8be..3e9a292 100644
 --- a/node_modules/expo-video/android/build.gradle
 +++ b/node_modules/expo-video/android/build.gradle
-@@ -25,6 +25,8 @@
+@@ -25,6 +25,8 @@ dependencies {
    implementation "androidx.media3:media3-exoplayer-hls:${androidxMedia3Version}"
    implementation "androidx.media3:media3-ui:${androidxMedia3Version}"
    implementation "androidx.media3:media3-datasource-okhttp:${androidxMedia3Version}"
@@ -10,10 +11,42 @@ diff --git a/node_modules/expo-video/android/build.gradle b/node_modules/expo-vi
  
    def fragment_version = "1.8.9"
    implementation "androidx.fragment:fragment:$fragment_version"
+diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/FullscreenPlayerActivity.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/FullscreenPlayerActivity.kt
+index 45d3d7b..9b4fd41 100644
+--- a/node_modules/expo-video/android/src/main/java/expo/modules/video/FullscreenPlayerActivity.kt
++++ b/node_modules/expo-video/android/src/main/java/expo/modules/video/FullscreenPlayerActivity.kt
+@@ -81,7 +81,7 @@ class FullscreenPlayerActivity : Activity(), VideoManagerListener {
+     requestedOrientation = options.orientation.toActivityOrientation()
+ 
+     videoPlayer = videoView.videoPlayer
+-    videoPlayer?.player?.let {
++    videoPlayer?.viewPlayer?.let {
+       PlayerView.switchTargetView(it, videoView.playerView, playerView)
+       videoPlayer?.hasBeenDisconnectedFromVideoView() // The video player is disconnected. We are only using the ExoPlayer it contained
+     }
+diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt
+index 71b8501..c1c70f4 100644
+--- a/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt
++++ b/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt
+@@ -220,6 +220,13 @@ class VideoModule : Module() {
+           ref.staysActiveInBackground = staysActive
+         }
+ 
++      // 128bitPlay: enables the controls' "next" button (pressing it emits "nextPress").
++      Property("nextAvailable")
++        .get { ref: VideoPlayer -> ref.nextAvailable }
++        .set { ref: VideoPlayer, available: Boolean ->
++          ref.nextAvailable = available
++        }
++
+       Property("loop")
+         .get { ref: VideoPlayer ->
+           runBlocking(appContext.mainQueue.coroutineContext) {
 diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
+index 8bae522..7a57010 100644
 --- a/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
 +++ b/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
-@@ -63,6 +63,9 @@
+@@ -63,6 +63,9 @@ class VideoPlayer(val context: Context, appContext: AppContext, source: VideoSou
    private var renderersFactory = DefaultRenderersFactory(context)
      .forceEnableMediaCodecAsynchronousQueueing()
      .setEnableDecoderFallback(true)
@@ -23,3 +56,43 @@ diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/pl
    private val listeners: MutableList<WeakReference<VideoPlayerListener>> = mutableListOf()
    private val currentVideoViewRef = MutableWeakReference<VideoView?>(null) { new, old ->
      sendEvent(PlayerEvent.TargetViewChanged(new, old))
+@@ -86,6 +89,22 @@ class VideoPlayer(val context: Context, appContext: AppContext, source: VideoSou
+       }
+     }.build()
+ 
++  // 128bitPlay: the controls' "next" button. ExoPlayer has no playlist here, so the views get
++  // this wrapper, which reports "next" as available when JS says there's a next episode and
++  // sends "nextPress" to JS instead of skipping.
++  @Volatile var nextAvailable = false
++  val viewPlayer: Player = object : androidx.media3.common.ForwardingPlayer(player) {
++    private fun withNext(c: Player.Commands) =
++      if (nextAvailable) c.buildUpon().addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM).build() else c
++    override fun getAvailableCommands() = withNext(super.getAvailableCommands())
++    override fun isCommandAvailable(command: Int) =
++      (nextAvailable && (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) ||
++        super.isCommandAvailable(command)
++    override fun hasNextMediaItem() = nextAvailable || super.hasNextMediaItem()
++    override fun seekToNext() = if (nextAvailable) emit("nextPress") else super.seekToNext()
++    override fun seekToNextMediaItem() = if (nextAvailable) emit("nextPress") else super.seekToNextMediaItem()
++  }
++
+   internal val firstFrameEventGenerator: FirstFrameEventGenerator
+   val serviceConnection = PlaybackServiceConnection(WeakReference(this), appContext)
+   var mediaSession: MediaSession = buildBasicMediaSession(context, player)
+@@ -399,14 +418,14 @@ class VideoPlayer(val context: Context, appContext: AppContext, source: VideoSou
+    * Used to notify the player that is has been disconnected from the player view by another player.
+    */
+   fun hasBeenDisconnectedFromVideoView() {
+-    if (currentVideoView?.playerView?.player == this.player) {
++    if (currentVideoView?.playerView?.player == this.viewPlayer) {
+       throw IllegalStateException("The player has been notified of disconnection from the player view, even though it's still connected.")
+     }
+     currentVideoView = null
+   }
+ 
+   fun changeVideoView(videoView: VideoView?) {
+-    PlayerView.switchTargetView(player, currentVideoView?.playerView, videoView?.playerView)
++    PlayerView.switchTargetView(viewPlayer, currentVideoView?.playerView, videoView?.playerView)
+     currentVideoView = videoView
+   }
+ 

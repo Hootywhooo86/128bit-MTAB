@@ -156,6 +156,25 @@ export async function setEpisodeWatched(imdb: string, season: number, episode: n
   invalidate('progress:', 'upnext');
 }
 
+// An episode played to the end: the show page ticks it straight away.
+const finishedListeners = new Set<(imdb: string, key: string) => void>();
+export function onEpisodeFinished(f: (imdb: string, key: string) => void) {
+  finishedListeners.add(f);
+  return () => void finishedListeners.delete(f);
+}
+
+/**
+ * Episode `key` ("tt…:season:episode") was watched to the end. With scrobbling on, Trakt
+ * already records it; otherwise it's added to the history here.
+ */
+export async function episodeFinished(key: string, scrobbled: boolean) {
+  const m = key.match(/^(tt\d+):(\d+):(\d+)$/);
+  if (!m) return;
+  finishedListeners.forEach((f) => f(m[1], `${m[2]}:${m[3]}`));
+  if (scrobbled) invalidate('progress:', 'upnext');
+  else await setEpisodeWatched(m[1], Number(m[2]), Number(m[3]), true);
+}
+
 export async function removeHistoryRow(rowId: number) {
   await traktApi('POST', '/sync/history/remove', { ids: [rowId] });
   invalidate('watched:', 'progress:', 'upnext');

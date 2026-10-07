@@ -33,6 +33,7 @@ import { MANUAL_SKIP_S, MANUAL_WINDOW_S, getSegments, type Segment } from '@/lib
 import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
 import { simklScrobble } from '@/lib/simkl';
 import { scrobble } from '@/lib/trakt';
+import { episodeFinished } from '@/lib/trakt-library';
 import {
   checkTorboxStream,
   getNowWatching,
@@ -49,6 +50,21 @@ import {
 import { Pressable } from '@/components/focusable';
 
 const SAVE_EVERY_S = 10;
+type NextButtonPlayer = {
+  nextAvailable: boolean;
+  addListener?: (event: 'nextPress', f: () => void) => { remove(): void };
+};
+
+/** False if the player is gone. (Module-level: React state rules don't allow it in effects.) */
+function setNextButton(player: unknown, on: boolean) {
+  try {
+    (player as NextButtonPlayer).nextAvailable = on;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Show "Next episode" this many seconds before the end. */
 const NEXT_WINDOW_S = 45;
 const SUB_SIZES = { small: 16, medium: 20, large: 26 };
@@ -345,10 +361,15 @@ export default function WatchScreen() {
       ) {
         counted = true;
         markWatched(entry);
+        // Tick the episode on Trakt (scrobbling records it itself, past 80%).
+        if (kind === 'episode') {
+          if (prefs.traktScrobble) scrobble('stop', item.key, item.link?.type, 95).catch(() => {});
+          episodeFinished(item.key, prefs.traktScrobble).catch(() => {});
+        }
       }
     }, 10_000);
     return () => clearInterval(tick);
-  }, [item, player]);
+  }, [item, player, prefs.traktScrobble]);
 
   // Tell Trakt what's playing (start / pause / stop).
   useEffect(() => {
@@ -478,7 +499,22 @@ export default function WatchScreen() {
       setNext({ status: 'error', message: e instanceof Error ? e.message : String(e) });
     try {
       const pick = await pickNextStream(upNext.id, item.source);
-      if (!pick) throw new Error('No streams found for the next episode');
+      // Nothing from the same source for the next episode: let them pick from the list.
+      if (!pick?.match) {
+        setNext({ status: 'idle' });
+        router.replace({
+          pathname: '/streams',
+          params: {
+            type: item.link?.type ?? 'series',
+            id: upNext.id,
+            title: item.title,
+            subtitle: upNext.label,
+            poster: item.poster ?? '',
+            linkId: item.link?.id ?? item.series?.metaId ?? '',
+          },
+        });
+        return;
+      }
       const start = async (result: StreamResult): Promise<void> => {
         if (result.status === 'ready') {
           const nextItem: WatchItem = {
@@ -513,6 +549,13 @@ export default function WatchScreen() {
       fail(e);
     }
   }, [item, upNext, next.status, player]);
+
+  // The controls' ⏭ button (see the expo-video patch): on when there's a next episode.
+  useEffect(() => {
+    if (!setNextButton(player, !!upNext)) return;
+    const sub = (player as unknown as NextButtonPlayer).addListener?.('nextPress', () => playNext());
+    return () => sub?.remove();
+  }, [player, playNext, upNext]);
 
   useEffect(() => {
     if (!prefs.autoPlayNextEpisode || !upNext) return;

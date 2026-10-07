@@ -123,7 +123,8 @@ export async function resolveStream(stream: Stream, name: string): Promise<Strea
 
 // --- Next episode ---------------------------------------------------------
 
-export type NextPick = { stream: Stream; addonId: string };
+/** `match`: same addon (and release group, when known) as the episode playing now. */
+export type NextPick = { stream: Stream; addonId: string; match: boolean };
 
 /**
  * Picks a stream for the next episode, preferring (in order): the same addon and
@@ -146,7 +147,7 @@ export async function pickNextStream(
     cached = await torbox.checkCached(hashes).catch(() => cached);
   const instant = (s: Stream) => !!s.url || (!!s.infoHash && cached.has(s.infoHash.toLowerCase()));
 
-  const score = ({ stream, addonId }: NextPick) =>
+  const score = ({ stream, addonId }: Omit<NextPick, 'match'>) =>
     (source &&
     addonId === source.addonId &&
     source.bingeGroup &&
@@ -158,7 +159,8 @@ export async function pickNextStream(
     (stream.url || stream.infoHash ? 1 : 0);
 
   // Stable: ties keep the addon's own order (usually best first).
-  return [...all].sort((a, b) => score(b) - score(a))[0];
+  const best = [...all].sort((a, b) => score(b) - score(a))[0];
+  return { ...best, match: score(best) >= (source?.bingeGroup ? 8 : 4) };
 }
 
 // --- Continue watching ------------------------------------------------------

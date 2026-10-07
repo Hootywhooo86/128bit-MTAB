@@ -7,7 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DownloadedPlay } from '@/components/downloaded-play';
 import { TraktActions, useTraktConnected } from '@/components/trakt-actions';
-import { getShowProgress, setEpisodeWatched } from '@/lib/trakt-library';
+import { getShowProgress, onEpisodeFinished, setEpisodeWatched } from '@/lib/trakt-library';
 import { StreamList } from '@/components/stream-list';
 import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
@@ -47,6 +47,10 @@ export default function TitleScreen() {
   useEffect(() => {
     if (!trakt || type === 'movie' || !/^tt\d+$/.test(id)) return;
     getShowProgress(id).then((p) => setWatchedEps(new Set(p.done)), () => {});
+    // Finished in the player: tick it now.
+    return onEpisodeFinished((imdb, key) => {
+      if (imdb === id) setWatchedEps((cur) => new Set(cur).add(key));
+    });
   }, [trakt, type, id]);
   async function toggleEpisode(season?: number, ep?: number) {
     if (!trakt || season === undefined || ep === undefined || !/^tt\d+$/.test(id)) return;
