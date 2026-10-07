@@ -19,6 +19,7 @@ import {
   DEFAULT_SOURCES,
   getSources,
   installSource,
+  SOURCE_TEMPLATE,
   isCatalog,
   removeSource,
   setSourceEnabled,
@@ -60,21 +61,22 @@ export default function SourcesSettings() {
       <SectionTitle>Add a source</SectionTitle>
       <View style={styles.card}>
         <Text style={styles.body}>
-          Paste a source URL in Pageturner’s format (a JSON link). Book catalogs (iTunes, Audible…)
-          fill Find audiobooks with bestsellers and search results. Download sources (torrent
-          indexes) find the files: tap a book, then TorBox on a result to send it to your TorBox
-          account.
+          Paste a source link in Pageturner’s format, or the source’s JSON itself to build your
+          own. Book catalogs (iTunes, Audible…) fill Find audiobooks; download sources (torrent
+          indexes) find the files. {'{TITLE}'} in the address is replaced with the book title.
         </Text>
         <Input
-          placeholder="https://… (source JSON link)"
+          placeholder="https://… or { …source JSON… }"
           value={url}
           onChangeText={setUrl}
-          keyboardType="url"
           autoCapitalize="none"
-          onSubmitEditing={() => add()}
+          autoCorrect={false}
+          multiline
+          style={{ maxHeight: 260, fontFamily: url.trim().startsWith('{') ? 'monospace' : undefined }}
         />
         {error ? <Text style={{ color: Colors.danger }}>{error}</Text> : null}
         <Button label="Add source" onPress={() => add()} loading={busy} disabled={!url.trim()} />
+        <Button label="Start from a template" variant="secondary" onPress={() => setUrl(SOURCE_TEMPLATE)} />
         {DEFAULT_SOURCES.filter((d) => !sources.some((s) => s.url === d.url)).map((d) => (
           <View key={d.url} style={styles.header}>
             <Text style={[styles.body, { flex: 1 }]}>Suggested: {d.name}</Text>
@@ -117,12 +119,19 @@ export default function SourcesSettings() {
             <Text style={styles.small}>{s.config.legal.disclaimer}</Text>
           ) : null}
           <View style={styles.actions}>
-            <Pressable
-              hitSlop={10}
-              onPress={() => installSource(s.url).then(load, (e) => setError(String(e.message)))}
-              accessibilityLabel="Refresh">
-              <Ionicons name="refresh" size={22} color={Colors.text} />
-            </Pressable>
+            {s.url.startsWith('custom:') ? (
+              // Your own source: load its JSON into the box above to change it.
+              <Pressable hitSlop={10} onPress={() => setUrl(JSON.stringify(s.config, null, 2))} accessibilityLabel="Edit">
+                <Ionicons name="create" size={22} color={Colors.text} />
+              </Pressable>
+            ) : (
+              <Pressable
+                hitSlop={10}
+                onPress={() => installSource(s.url).then(load, (e) => setError(String(e.message)))}
+                accessibilityLabel="Refresh">
+                <Ionicons name="refresh" size={22} color={Colors.text} />
+              </Pressable>
+            )}
             <Pressable
               hitSlop={10}
               onPress={() => removeSource(s.config.id).then(load)}

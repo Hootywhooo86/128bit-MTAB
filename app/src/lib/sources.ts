@@ -124,12 +124,27 @@ export async function getSources(): Promise<InstalledSource[]> {
 
 const saveSources = (list: InstalledSource[]) => AsyncStorage.setItem(KEY, JSON.stringify(list));
 
-function validate(c: Partial<SourceConfig>): SourceConfig {
-  if (!c.id || !c.name) throw new Error("This doesn't look like a Pageturner source");
-  if (c.search?.request?.url && c.search.response?.mapping) return c as SourceConfig;
-  if (!c.request?.url || !c.response?.mapping) {
-    throw new Error("This doesn't look like a Pageturner source");
+const NOT_A_SOURCE =
+  "This doesn't look like a source. It needs an id, a name, and either request + response " +
+  '(a torrent index) or search (a book catalog). Tap “Start from a template” to see one.';
+
+/** A starting point for your own torrent source (The Pirate Bay's audiobook search). */
+export const SOURCE_TEMPLATE = `{
+  "id": "my-source",
+  "name": "My source",
+  "type": "torrent",
+  "request": { "url": "https://apibay.org/q.php?q={TITLE}&cat=102" },
+  "response": {
+    "type": "json",
+    "resultsPath": "",
+    "mapping": { "title": "name", "infoHash": "info_hash", "size": "size", "seeders": "seeders" }
   }
+}`;
+
+function validate(c: Partial<SourceConfig>): SourceConfig {
+  if (!c.id || !c.name) throw new Error(NOT_A_SOURCE);
+  if (c.search?.request?.url && c.search.response?.mapping) return c as SourceConfig;
+  if (!c.request?.url || !c.response?.mapping) throw new Error(NOT_A_SOURCE);
   if (c.type !== 'torrent') {
     throw new Error(
       `“${c.name}” is a ${c.type ?? 'unknown'} source. 128bit can use torrent sources (sent to TorBox) and book catalogs for now.`,
@@ -141,12 +156,24 @@ function validate(c: Partial<SourceConfig>): SourceConfig {
   return c as SourceConfig;
 }
 
+/** Installs from a link to a source's JSON, or from the JSON itself (your own sources). */
 export async function installSource(input: string): Promise<InstalledSource> {
-  const url = input.trim();
-  if (!/^https?:\/\//i.test(url)) throw new Error('Paste the full source URL (https://…)');
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  const config = validate(await res.json());
+  const text = input.trim();
+  let url = text;
+  let config: SourceConfig;
+  if (text.startsWith('{')) {
+    try {
+      config = validate(JSON.parse(text));
+    } catch (e) {
+      throw e instanceof SyntaxError ? new Error(`The JSON has a mistake: ${e.message}`) : e;
+    }
+    url = `custom:${config.id}`;
+  } else {
+    if (!/^https?:\/\//i.test(url)) throw new Error('Paste the source link (https://…) or its JSON ({ … })');
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    config = validate(await res.json());
+  }
   const list = await getSources();
   const existing = list.findIndex((s) => s.config.id === config.id);
   const source: InstalledSource = {

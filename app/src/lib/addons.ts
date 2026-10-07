@@ -12,7 +12,7 @@ import type {
   Stream,
 } from './types';
 
-/** Safe metadata/subtitle addons (no streams). Installed on first launch, and suggested in Addons. */
+/** Safe metadata/subtitle addons (no streams), suggested in Addons. Not installed by themselves. */
 export const DEFAULT_ADDONS = [
   {
     id: 'com.linvo.cinemeta',
@@ -34,26 +34,17 @@ export const DEFAULT_ADDONS = [
   },
 ];
 
-const SEEDED_KEY = '128bit.defaultsInstalled';
-/** Defaults added in a later version get their own flag, so existing installs pick them up once. */
-const LATER_DEFAULTS: { key: string; url: string }[] = [
-  { key: '128bit.defaultsInstalled.kitsu', url: 'https://anime-kitsu.strem.fun/manifest.json' },
-];
-
+const SEEDED_KEY = '128bit.starterAddons';
 /**
- * On the very first launch, install the default addons so Home isn't empty.
- * Runs once; if the phone is offline it tries again next launch.
+ * The only addons a new install starts with: live TV / sports. Everything else is the
+ * user's choice (suggested in Addons). Fill in once the sports addon links are picked.
  */
+const STARTER_ADDONS: string[] = [];
+
+/** First launch: install the starter addons (retried next launch if the phone was offline). */
 export async function installDefaultAddons() {
-  for (const d of LATER_DEFAULTS) {
-    if (await AsyncStorage.getItem(d.key)) continue;
-    await installAddon(d.url).then(
-      () => AsyncStorage.setItem(d.key, '1'),
-      () => {},
-    );
-  }
-  if (await AsyncStorage.getItem(SEEDED_KEY)) return;
-  const results = await Promise.allSettled(DEFAULT_ADDONS.map((a) => installAddon(a.url)));
+  if (!STARTER_ADDONS.length || (await AsyncStorage.getItem(SEEDED_KEY))) return;
+  const results = await Promise.allSettled(STARTER_ADDONS.map((url) => installAddon(url)));
   if (results.some((r) => r.status === 'fulfilled')) await AsyncStorage.setItem(SEEDED_KEY, '1');
 }
 
@@ -84,7 +75,13 @@ async function getJson<T>(url: string): Promise<T> {
 
 function validateManifest(m: Partial<Manifest>): Manifest {
   if (!m.id || !m.name || !m.version) throw new Error('Manifest is missing id, name or version');
-  const types = Array.isArray(m.types) ? m.types : [];
+  // Some addons (StremThru…) list their types only per resource and leave `types` empty.
+  const types = [
+    ...new Set([
+      ...(Array.isArray(m.types) ? m.types : []),
+      ...(m.resources ?? []).flatMap((r) => (typeof r === 'object' && r.types) || []),
+    ]),
+  ];
   if (!types.some((t) => SUPPORTED_TYPES.includes(t))) {
     throw new Error(
       `128bit doesn't know where to put this addon's content (type: ${types.join(', ') || 'none'}). ` +

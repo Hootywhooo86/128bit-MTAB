@@ -45,7 +45,11 @@ async function get(url: string, init: RequestInit) {
   }
 }
 
-/** The desktop site; if it can't be reached, the mobile site (a different address). */
+/** A reader service that fetches the page for us: the last way in when the phone can't reach
+ * webtoons.com at all (DNS / ad blockers). It returns the same desktop page. */
+const RELAY = 'https://r.jina.ai/';
+
+/** The desktop site; if it can't be reached, the mobile site (a different address), then the relay. */
 async function page(path: string, mobilePath = path) {
   try {
     const res = await get(`${SITE}${path}`, { headers: { 'User-Agent': UA, Referer: `${SITE}/` } });
@@ -58,7 +62,14 @@ async function page(path: string, mobilePath = path) {
       if (!res.ok) throw new Error(`WEBTOON answered ${res.status}`);
       return { html: await res.text(), mobile: true };
     } catch (e2) {
-      throw isNetwork(e2) ? new Error(OFFLINE) : e2;
+      if (!isNetwork(e2)) throw e2;
+      try {
+        const res = await fetch(`${RELAY}${SITE}${path}`, { headers: { 'X-Return-Format': 'html' } });
+        if (!res.ok) throw new Error(`WEBTOON answered ${res.status}`);
+        return { html: await res.text(), mobile: false };
+      } catch {
+        throw new Error(OFFLINE);
+      }
     }
   }
 }
