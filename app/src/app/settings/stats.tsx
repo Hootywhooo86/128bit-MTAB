@@ -45,16 +45,14 @@ export default function StatsScreen() {
     (a, b) => b - a,
   );
   const streak = streaks(stats);
-  const topShows = Object.entries(
-    episodesFinished(stats).reduce<Record<string, number>>((m, t) => ({ ...m, [t]: (m[t] ?? 0) + 1 }), {}),
-  )
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
 
   const books = Object.values(stats.books).sort((a, b) => b.seconds - a.seconds);
   const watched = Object.values(stats.watched);
   const movies = watched.filter((w) => w.kind === 'movie');
   const episodes = watched.filter((w) => w.kind === 'episode');
+  const showCounts = new Map<string, number>();
+  for (const w of episodes) if (w.finished) showCounts.set(w.title, (showCounts.get(w.title) ?? 0) + 1);
+  const topShows = [...showCounts].sort(([, a], [, b]) => b - a).slice(0, 5);
   const shows = new Set(episodes.map((e) => e.title));
   const liveSeconds = watched.filter((w) => w.kind === 'live').reduce((n, w) => n + w.seconds, 0);
   const comics = Object.values(stats.comics).sort((a, b) => b.chapters - a.chapters);
@@ -224,12 +222,6 @@ export default function StatsScreen() {
     </SettingsPage>
   );
 }
-
-/** Show title of every finished episode (one entry per episode). */
-const episodesFinished = (s: Stats) =>
-  Object.values(s.watched)
-    .filter((w) => w.kind === 'episode' && w.finished)
-    .map((w) => w.title);
 
 function Tile({ value, label }: { value: string; label: string }) {
   const styles = useStyles();

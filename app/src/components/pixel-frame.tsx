@@ -42,18 +42,12 @@ export function PixelFrame({ children, playing }: { children: ReactNode; playing
     return () => loop.stop();
   }, [playing, beat]);
 
-  // The real sound: each bar follows one frequency band. Plain state, ~12 redraws a second:
-  // cheap enough that taps (like the back button) never wait behind it.
+  // The real sound: each bar follows one frequency band. Plain state at the ~12/s the
+  // player sends: cheap enough that taps (like the back button) never wait behind it.
   const [levels, setLevels] = useState<number[] | null>(null);
   useEffect(() => {
     if (!playing) return;
-    let last = 0;
-    const off = onAudioLevels((l) => {
-      const now = Date.now();
-      if (l.length < BARS || now - last < 80) return;
-      last = now;
-      setLevels(l.slice(0, BARS));
-    });
+    const off = onAudioLevels((l) => l.length >= BARS && setLevels(l.slice(0, BARS)));
     return () => {
       off();
       setLevels(null);
