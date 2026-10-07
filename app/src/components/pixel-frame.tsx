@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Animated, Easing, View } from 'react-native';
 
 import { useColors } from '@/constants/theme';
+import { onAudioLevels } from '@/lib/player';
 
 /** Blend two #rrggbb colours (t = 0 → a, 1 → b). */
 function mix(a: string, b: string, t: number) {
@@ -17,7 +18,8 @@ const BARS = 16;
 /**
  * The audiobook Now Playing frame: a chunky 8-bit arcade-cabinet border in shades of the
  * accent colour — stepped corners, bevelled edges, rivets, a hard drop shadow, two
- * blinking sparkles and an equalizer of blocks that bounces while the book plays.
+ * blinking sparkles and an equalizer of blocks that moves with the book's sound (or just
+ * bounces where the sound can't be read).
  */
 export function PixelFrame({ children, playing }: { children: ReactNode; playing: boolean }) {
   const Colors = useColors();
@@ -40,8 +42,24 @@ export function PixelFrame({ children, playing }: { children: ReactNode; playing
     return () => loop.stop();
   }, [playing, beat]);
 
+  // The real sound: each bar follows one frequency band.
+  const [levels] = useState(() => Array.from({ length: BARS }, () => new Animated.Value(0.25)));
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    return onAudioLevels((l) => {
+      if (l.length < BARS) return;
+      setLive(true);
+      Animated.parallel(
+        levels.map((v, i) =>
+          Animated.timing(v, { toValue: 0.15 + 0.85 * l[i], duration: 60, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        ),
+      ).start();
+    });
+  }, [playing, levels]);
+
   // Each bar gets its own bouncy pattern from the shared beat.
-  const bars = useMemo(
+  const fake = useMemo(
     () =>
       Array.from({ length: BARS }, (_, i) => {
         const steps = [0, 0.25, 0.5, 0.75, 1];
@@ -50,6 +68,7 @@ export function PixelFrame({ children, playing }: { children: ReactNode; playing
       }),
     [beat],
   );
+  const bars = live ? levels : fake;
   const blink = beat.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.2, 1] });
 
   const corner = (pos: object) => (

@@ -5,20 +5,34 @@ import { FlatList, Text, View } from 'react-native';
 import { useTraktConnected } from '@/components/trakt-actions';
 import { Heading } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
-import { getUpNext, getWatchlist, poster, type TraktItem } from '@/lib/trakt-library';
+import { usePrefs } from '@/lib/prefs';
+import { TRAKT_ROWS, getLists, getTraktRow, poster, type TraktItem } from '@/lib/trakt-library';
 import type { MetaPreview } from '@/lib/types';
 
 import { PosterTile } from './video-browse';
 import { Pressable } from '@/components/focusable';
 
-/** Trakt rows for the Shows / Movies tabs: Up next (shows) and your watchlist. */
+/** Trakt rows for the Shows / Movies tabs, as picked in Settings → Tracking. */
 export function TraktRows({ type }: { type: 'movie' | 'series' }) {
   const connected = useTraktConnected();
+  const { prefs } = usePrefs();
+  const [listNames, setListNames] = useState<Record<string, string>>({});
+  const lists = prefs.traktRows.some((r) => r.startsWith('list:'));
+  useEffect(() => {
+    if (!connected || !lists) return;
+    getLists().then((l) => setListNames(Object.fromEntries(l.map((x) => [`list:${x.id}`, x.name]))), () => {});
+  }, [connected, lists]);
   if (!connected) return null;
+  const kind = type === 'movie' ? 'movie' : 'show';
   return (
     <>
-      {type === 'series' ? <Row title="Up next on Trakt" load={getUpNext} type={type} /> : null}
-      <Row title="Your Trakt watchlist" load={() => getWatchlist(type === 'movie' ? 'movie' : 'show')} type={type} />
+      {prefs.traktRows.map((id) => {
+        const def = TRAKT_ROWS.find((r) => r.id === id);
+        if (def && !(type === 'movie' ? def.movies : def.shows)) return null;
+        const name = def?.name ?? listNames[id];
+        if (!name) return null;
+        return <Row key={id} title={`${name} · Trakt`} load={() => getTraktRow(id, kind)} type={type} />;
+      })}
     </>
   );
 }

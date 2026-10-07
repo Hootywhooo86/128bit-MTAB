@@ -1,7 +1,153 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
+index c76a9fd..6f486f4 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
+@@ -32,9 +32,11 @@ class AudioPlayer(
+   appContext: AppContext,
+   source: MediaSource?,
+   updateInterval: Double,
+-  bufferDurationMs: Long = 0
++  bufferDurationMs: Long = 0,
++  // 128bitPlay: sampling from the decoded audio (see LevelTap) instead of Visualizer.
++  private val levelTap: LevelTap = LevelTap()
+ ) : BaseAudioPlayer(
+-  player = ExoPlayer.Builder(context)
++  player = ExoPlayer.Builder(context, levelTap.renderersFactory(context))
+     .setLooper(context.mainLooper)
+     .setAudioAttributes(AudioAttributes.DEFAULT, false)
+     .setSeekForwardIncrementMs(SEEK_JUMP_INTERVAL_MS)
+@@ -164,20 +166,9 @@ class AudioPlayer(
+   }
+ 
+   fun setSamplingEnabled(enabled: Boolean) {
+-    appContext?.reactContext?.let {
+-      if (ContextCompat.checkSelfPermission(it, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+-        Log.d(TAG, "\'android.permission.RECORD_AUDIO\' is required to use audio sampling. Please request this permission and try again.")
+-        return
+-      }
+-    }
+-
+     samplingEnabled = enabled
+-    if (enabled) {
+-      createVisualizer()
+-    } else {
+-      visualizer?.release()
+-      visualizer = null
+-    }
++    // Called on the playback thread: don't touch the player there.
++    levelTap.listener = if (enabled) { levels -> emit(AUDIO_SAMPLE_UPDATE, mapOf("channels" to listOf(mapOf("frames" to levels)), "timestamp" to 0)) } else null
+   }
+ 
+   override fun setPlaybackRate(rate: Float) {
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/LevelTap.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/LevelTap.kt
+new file mode 100644
+index 0000000..353a7a8
+--- /dev/null
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/LevelTap.kt
+@@ -0,0 +1,98 @@
++package expo.modules.audio
++
++import android.content.Context
++import androidx.media3.common.C
++import androidx.media3.common.util.UnstableApi
++import androidx.media3.exoplayer.DefaultRenderersFactory
++import androidx.media3.exoplayer.audio.AudioSink
++import androidx.media3.exoplayer.audio.DefaultAudioSink
++import androidx.media3.exoplayer.audio.TeeAudioProcessor
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++import kotlin.math.PI
++import kotlin.math.cos
++import kotlin.math.ln
++import kotlin.math.max
++import kotlin.math.min
++import kotlin.math.sqrt
++
++/**
++ * 128bitPlay: loudness of 16 frequency bands of what's playing, ~20 times a second, read
++ * from the decoded audio itself (no microphone permission, unlike Android's Visualizer).
++ */
++@UnstableApi
++class LevelTap : TeeAudioProcessor.AudioBufferSink {
++  @Volatile var listener: ((List<Float>) -> Unit)? = null
++
++  private var rate = 44_100
++  private var channels = 2
++  private var encoding = C.ENCODING_INVALID
++  private val window = FloatArray(1024)
++  private var filled = 0
++  private var lastEmit = 0L
++  private val peaks = FloatArray(BANDS) { 1e-3f }
++
++  fun renderersFactory(context: Context) = object : DefaultRenderersFactory(context) {
++    override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
++      DefaultAudioSink.Builder(context)
++        .setAudioProcessors(arrayOf(TeeAudioProcessor(this@LevelTap)))
++        .setEnableFloatOutput(enableFloatOutput)
++        .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
++        .build()
++  }
++
++  override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
++    rate = sampleRateHz
++    channels = max(1, channelCount)
++    this.encoding = encoding
++    filled = 0
++  }
++
++  override fun handleBuffer(buffer: ByteBuffer) {
++    if (listener == null) return
++    val b = buffer.duplicate().order(ByteOrder.nativeOrder())
++    val float = encoding == C.ENCODING_PCM_FLOAT
++    if (!float && encoding != C.ENCODING_PCM_16BIT) return
++    val frameBytes = channels * (if (float) 4 else 2)
++    while (b.remaining() >= frameBytes) {
++      var s = 0f
++      repeat(channels) { s += if (float) b.float else b.short / 32768f }
++      window[filled++] = s / channels
++      if (filled == window.size) {
++        filled = 0
++        val now = System.nanoTime()
++        if (now - lastEmit >= 45_000_000L) {
++          lastEmit = now
++          listener?.invoke(analyze())
++        }
++      }
++    }
++  }
++
++  /** Goertzel at 16 log-spaced frequencies (90 Hz – 7 kHz), each scaled to its recent peak. */
++  private fun analyze(): List<Float> {
++    val n = window.size
++    return List(BANDS) { i ->
++      val f = 90.0 * Math.pow(7000.0 / 90.0, i / (BANDS - 1.0))
++      val coeff = 2 * cos(2 * PI * min(f, rate / 2.2) / rate)
++      var s1 = 0.0
++      var s2 = 0.0
++      for (k in 0 until n) {
++        // Hann window keeps neighbouring bands apart.
++        val w = 0.5 - 0.5 * cos(2 * PI * k / (n - 1))
++        val s0 = window[k] * w + coeff * s1 - s2
++        s2 = s1
++        s1 = s0
++      }
++      val mag = sqrt(max(0.0, s1 * s1 + s2 * s2 - coeff * s1 * s2)).toFloat()
++      // Auto-gain: each band remembers its loudest moment and slowly forgets it.
++      peaks[i] = max(mag, peaks[i] * 0.995f)
++      val level = ln(1 + 9 * mag / peaks[i]) / ln(10f)
++      level.coerceIn(0f, 1f)
++    }
++  }
++
++  companion object {
++    const val BANDS = 16
++  }
++}
 diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+index 196a5d5..246577b 100644
 --- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
 +++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
-@@ -240,10 +240,21 @@
+@@ -240,10 +240,21 @@ class AudioControlsService : MediaSessionService() {
      val session = mediaSession ?: return
      val mediaButtons = mutableListOf<CommandButton>()
  
@@ -24,7 +170,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
            .setDisplayName("Seek Backward")
            .setEnabled(true)
            .setSessionCommand(SessionCommand(ACTION_SEEK_BACKWARD, Bundle.EMPTY))
-@@ -265,7 +276,7 @@
+@@ -265,7 +276,7 @@ class AudioControlsService : MediaSessionService() {
      // Add seek forward button if enabled
      if (currentOptions?.showSeekForward == true) {
        mediaButtons.add(
@@ -33,7 +179,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
            .setDisplayName("Seek Forward")
            .setEnabled(true)
            .setSessionCommand(SessionCommand(ACTION_SEEK_FORWARD, Bundle.EMPTY))
-@@ -274,6 +285,17 @@
+@@ -274,6 +285,17 @@ class AudioControlsService : MediaSessionService() {
        )
      }
  
@@ -51,7 +197,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
      session.setCustomLayout(mediaButtons)
      session.setMediaButtonPreferences(mediaButtons)
    }
-@@ -350,6 +372,7 @@
+@@ -350,6 +372,7 @@ class AudioControlsService : MediaSessionService() {
      hideNotification()
  
      currentPlayer = player
@@ -59,7 +205,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
      currentMetadata = metadata
      currentOptions = options
  
-@@ -414,6 +437,7 @@
+@@ -414,6 +437,7 @@ class AudioControlsService : MediaSessionService() {
      currentPlayer?.isActiveForLockScreen = false
      removePlayerListener()
      currentPlayer = null
@@ -67,7 +213,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
      currentMetadata = null
      mediaSession?.release()
      mediaSession = null
-@@ -520,6 +544,7 @@
+@@ -520,6 +544,7 @@ class AudioControlsService : MediaSessionService() {
      mediaSession = null
      sessionMetadataPlayer = null
      currentPlayer = null
@@ -75,7 +221,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
      currentMetadata = null
      currentOptions = null
      currentArtwork = null
-@@ -559,6 +584,13 @@
+@@ -559,6 +584,13 @@ class AudioControlsService : MediaSessionService() {
      const val ACTION_SEEK_FORWARD = "expo.modules.audio.action.SEEK_FORWARD"
      const val ACTION_SEEK_BACKWARD = "expo.modules.audio.action.SEEK_BACKWARD"
  
@@ -91,9 +237,10 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
    }
  }
 diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+index 839aaef..f46cf23 100644
 --- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
 +++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
-@@ -35,6 +35,8 @@
+@@ -35,6 +35,8 @@ class AudioMediaSessionCallback : MediaSession.Callback {
            MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
              .add(SessionCommand(AudioControlsService.ACTION_SEEK_BACKWARD, Bundle.EMPTY))
              .add(SessionCommand(AudioControlsService.ACTION_SEEK_FORWARD, Bundle.EMPTY))
@@ -102,7 +249,7 @@ diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/se
              .build()
          )
          .build()
-@@ -56,6 +58,12 @@
+@@ -56,6 +58,12 @@ class AudioMediaSessionCallback : MediaSession.Callback {
        AudioControlsService.ACTION_SEEK_BACKWARD -> {
          session.player.seekTo(session.player.currentPosition - AudioControlsService.SEEK_INTERVAL_MS)
        }

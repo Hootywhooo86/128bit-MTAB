@@ -4,7 +4,7 @@ import { Alert, Platform, Text, View } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { dayKey, formatDuration, getStats, resetStats, type Stats } from '@/lib/stats';
+import { dayKey, formatDuration, getStats, resetStats, streaks, summarize, type Stats } from '@/lib/stats';
 import { Pressable } from '@/components/focusable';
 
 // Chart series colours (validated for colour-blind separation and contrast on the dark surfaces).
@@ -25,6 +25,7 @@ export default function StatsScreen() {
   const styles = useStyles();
   const [stats, setStats] = useState<Stats | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [year, setYear] = useState(new Date().getFullYear());
 
   useFocusEffect(
     useCallback(() => {
@@ -35,10 +36,20 @@ export default function StatsScreen() {
 
   if (!stats) return <SettingsPage>{null}</SettingsPage>;
 
-  const days = Object.values(stats.days);
-  const listenTotal = days.reduce((n, d) => n + d.listen, 0);
-  const watchTotal = days.reduce((n, d) => n + d.watch, 0);
-  const chaptersTotal = days.reduce((n, d) => n + d.chapters, 0);
+  const all = summarize(stats);
+  const listenTotal = all.listen;
+  const watchTotal = all.watch;
+  const chaptersTotal = all.chapters;
+  const yr = summarize(stats, year);
+  const years = [...new Set([new Date().getFullYear(), ...Object.keys(stats.days).map((k) => Number(k.slice(0, 4)))])].sort(
+    (a, b) => b - a,
+  );
+  const streak = streaks(stats);
+  const topShows = Object.entries(
+    episodesFinished(stats).reduce<Record<string, number>>((m, t) => ({ ...m, [t]: (m[t] ?? 0) + 1 }), {}),
+  )
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
 
   const books = Object.values(stats.books).sort((a, b) => b.seconds - a.seconds);
   const watched = Object.values(stats.watched);
@@ -75,6 +86,47 @@ export default function StatsScreen() {
         <Tile value={formatDuration(watchTotal)} label="Watching" />
         <Tile value={String(chaptersTotal)} label="Chapters read" />
       </View>
+      <View style={styles.tiles}>
+        <Tile value={String(all.books)} label="Books finished" />
+        <Tile value={String(all.movies)} label="Movies" />
+        <Tile value={String(all.episodes)} label="Episodes" />
+      </View>
+
+      <SectionTitle>Year</SectionTitle>
+      {years.length > 1 ? (
+        <View style={styles.years}>
+          {years.map((y) => (
+            <Pressable key={y} onPress={() => setYear(y)} style={[styles.yearChip, y === year && styles.yearChipOn]}>
+              <Text style={[styles.yearText, y === year && { color: Colors.accentText }]}>{y}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      <Group>
+        <Row title={`Listening in ${year}`} value={formatDuration(yr.listen)} />
+        <Row title={`Watching in ${year}`} value={formatDuration(yr.watch)} />
+        <Row title="Books finished" value={String(yr.books)} />
+        <Row title="Movies watched" value={String(yr.movies)} />
+        <Row title="Episodes watched" value={`${yr.episodes} · ${yr.shows} shows`} />
+        <Row title="Comic chapters read" value={String(yr.chapters)} />
+      </Group>
+
+      <SectionTitle>Streaks & records</SectionTitle>
+      <Group>
+        <Row title="Current streak" value={`${streak.current} ${streak.current === 1 ? 'day' : 'days'}`} />
+        <Row title="Longest streak" value={`${streak.longest} ${streak.longest === 1 ? 'day' : 'days'}`} />
+        {streak.best ? (
+          <Row
+            title="Biggest day"
+            subtitle={new Date(`${streak.best.day}T12:00:00`).toLocaleDateString()}
+            value={formatDuration(streak.best.seconds)}
+          />
+        ) : null}
+        <Row
+          title="Average active day"
+          value={formatDuration(streak.activeDays ? (all.listen + all.watch) / streak.activeDays : 0)}
+        />
+      </Group>
 
       <SectionTitle>Last 7 days</SectionTitle>
       <View style={styles.card}>
@@ -141,6 +193,9 @@ export default function StatsScreen() {
         <Row title="Episodes watched" value={String(episodes.filter((e) => e.finished).length)} />
         <Row title="Shows" value={String(shows.size)} />
         <Row title="Live TV & sports" value={formatDuration(liveSeconds)} />
+        {topShows.map(([title, n]) => (
+          <Row key={`top:${title}`} title={title} subtitle="Most-watched show" value={`${n} ep.`} />
+        ))}
         {recent.map((w) => (
           <Row
             key={`${w.title}:${w.subtitle ?? ''}:${w.at}`}
@@ -169,6 +224,12 @@ export default function StatsScreen() {
     </SettingsPage>
   );
 }
+
+/** Show title of every finished episode (one entry per episode). */
+const episodesFinished = (s: Stats) =>
+  Object.values(s.watched)
+    .filter((w) => w.kind === 'episode' && w.finished)
+    .map((w) => w.title);
 
 function Tile({ value, label }: { value: string; label: string }) {
   const styles = useStyles();
@@ -230,5 +291,9 @@ const useStyles = makeStyles((Colors) => ({
   segment: { width: 18, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   gap: { borderTopWidth: 2, borderTopColor: Colors.surface },
   dayLabel: { color: Colors.textSecondary, fontSize: 11 },
+  years: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two },
+  yearChip: { paddingHorizontal: Spacing.three, paddingVertical: 6, borderRadius: Radius.lg, backgroundColor: Colors.surface },
+  yearChipOn: { backgroundColor: Colors.accent },
+  yearText: { color: Colors.text, fontWeight: '700' },
   since: { color: Colors.textSecondary, fontSize: 12, marginVertical: Spacing.three },
 }));

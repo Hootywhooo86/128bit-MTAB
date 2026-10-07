@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Text, TextInput } from 'react-native';
 
 import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
+import { TraktRowPicker } from '@/components/trakt-row-picker';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
 import { HardcoverCard } from '@/components/hardcover-card';
 import { SimklCard } from '@/components/simkl-card';
@@ -220,6 +221,8 @@ export default function TrackingSettings() {
           onChange={(v) => setPref('traktContinueWatching', v)}
         />
       </Group>
+
+      <TraktRowPicker />
 
       <SectionTitle>Simkl</SectionTitle>
       <SimklCard />

@@ -31,6 +31,8 @@ export type Prefs = {
   cachedFirst: boolean;
   traktScrobble: boolean;
   traktContinueWatching: boolean;
+  /** Trakt rows on the Shows / Movies tabs, in order ("trending", "list:123", …). */
+  traktRows: string[];
   /** 3-letter code, e.g. "eng". */
   subtitleLanguage: string;
   autoSubtitles: boolean;
@@ -68,6 +70,7 @@ export const DEFAULT_PREFS: Prefs = {
   cachedFirst: true,
   traktScrobble: true,
   traktContinueWatching: true,
+  traktRows: ['upnext', 'watchlist'],
   subtitleLanguage: 'eng',
   autoSubtitles: false,
   subtitleSize: 'medium',

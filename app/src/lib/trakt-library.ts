@@ -314,6 +314,50 @@ export async function getRecommendations(kind: Kind): Promise<TraktItem[]> {
   return rows.map((m) => ({ kind, title: m.title, year: m.year, imdb: m.ids.imdb, traktId: m.ids.trakt }));
 }
 
+// --- Discovery rows for the Shows / Movies tabs -------------------------------------------
+
+/** Rows you can add to the Shows / Movies tabs (Settings → Tracking → Trakt rows). */
+export const TRAKT_ROWS = [
+  { id: 'upnext', name: 'Up next', shows: true, movies: false },
+  { id: 'watchlist', name: 'Your watchlist', shows: true, movies: true },
+  { id: 'recommended', name: 'Recommended for you', shows: true, movies: true },
+  { id: 'trending', name: 'Trending now', shows: true, movies: true },
+  { id: 'popular', name: 'Popular', shows: true, movies: true },
+  { id: 'anticipated', name: 'Most anticipated', shows: true, movies: true },
+  { id: 'watched', name: 'Most watched this week', shows: true, movies: true },
+  { id: 'boxoffice', name: 'Box office', shows: false, movies: true },
+] as const;
+
+/** One discovery row ("trending", …) or a personal list ("list:123"). */
+export function getTraktRow(row: string, kind: Kind): Promise<TraktItem[]> {
+  const p = plural(kind);
+  if (row.startsWith('list:')) return getListItems(Number(row.slice(5))).then((l) => l.filter((i) => i.kind === kind));
+  switch (row) {
+    case 'upnext':
+      return getUpNext();
+    case 'watchlist':
+      return getWatchlist(kind);
+    case 'recommended':
+      return getRecommendations(kind);
+    case 'popular':
+      // Bare titles, not wrapped like the others.
+      return cached(`row:${row}:${p}`, async () =>
+        (await traktApi<(RawMovie | RawShow)[]>('GET', `/${p}/popular?limit=30`)).map((m) => ({
+          kind,
+          title: m.title,
+          year: m.year,
+          imdb: m.ids.imdb,
+          traktId: m.ids.trakt,
+        })),
+      );
+    default: {
+      const path = { trending: 'trending', anticipated: 'anticipated', watched: 'watched/weekly', boxoffice: 'boxoffice' }[row];
+      if (!path) return Promise.resolve([]);
+      return cached(`row:${row}:${p}`, async () => items(await traktApi<Raw[]>('GET', `/${p}/${path}?limit=30`)));
+    }
+  }
+}
+
 /** "Not interested": hides it from your recommendations. */
 export async function hideRecommendation(kind: Kind, traktId: number) {
   await traktApi('DELETE', `/recommendations/${plural(kind)}/${traktId}`);

@@ -135,6 +135,28 @@ let sleepTimer: ReturnType<typeof setTimeout> | null = null;
 
 let audio: AudioPlayer | null = null;
 
+/**
+ * Loudness of 16 frequency bands of the book, ~20×/s (Android; see the expo-audio patch).
+ * Sampling runs only while someone is listening for it.
+ */
+export function onAudioLevels(f: (levels: number[]) => void) {
+  const a = getAudio();
+  try {
+    a.setAudioSamplingEnabled(true);
+  } catch {
+    return () => {};
+  }
+  const sub = a.addListener('audioSampleUpdate', (s) => f(s.channels[0]?.frames ?? []));
+  return () => {
+    sub.remove();
+    try {
+      a.setAudioSamplingEnabled(false);
+    } catch {
+      // released
+    }
+  };
+}
+
 function getAudio(): AudioPlayer {
   if (audio) return audio;
   audio = createAudioPlayer(null, { updateInterval: 500 });

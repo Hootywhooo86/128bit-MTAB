@@ -143,8 +143,9 @@ export default function AudiobooksScreen() {
 
   const onLongPress = (book: PlayableBook) =>
     tab === 'library'
-      ? confirm('Remove from library', book.title, 'Remove', async () => {
+      ? confirm('Remove from library', `${book.title}\n\nAlso deletes it from this phone.`, 'Remove', async () => {
           await removeFromLibrary(book.key);
+          await cancelBookDownload(book.key); // stops a running download too
           load();
         })
       : confirm('Delete download', `Remove ${book.title} from this phone?`, 'Delete', async () => {

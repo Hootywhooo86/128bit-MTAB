@@ -15,11 +15,11 @@ export type WatchKind = 'movie' | 'episode' | 'live';
 export type Stats = {
   /** "2026-10-01" → seconds listened / watched and chapters read that day. */
   days: Record<string, Day>;
-  books: Record<string, { title: string; author?: string; seconds: number; finished?: boolean }>;
+  books: Record<string, { title: string; author?: string; seconds: number; finished?: boolean; finishedAt?: number }>;
   /** Movies, episodes and channels, keyed by their id. */
   watched: Record<
     string,
-    { title: string; subtitle?: string; kind: WatchKind; seconds: number; finished?: boolean; at: number }
+    { title: string; subtitle?: string; kind: WatchKind; seconds: number; finished?: boolean; finishedAt?: number; at: number }
   >;
   comics: Record<string, { title: string; chapters: number }>;
   since: number;
@@ -76,7 +76,9 @@ export async function addListening(
 
 export async function markBookFinished(book: { key: string; title: string; author?: string }) {
   const s = await getStats();
-  (s.books[book.key] ??= { title: book.title, author: book.author, seconds: 0 }).finished = true;
+  const b = (s.books[book.key] ??= { title: book.title, author: book.author, seconds: 0 });
+  if (!b.finished) b.finishedAt = Date.now();
+  b.finished = true;
   scheduleSave();
 }
 
@@ -107,6 +109,7 @@ export async function markWatched(item: {
 }) {
   const s = await getStats();
   const w = (s.watched[item.key] ??= { ...item, seconds: 0, at: Date.now() });
+  if (!w.finished) w.finishedAt = Date.now();
   w.finished = true;
   scheduleSave();
 }
@@ -117,6 +120,68 @@ export async function addChapterRead(comic: { id: string; title: string }) {
   const c = (s.comics[comic.id] ??= { title: comic.title, chapters: 0 });
   c.chapters += 1;
   scheduleSave();
+}
+
+export type Summary = {
+  listen: number;
+  watch: number;
+  chapters: number;
+  books: number;
+  movies: number;
+  episodes: number;
+  shows: number;
+};
+
+/** Totals for everything (no year) or one calendar year. Older finishes without a date count to "all". */
+export function summarize(s: Stats, year?: number): Summary {
+  const inYear = (t?: number) => year === undefined || (!!t && new Date(t).getFullYear() === year);
+  const days = Object.entries(s.days)
+    .filter(([k]) => year === undefined || k.startsWith(`${year}-`))
+    .map(([, d]) => d);
+  const done = Object.values(s.watched).filter((w) => w.finished && inYear(w.finishedAt ?? w.at));
+  const episodes = done.filter((w) => w.kind === 'episode');
+  return {
+    listen: days.reduce((n, d) => n + d.listen, 0),
+    watch: days.reduce((n, d) => n + d.watch, 0),
+    chapters: days.reduce((n, d) => n + d.chapters, 0),
+    books: Object.values(s.books).filter((b) => b.finished && inYear(b.finishedAt)).length,
+    movies: done.filter((w) => w.kind === 'movie').length,
+    episodes: episodes.length,
+    shows: new Set(episodes.map((e) => e.title)).size,
+  };
+}
+
+/** Days in a row with any listening, watching or reading; best single day. */
+export function streaks(s: Stats) {
+  const active = (k: string) => {
+    const d = s.days[k];
+    return !!d && (d.listen + d.watch >= 60 || d.chapters > 0);
+  };
+  const d = new Date();
+  if (!active(dayKey(d))) d.setDate(d.getDate() - 1); // today isn't over yet
+  let current = 0;
+  while (active(dayKey(d))) {
+    current++;
+    d.setDate(d.getDate() - 1);
+  }
+  let longest = 0;
+  let run = 0;
+  let prev: Date | null = null;
+  for (const k of Object.keys(s.days).sort()) {
+    if (!active(k)) continue;
+    const day = new Date(`${k}T12:00:00`);
+    run = prev && Math.round((day.getTime() - prev.getTime()) / 86_400_000) === 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+    prev = day;
+  }
+  const best = Object.entries(s.days).sort(([, a], [, b]) => b.listen + b.watch - (a.listen + a.watch))[0];
+  const activeDays = Object.keys(s.days).filter(active).length;
+  return {
+    current,
+    longest: Math.max(longest, current),
+    best: best ? { day: best[0], seconds: best[1].listen + best[1].watch } : null,
+    activeDays,
+  };
 }
 
 export async function resetStats() {
