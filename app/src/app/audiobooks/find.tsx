@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { AbbResults } from '@/components/abb-results';
 import { SourceResults } from '@/components/source-results';
+import { TorboxMatches } from '@/components/torbox-matches';
 import { Body, Button, Cover, Input, Title } from '@/components/ui';
 import { Spacing, makeStyles } from '@/constants/theme';
 import { cleanTitle, getSources, isCatalog } from '@/lib/sources';
@@ -98,6 +99,7 @@ export default function FindBookScreen() {
           onSubmitEditing={() => setSubmitted(query.trim())}
         />
       </View>
+      {submitted ? <TorboxMatches key={`tb:${submitted}`} query={submitted} onPick={onSent} /> : null}
       {submitted ? <AbbResults key={`abb:${submitted}`} query={submitted} onSent={onSent} /> : null}
       {submitted && downloadSources ? (
         <SourceResults
