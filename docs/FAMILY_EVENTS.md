@@ -13,13 +13,13 @@ in 128bittracker's `docs/EVENTS.md` and `src/events.ts`; keep them in step.
   "app": "play",
   "type": "episode.watched",
   "at": 1791427200000,
-  "data": { "show": "Severance", "episode": "S2E3 · Who Is Alive?" }
+  "data": { "show": "Severance", "episode": "S2 E3 · Who Is Alive?" }
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `id` | Unique per event (per account). Sending it twice does nothing. |
+| `id` | Unique per event (per account). Sending it again replaces the event. |
 | `app` | Which 128bit app sent it: `play`, `tracker`, `fit`, `gold`, `music`, `fantasy`, `trip`, `life`. |
 | `type` | `noun.verb`, past tense. |
 | `at` | When it happened, ms since 1970. |
@@ -40,10 +40,16 @@ Live TV sends nothing.
 
 - Events wait on the phone (`128bit.family.queue`, newest 500) and go up a few seconds after they
   happen, when signed in. Signed out or offline, they wait.
-- `log_events(events jsonb)` inserts a batch; duplicates (same `id`) are ignored.
-- `get_events(before_ms bigint, max_rows int)` returns the newest events first, up to 1000; pass the
-  oldest `at` you have as `before_ms` for the next page.
-- A paired TV writes to its owner's feed, like its settings.
+- The feed's SQL is part of the setup SQL (Settings → Account → Copy setup SQL), and the same
+  block is 128bittracker's `supabase/family.sql`. Keep them in step.
+- `log_events(events jsonb)` adds a batch; the same `id` again replaces the event.
+  `get_events(before_ms, max_rows)` reads newest first; `delete_event(event_id)` removes one.
+- Other apps post there too: 128bitfit (workouts, Health Connect totals), Tracker's own
+  "Log anything", and outside apps with a personal key (`log_events_with_key`). Full list:
+  128bittracker's `docs/EVENTS.md`.
+- 128bit Tracker also reads the Trakt and Hardcover connections saved here (Settings → Tracking,
+  synced to the account) to show your Trakt history and Hardcover shelf. It only reads them; it
+  never refreshes the Trakt sign-in, so this app's stays valid.
+- A paired TV writes to its owner's feed.
 
-Existing accounts: run the setup SQL again (Settings → Account → Copy setup SQL). It only adds
-what's missing.
+Existing accounts: run the setup SQL again. It only adds what's missing.
