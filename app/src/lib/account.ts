@@ -14,6 +14,8 @@
  * QR code); a signed-in phone enters it, which links the TV to that account.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
+import * as Linking from 'expo-linking';
 import { AppState } from 'react-native';
 
 import { IS_TV } from '@/constants/tv';
@@ -29,11 +31,20 @@ const LAST_KEY = '128bit.account.last';
 
 export type Project = { url: string; anonKey: string };
 
-/** Baked into the build from the SUPABASE_URL / SUPABASE_ANON_KEY repo secrets, if set. */
-const BUILT_IN: Project | null =
+/**
+ * The 128bit family project: one account for every 128bit app (play, fit, tracker, gold,
+ * life). The publishable key is meant to ship inside apps; the tables are only reachable
+ * through the setup SQL's functions. SUPABASE_URL / SUPABASE_ANON_KEY repo secrets override it.
+ */
+export const FAMILY_PROJECT: Project = {
+  url: 'https://wvflpwtaszpstmjpkrhu.supabase.co',
+  anonKey: 'sb_publishable_dO8uP74cTV1tbuqESgxysw_323C7lWh',
+};
+
+const BUILT_IN: Project =
   process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
     ? { url: process.env.EXPO_PUBLIC_SUPABASE_URL, anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY }
-    : null;
+    : FAMILY_PROJECT;
 
 export const projectBuiltIn = !!BUILT_IN;
 
@@ -161,6 +172,63 @@ export async function signUp(email: string, password: string): Promise<boolean> 
   await saveSession(s);
   await firstSync();
   return true;
+}
+
+// --- Google / Apple ------------------------------------------------------------------
+//
+// Supabase's own sign-in page in the browser, then back through bit128://auth-callback
+// (app/auth-callback.tsx). PKCE: the browser only ever sees the challenge, and the code it
+// returns is worthless without the verifier kept here, so another app catching the link gets
+// nothing. Needs the provider on in Supabase (Authentication → Sign In / Providers) and
+// bit128://auth-callback in Authentication → URL Configuration → Redirect URLs.
+
+export type Provider = 'google' | 'apple';
+export const AUTH_CALLBACK = 'bit128://auth-callback';
+const VERIFIER_KEY = '128bit.account.pkce';
+
+const base64url = (b64: string) => b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/** A fresh verifier and its S256 challenge. */
+async function pkce() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const verifier = Array.from(Crypto.getRandomBytes(64), (b) => chars[b % chars.length]).join('');
+  const challenge = base64url(
+    await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, {
+      encoding: Crypto.CryptoEncoding.BASE64,
+    }),
+  );
+  return { verifier, challenge };
+}
+
+/** Opens the provider's sign-in. The session arrives later, through finishProviderSignIn. */
+export async function startProviderSignIn(provider: Provider) {
+  const p = await getProject();
+  if (!p) throw new Error('No Supabase project set.');
+  const { verifier, challenge } = await pkce();
+  await AsyncStorage.setItem(VERIFIER_KEY, verifier);
+  const url =
+    `${p.url}/auth/v1/authorize?provider=${provider}` +
+    `&redirect_to=${encodeURIComponent(AUTH_CALLBACK)}` +
+    `&code_challenge=${challenge}&code_challenge_method=s256`;
+  await Linking.openURL(url);
+}
+
+/** bit128://auth-callback?code=… → a session. */
+export async function finishProviderSignIn(code: string) {
+  const verifier = await AsyncStorage.getItem(VERIFIER_KEY);
+  if (!verifier) throw new Error('That sign-in link is old. Tap Continue with Google or Apple again.');
+  await AsyncStorage.removeItem(VERIFIER_KEY);
+  const s = toSession(await auth('token?grant_type=pkce', { auth_code: code, code_verifier: verifier }));
+  if (!s) throw new Error('Sign-in failed.');
+  await saveSession(s);
+  await firstSync();
+}
+
+/** Deletes the 128bit family account and everything every 128bit app stored in it. */
+export async function deleteAccount() {
+  await rpc('delete_my_account');
+  await saveSession(null);
+  await AsyncStorage.multiRemove([TIMES_KEY, LAST_KEY]);
 }
 
 export async function signOut() {
@@ -618,12 +686,22 @@ language sql security definer set search_path = public as $$
   delete from family_keys where user_id = auth.uid() and key_hash = decode(key_id, 'hex')
 $$;
 
+-- Deletes the signed-in account and, through the cascades, everything it stored in every
+-- 128bit app: settings, TVs, feed, keys. Required by Google Play and the App Store.
+create or replace function public.delete_my_account() returns void
+language plpgsql security definer set search_path = public, auth as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
+  delete from auth.users where id = auth.uid();
+end $$;
+
 revoke all on function public.family_owner(), public.family_insert(uuid, jsonb), public.log_events(jsonb),
   public.log_events_with_key(text, jsonb), public.delete_event(text), public.get_events(bigint, int),
-  public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text)
-  from public, anon, authenticated;  -- Supabase grants new functions to everyone; family_insert must stay internal.
+  public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text),
+  public.delete_my_account() from public, anon, authenticated;  -- Supabase grants new functions to everyone; family_insert must stay internal.
 grant execute on function public.log_events(jsonb), public.delete_event(text), public.get_events(bigint, int),
-  public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text) to authenticated;
+  public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text),
+  public.delete_my_account() to authenticated;
 -- The one call that works without a sign-in: it checks the key itself.
 grant execute on function public.log_events_with_key(text, jsonb) to anon, authenticated;
 -- End of the family block.

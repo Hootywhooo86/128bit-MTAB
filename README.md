@@ -218,9 +218,11 @@ No TorBox key? The phone and TV apps download torrents themselves with a built-i
 
 ### Account & sync (your own Supabase project)
 
-**Settings → Account & sync** signs you in on every phone and TV so your setup follows you: add-ons (in order), settings, Live TV playlists, TorBox / TMDB / MDBList keys, Trakt and Simkl sign-ins, Continue watching, and on phones also books (library, positions, wanted) and comics (library, progress, follows). Changes are sent a few seconds after you make them and fetched each time the app opens; **Sync now** does both. The TV only takes the video parts and leaves books/comics in the account untouched.
+**Settings → Account & sync** signs you in to your **128bit family account** (Continue with Google, Continue with Apple, or email and password; the same account as 128bitfit and 128bit Tracker). The family project is built into the app (`FAMILY_PROJECT` in `app/src/lib/account.ts`; the `SUPABASE_URL` / `SUPABASE_ANON_KEY` repo secrets override it). **Delete account** removes it from every 128bit app.
 
-Setup, once (free):
+It signs you in on every phone and TV so your setup follows you: add-ons (in order), settings, Live TV playlists, TorBox / TMDB / MDBList keys, Trakt and Simkl sign-ins, Continue watching, and on phones also books (library, positions, wanted) and comics (library, progress, follows). Changes are sent a few seconds after you make them and fetched each time the app opens; **Sync now** does both. The TV only takes the video parts and leaves books/comics in the account untouched.
+
+Running your own project instead (setup, once, free):
 
 1. Create a project at [supabase.com](https://supabase.com) → **New project**.
 2. **SQL Editor** → paste the setup SQL (**Settings → Account & sync → Copy setup SQL** in the app, or `SETUP_SQL` in `app/src/lib/account.ts`) → **Run**.
