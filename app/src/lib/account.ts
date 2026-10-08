@@ -620,7 +620,8 @@ $$;
 
 revoke all on function public.family_owner(), public.family_insert(uuid, jsonb), public.log_events(jsonb),
   public.log_events_with_key(text, jsonb), public.delete_event(text), public.get_events(bigint, int),
-  public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text) from public, anon;
+  public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text)
+  from public, anon, authenticated;  -- Supabase grants new functions to everyone; family_insert must stay internal.
 grant execute on function public.log_events(jsonb), public.delete_event(text), public.get_events(bigint, int),
   public.create_family_key(text), public.list_family_keys(), public.delete_family_key(text) to authenticated;
 -- The one call that works without a sign-in: it checks the key itself.
@@ -628,7 +629,7 @@ grant execute on function public.log_events_with_key(text, jsonb) to anon, authe
 -- End of the family block.
 
 revoke all on function public.settings_owner(), public.get_settings(), public.put_settings(jsonb),
-  public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() from public, anon;
+  public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() from public, anon, authenticated;
 grant execute on function public.get_settings(), public.put_settings(jsonb),
   public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() to authenticated;
 `;
