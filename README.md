@@ -35,6 +35,7 @@ Anime catalogs that addons label as ordinary shows or movies (Kitsu, Crunchyroll
 | Path | What it is |
 |---|---|
 | [`app/`](app) | The mobile app (Expo SDK 57, iOS, Android and web) |
+| [`app/src/family/`](app/src/family) | The 128bit family kit, identical in every 128bit app: pixel font, colours, accent rules, sibling app links, shared event schema |
 | [`addons/librivox/`](addons/librivox) | Example addon: free public-domain LibriVox audiobooks from archive.org |
 | [`docs/ADDON_PROTOCOL.md`](docs/ADDON_PROTOCOL.md) | The addon JSON format, if you want to write your own |
 

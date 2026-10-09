@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
+import { PIXEL_FONT } from '@/family/tokens';
 import { ACCENTS, usePrefs, type AccentId } from '@/lib/prefs';
 
 export type Palette = {
@@ -82,8 +83,8 @@ export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
   };
 }
 
-/** The 128bit pixel font. Use small sizes (8–16): it's big for its point size. */
-export const PixelFont = 'PressStart2P_400Regular';
+/** The 128bit pixel font (src/family/tokens.ts). Use small sizes (8–16): it's big for its point size. */
+export const PixelFont = PIXEL_FONT;
 
 export const Spacing = {
   one: 4,
