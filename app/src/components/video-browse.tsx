@@ -45,7 +45,8 @@ export function VideoBrowse({ type, noun }: Props) {
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
   // Searching Shows also searches the anime catalogs (anime are shows too).
-  const inTab = (tab: string) => tab === type || (!!submitted && type === 'series' && tab === 'anime');
+  const inTab = (tab: string) =>
+    tab === type || tab === 'all' || (!!submitted && type === 'series' && tab === 'anime');
   const rows = addons.flatMap((addon) =>
     addon.manifest.catalogs
       .filter((c) => inTab(catalogTab(addon, c)) && (submitted ? supportsSearch(c) : isBrowsable(c)))
@@ -65,7 +66,7 @@ export function VideoBrowse({ type, noun }: Props) {
     return () => sub.remove();
   }, [submitted]);
 
-  if (loaded && !addons.some((a) => a.manifest.catalogs.some((c) => catalogTab(a, c) === type))) {
+  if (loaded && !addons.some((a) => a.manifest.catalogs.some((c) => [type, 'all'].includes(catalogTab(a, c))))) {
     return (
       <View style={styles.screen}>
         <EmptyState

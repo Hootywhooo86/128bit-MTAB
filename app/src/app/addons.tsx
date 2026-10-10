@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Platform, Text, View } from 'react-native';
 
 import { Chip, SectionTitle, SettingsPage, ThemedSwitch } from '@/components/settings-ui';
 import { Button, Input } from '@/components/ui';
@@ -10,6 +10,8 @@ import {
   DEFAULT_ADDONS,
   installAddon,
   moveAddon,
+  needsPlace,
+  setAddonPlace,
   refreshAddon,
   resourceNames,
   setAddonEnabled,
@@ -17,7 +19,7 @@ import {
 } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
 import { isEnabled } from '@/lib/storage';
-import type { InstalledAddon } from '@/lib/types';
+import type { AddonPlace, InstalledAddon } from '@/lib/types';
 import { Pressable } from '@/components/focusable';
 
 const SUGGESTED = DEFAULT_ADDONS;
@@ -51,6 +53,8 @@ export default function AddonsScreen() {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // An addon 128bit can't place by itself: ask where it goes.
+  const [placing, setPlacing] = useState<InstalledAddon | null>(null);
 
   async function run(key: string, fn: () => Promise<unknown>) {
     setBusy(key);
@@ -68,8 +72,9 @@ export default function AddonsScreen() {
   const install = (target: string) =>
     target.trim() &&
     run(`install:${target}`, async () => {
-      await installAddon(target);
+      const addon = await installAddon(target);
       setUrl('');
+      if (needsPlace(addon)) setPlacing(addon);
     });
 
   const active = all.filter(isEnabled).length;
@@ -137,6 +142,7 @@ export default function AddonsScreen() {
           onRefresh={() =>
             run(`refresh:${addon.manifest.id}`, () => refreshAddon(addon.manifest.id))
           }
+          onPlace={addon.place ? () => setPlacing(addon) : undefined}
           onRemove={() =>
             confirm(`Remove ${addon.manifest.name}?`, () =>
               run(`remove:${addon.manifest.id}`, () => uninstallAddon(addon.manifest.id)),
@@ -144,7 +150,59 @@ export default function AddonsScreen() {
           }
         />
       ))}
+      <PlacePicker
+        addon={placing}
+        onPick={(place) => {
+          const id = placing!.manifest.id;
+          setPlacing(null);
+          run(`place:${id}`, () => setAddonPlace(id, place));
+        }}
+        onClose={() => setPlacing(null)}
+      />
     </SettingsPage>
+  );
+}
+
+const PLACES: { place: AddonPlace; label: string; icon: ComponentProps<typeof Ionicons>['name'] }[] = [
+  { place: 'series', label: 'Shows', icon: 'tv-outline' },
+  { place: 'movie', label: 'Movies', icon: 'film-outline' },
+  { place: 'anime', label: 'Anime', icon: 'sparkles-outline' },
+  { place: 'all', label: 'All', icon: 'apps-outline' },
+];
+const placeLabel = (p: AddonPlace) => PLACES.find((x) => x.place === p)!.label;
+
+/** "Where should this addon go?" — only for addons 128bit can't place by itself. */
+function PlacePicker({
+  addon,
+  onPick,
+  onClose,
+}: {
+  addon: InstalledAddon | null;
+  onPick: (place: AddonPlace) => void;
+  onClose: () => void;
+}) {
+  const Colors = useColors();
+  const styles = useStyles();
+  return (
+    <Modal visible={!!addon} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <View style={styles.sheet}>
+          <Text style={styles.name}>Where should {addon?.manifest.name} go?</Text>
+          <Text style={styles.description}>128bit couldn’t tell from the addon. You can change this later on its card.</Text>
+          <View style={styles.places}>
+            {PLACES.map((p) => (
+              <Pressable
+                key={p.place}
+                style={[styles.place, addon?.place === p.place && { borderColor: Colors.accent }]}
+                onPress={() => onPick(p.place)}>
+                <Ionicons name={p.icon} size={26} color={Colors.accent} />
+                <Text style={styles.placeText}>{p.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -167,9 +225,11 @@ type CardProps = {
   onMove: (delta: -1 | 1) => void;
   onRefresh: () => void;
   onRemove: () => void;
+  /** Only for addons whose tab the user picked. */
+  onPlace?: () => void;
 };
 
-function AddonCard({ addon, first, last, busy, onToggle, onMove, onRefresh, onRemove }: CardProps) {
+function AddonCard({ addon, first, last, busy, onToggle, onMove, onRefresh, onRemove, onPlace }: CardProps) {
   const Colors = useColors();
   const styles = useStyles();
   const { manifest, baseUrl } = addon;
@@ -228,6 +288,11 @@ function AddonCard({ addon, first, last, busy, onToggle, onMove, onRefresh, onRe
         <Chip label={`${resources.length} resources`} />
         <Chip label={`${manifest.catalogs.length} catalogs`} />
         {configurable ? <Chip label="Configurable" /> : null}
+        {onPlace && addon.place ? (
+          <Pressable onPress={onPlace} accessibilityLabel="Change where this addon goes">
+            <Chip label={`In: ${placeLabel(addon.place)} ✎`} />
+          </Pressable>
+        ) : null}
       </View>
       {manifest.description ? <Text style={styles.description}>{manifest.description}</Text> : null}
       <Text style={styles.footer}>{footer}</Text>
@@ -255,6 +320,20 @@ function Action({
 }
 
 const useStyles = makeStyles((Colors) => ({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.four },
+  sheet: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.four, gap: Spacing.three },
+  places: { flexDirection: 'row', gap: Spacing.two },
+  place: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: Spacing.three,
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceRaised,
+  },
+  placeText: { color: Colors.text, fontWeight: '700' },
   stats: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,

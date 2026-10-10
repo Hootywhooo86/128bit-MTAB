@@ -92,7 +92,7 @@ export default function TabLayout() {
         options={{
           title: 'Audiobooks',
           tabBarLabel: 'Books',
-          // Books and Comics are phone-only; the TV app has Shows, Movies, Anime and Live TV.
+          // Books and Comics are phone-only; the TV app has Shows, Movies, Anime and Sports.
           href: IS_TV ? null : undefined,
           tabBarIcon: icon('headset-outline'),
         }}
@@ -110,7 +110,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="live" options={{ title: 'Live TV', tabBarIcon: icon('radio-outline') }} />
+      <Tabs.Screen name="live" options={{ title: 'Sports', tabBarIcon: icon('football-outline') }} />
       <Tabs.Screen
         name="comics"
         options={{

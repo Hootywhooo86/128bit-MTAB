@@ -45,6 +45,12 @@ export default function PlaybackSettings() {
               value={prefs.autoNextChapter}
               onChange={(v) => setPref('autoNextChapter', v)}
             />
+            <ToggleRow
+              title="Watch my series for new books"
+              subtitle="Once a day, new books in the series you have or want go on your Wanted list."
+              value={prefs.watchSeries}
+              onChange={(v) => setPref('watchSeries', v)}
+            />
           </Group>
         </>
       )}

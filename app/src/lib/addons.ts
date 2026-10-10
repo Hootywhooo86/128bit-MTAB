@@ -4,6 +4,7 @@ import { getAddons, saveAddons } from './storage';
 import type {
   BookDetail,
   BookPreview,
+  AddonPlace,
   CatalogDef,
   InstalledAddon,
   Manifest,
@@ -35,20 +36,24 @@ export const DEFAULT_ADDONS = [
 ];
 
 const SEEDED_KEY = '128bit.starterAddons';
-/**
- * The only addons a new install starts with: live TV / sports. Everything else is the
- * user's choice (suggested in Addons). Fill in once the sports addon links are picked.
- */
-const STARTER_ADDONS: string[] = [];
+/** What a new install starts with (once): catalogs, anime, subtitles and live sports (no setup). */
+const STARTER_ADDONS = [
+  'https://v3-cinemeta.strem.io/manifest.json',
+  'https://anime-kitsu.strem.fun/manifest.json',
+  'https://opensubtitles-v3.strem.io/manifest.json',
+  'https://sports.highfly.to/eyJpbmNsdWRlU3BvcnRzIjpbImhvY2tleSIsImZpZ2h0IiwiYmFza2V0YmFsbCIsImZvb3RiYWxsIiwiYW1lcmljYW4tZm9vdGJhbGwiXX0/manifest.json',
+];
 
 /** First launch: install the starter addons (retried next launch if the phone was offline). */
 export async function installDefaultAddons() {
-  if (!STARTER_ADDONS.length || (await AsyncStorage.getItem(SEEDED_KEY))) return;
-  const results = await Promise.allSettled(STARTER_ADDONS.map((url) => installAddon(url)));
-  if (results.some((r) => r.status === 'fulfilled')) await AsyncStorage.setItem(SEEDED_KEY, '1');
+  if (await AsyncStorage.getItem(SEEDED_KEY)) return;
+  let ok = false;
+  // One at a time: each install rewrites the saved list.
+  for (const url of STARTER_ADDONS) ok = (await installAddon(url).then(() => true, () => false)) || ok;
+  if (ok) await AsyncStorage.setItem(SEEDED_KEY, '1');
 }
 
-/** Types shown in the Live TV tab. "tv"/"channel" are channels; the rest are sports and events. */
+/** Types shown in the Sports tab (channels too). "tv"/"channel" are channels; the rest are sports and events. */
 export const CHANNEL_TYPES = ['tv', 'channel'];
 export const SPORT_TYPES = ['sport', 'sports', 'events', 'event', 'live'];
 export const LIVE_TYPES = [...CHANNEL_TYPES, ...SPORT_TYPES];
@@ -82,17 +87,12 @@ function validateManifest(m: Partial<Manifest>): Manifest {
       ...(m.resources ?? []).flatMap((r) => (typeof r === 'object' && r.types) || []),
     ]),
   ];
-  if (!types.some((t) => SUPPORTED_TYPES.includes(t))) {
-    throw new Error(
-      `128bit doesn't know where to put this addon's content (type: ${types.join(', ') || 'none'}). ` +
-        'It understands audiobook, movie, series, tv/channel and sport.',
-    );
-  }
+  // Unknown types are kept: the user picks where the addon goes (needsPlace / setAddonPlace).
   return {
     ...m,
     types,
     resources: m.resources ?? (types.includes('audiobook') ? ['catalog', 'book'] : []),
-    catalogs: (m.catalogs ?? []).filter((c) => SUPPORTED_TYPES.includes(c.type)),
+    catalogs: m.catalogs ?? [],
   } as Manifest;
 }
 
@@ -106,8 +106,8 @@ export async function installAddon(input: string): Promise<InstalledAddon> {
   const addons = await getAddons();
   const existing = addons.findIndex((a) => a.manifest.id === manifest.id);
   if (existing >= 0) {
-    // Reinstalling keeps its place and on/off state.
-    addons[existing] = { ...addon, enabled: addons[existing].enabled };
+    // Reinstalling keeps its order, on/off state and chosen tab.
+    addons[existing] = { ...addon, enabled: addons[existing].enabled, place: addons[existing].place };
     await saveAddons(addons);
   } else {
     await saveAddons([...addons, addon]);
@@ -119,6 +119,15 @@ export async function installAddon(input: string): Promise<InstalledAddon> {
 export async function refreshAddon(id: string) {
   const addon = (await getAddons()).find((a) => a.manifest.id === id);
   if (addon) await installAddon(`${addon.baseUrl}/manifest.json`);
+}
+
+/** 128bit can't tell which tab this addon's content belongs in (and it hasn't been picked). */
+export const needsPlace = (a: InstalledAddon) =>
+  !a.place && !a.manifest.types.some((t) => SUPPORTED_TYPES.includes(t));
+
+export async function setAddonPlace(id: string, place: AddonPlace) {
+  const addons = await getAddons();
+  await saveAddons(addons.map((a) => (a.manifest.id === id ? { ...a, place } : a)));
 }
 
 export async function setAddonEnabled(id: string, enabled: boolean) {
@@ -151,6 +160,8 @@ export function supports(addon: InstalledAddon, resource: string, type: string, 
   return manifest.resources.some((r) => {
     const name = typeof r === 'string' ? r : r.name;
     if (name !== resource) return false;
+    // Placed by the user: it serves its tab (anime items are shows or movies).
+    if (addon.place) return addon.place === 'all' || addon.place === 'anime' || addon.place === type;
     const types = (typeof r === 'object' && r.types) || manifest.types;
     if (!types.includes(type)) return false;
     const prefixes = (typeof r === 'object' && r.idPrefixes) || manifest.idPrefixes;
@@ -167,6 +178,7 @@ const ANIME =
  * "movie" (Kitsu rows, "Top Seeded Anime", Crunchyroll…), so names count too.
  */
 export function catalogTab(addon: InstalledAddon, catalog: CatalogDef): string {
+  if (addon.place) return addon.place; // 'all' = every video tab
   if (catalog.type === 'anime') return 'anime';
   if (catalog.type !== 'series' && catalog.type !== 'movie') return catalog.type;
   // An anime addon (e.g. "Anime Kitsu"): all its show/movie catalogs are anime.

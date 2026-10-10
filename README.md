@@ -2,14 +2,14 @@
 
 Audiobooks, shows, movies, anime, live TV and comics in one app, powered by **addons**, like Stremio/Nuvio for video and PageTurner for audiobooks. When a stream or book comes as a torrent or web link, 128bit sends it to your **TorBox** account and plays the finished files from there.
 
-The bottom row is **Books · Shows · Movies · Anime · Live TV · Comics**; the app opens on Books.
+The bottom row is **Books · Shows · Movies · Anime · Sports · Comics**; the app opens on Books.
 
 | Tab | What it does |
 |---|---|
 | **Shows** | Catalogs from Stremio-compatible addons, search, seasons and episodes, then a stream picker (quality/size badges, filters). Subtitles, audio tracks, Next episode / auto-play. |
 | **Movies** | Same for movies. |
 | **Anime** | Anime catalogs (Kitsu addon), episodes and streams, like Shows. |
-| **Live TV** | Channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
+| **Sports** | Live sports from `sport` addons (Live Now, Today, per sport), plus TV channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
 | **Comics** | **Library**: only comics on the phone (downloaded, grabbed or imported), last read first, plus Import CBZ/CBR. **Find**: GetComics + Pirate Bay (tap **Get**), MangaDex and your Suwayomi sources (open one and download chapters). **Wanted**: where each grabbed comic is, and new issues of series you follow. Reader with scroll-down or page-turn modes, data saver, read marks and next chapter. |
 | **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
@@ -202,7 +202,7 @@ Two kinds, both added in **Settings → Content & Discovery → Audiobook downlo
 
 ### Android TV app ("128bitPlay TV")
 
-Every build also makes `128bit-tv-<version>-build<N>.apk`: the same app for Android TV with **Shows, Movies, Anime and Live TV** only (no Books or Comics). It has its own name and package (`app.bit128.mtab.tv`), so it installs next to the phone app, and it shows in the TV's launcher with a banner. Everything works with the remote: the focused item gets a ring in your accent colour. Live TV has big channel rows and **CH ▲ / CH ▼** buttons in the player to flip through the list you opened. Sideload it with e.g. *Downloader* or *Send Files to TV*. (The phone APK also switches to this layout if it's installed on a TV.)
+Every build also makes `128bit-tv-<version>-build<N>.apk`: the same app for Android TV with **Shows, Movies, Anime and Sports** only (no Books or Comics). It has its own name and package (`app.bit128.mtab.tv`), so it installs next to the phone app, and it shows in the TV's launcher with a banner. Everything works with the remote: the focused item gets a ring in your accent colour. Live TV has big channel rows and **CH ▲ / CH ▼** buttons in the player to flip through the list you opened. Sideload it with e.g. *Downloader* or *Send Files to TV*. (The phone APK also switches to this layout if it's installed on a TV.)
 
 ### Torrents without TorBox (on this device)
 

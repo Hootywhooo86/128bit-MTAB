@@ -39,7 +39,11 @@ export type InstalledAddon = {
   baseUrl: string;
   /** Turned off addons stay installed but aren't used. Missing means on. */
   enabled?: boolean;
+  /** Where its content goes when 128bit can't tell by itself (picked by the user). */
+  place?: AddonPlace;
 };
+
+export type AddonPlace = 'series' | 'movie' | 'anime' | 'all';
 
 // --- Video (Stremio protocol) -----------------------------------------------
 

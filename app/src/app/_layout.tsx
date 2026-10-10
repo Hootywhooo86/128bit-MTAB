@@ -18,6 +18,7 @@ import { syncHardcover } from '@/lib/hardcover';
 import { getSuwayomi } from '@/lib/suwayomi';
 import { runVideoQueue } from '@/lib/video-downloads';
 import { runAutoDownloads } from '@/lib/wanted';
+import { watchSeries } from '@/lib/series-watch';
 import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
 SplashScreen.preventAutoHideAsync();
@@ -83,6 +84,7 @@ function AppNavigator() {
       runVideoQueue().catch(() => {});
       if (IS_TV) return; // audiobooks and comics are phone-only
       runAutoDownloads().catch(() => {});
+      watchSeries().catch(() => {}); // once a day
       // Comics: TorBox → phone, and new issues of followed series (every 6 h).
       runComicQueue().catch(() => {});
       checkFollows().catch(() => {});

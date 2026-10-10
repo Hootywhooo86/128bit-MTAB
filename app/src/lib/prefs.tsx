@@ -34,6 +34,8 @@ export type Prefs = {
   skipForward: number;
   defaultRate: number;
   autoNextChapter: boolean;
+  /** Put newly released books of your series on Wanted (checked daily). */
+  watchSeries: boolean;
   resumeVideos: boolean;
   /** Put streams TorBox already has cached at the top. */
   cachedFirst: boolean;
@@ -75,6 +77,7 @@ export const DEFAULT_PREFS: Prefs = {
   skipForward: 30,
   defaultRate: 1,
   autoNextChapter: true,
+  watchSeries: true,
   resumeVideos: true,
   cachedFirst: true,
   traktScrobble: true,
