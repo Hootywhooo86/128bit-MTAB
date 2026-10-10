@@ -6,27 +6,41 @@ import { useTraktConnected } from '@/components/trakt-actions';
 import { Body, Heading } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePrefs } from '@/lib/prefs';
-import { TRAKT_ROWS, getLists, getTraktRow, poster, searchTrakt, type TraktItem } from '@/lib/trakt-library';
+import { TRAKT_ROWS, getAnimeRow, getLists, getTraktRow, poster, searchTrakt, type TraktItem } from '@/lib/trakt-library';
 import type { MetaPreview } from '@/lib/types';
 
 import { PosterTile } from './video-browse';
 import { Pressable } from '@/components/focusable';
 
-/** Trakt rows for the Shows / Movies tabs, as picked in Settings → Tracking. */
-export function TraktRows({ type }: { type: 'movie' | 'series' }) {
+/** Trakt rows for the Shows / Movies / Anime tabs, as picked in Settings → Tracking. */
+export function TraktRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
   const connected = useTraktConnected();
   const { prefs } = usePrefs();
   const [listNames, setListNames] = useState<Record<string, string>>({});
-  const lists = prefs.traktRows.some((r) => r.startsWith('list:'));
+  const lists = prefs.traktRows.some((r) => r.includes('list:'));
   useEffect(() => {
     if (!connected || !lists) return;
     getLists().then((l) => setListNames(Object.fromEntries(l.map((x) => [`list:${x.id}`, x.name]))), () => {});
   }, [connected, lists]);
   if (!connected) return null;
   const kind = type === 'movie' ? 'movie' : 'show';
+  if (type === 'anime') {
+    // "anime:watchlist" / "anime:list:123": the anime in your watchlist and lists.
+    return (
+      <>
+        {prefs.traktRows
+          .filter((r) => r.startsWith('anime:'))
+          .map((r) => {
+            const row = r.slice(6);
+            const name = row === 'watchlist' ? 'Your watchlist' : listNames[row];
+            return name ? <Row key={r} title={`${name} · Trakt`} load={() => getAnimeRow(row)} type={type} /> : null;
+          })}
+      </>
+    );
+  }
   return (
     <>
-      {prefs.traktRows.map((id) => {
+      {prefs.traktRows.filter((r) => !r.startsWith('anime:')).map((id) => {
         const def = TRAKT_ROWS.find((r) => r.id === id);
         if (def && !(type === 'movie' ? def.movies : def.shows)) return null;
         const name = def?.name ?? listNames[id];
@@ -99,7 +113,7 @@ function Row({
         renderItem={({ item }) => {
           const meta: MetaPreview = {
             id: item.imdb!,
-            type,
+            type: type === 'anime' ? (item.kind === 'movie' ? 'movie' : 'series') : type,
             name: item.kind === 'episode' && item.subtitle ? `${item.title} · ${item.subtitle.split(' · ')[0]}` : item.title,
             poster: poster(item.imdb),
             releaseInfo: item.year ? String(item.year) : undefined,

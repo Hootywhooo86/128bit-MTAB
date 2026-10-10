@@ -17,7 +17,7 @@ import {
   lastSyncTime,
   onAccount,
   pairLink,
-  projectBuiltIn,
+  isOtherProject,
   setProject,
   signIn,
   signOut,
@@ -147,11 +147,29 @@ export default function AccountSettings() {
       {busy ? <ActivityIndicator color={Colors.accent} /> : null}
       {note}
 
-      {project && !IS_TV ? (
+      {project ? (
         <>
-          <SectionTitle>Supabase project</SectionTitle>
+          <SectionTitle>Account server</SectionTitle>
           <Group>
-            <Row icon="server" title={project.url.replace('https://', '')} subtitle={projectBuiltIn ? 'Built into this app' : 'Added on this device'} />
+            {/* Compare phone and TV here: the same server means the same account. */}
+            <Row
+              icon="server"
+              title={project.url.replace('https://', '')}
+              subtitle={isOtherProject(project) ? 'Added on this device' : '128bit account server (built in)'}
+            />
+            {isOtherProject(project) ? (
+              <Row
+                icon="swap-horizontal"
+                title="Use the 128bit account server"
+                subtitle="The same sign-in as the phone and TV apps"
+                onPress={() => run(async () => {
+                  await signOut();
+                  await setProject(null);
+                  getProject().then(setProj);
+                  return 'Now on the 128bit account server. Sign in again.';
+                })}
+              />
+            ) : null}
             <Row
               icon="copy"
               title="Copy setup SQL"
@@ -161,12 +179,6 @@ export default function AccountSettings() {
                 return 'Setup SQL copied.';
               })}
             />
-            {!projectBuiltIn ? (
-              <Row icon="close-circle" title="Use a different project" danger onPress={() => run(async () => {
-                await signOut();
-                await setProject(null);
-              })} />
-            ) : null}
           </Group>
         </>
       ) : null}

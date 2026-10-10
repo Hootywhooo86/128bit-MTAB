@@ -30,6 +30,7 @@ import {
   resumeSavedStream,
   streamsRoute,
   type WatchProgress,
+  isAnime,
 } from '@/lib/video';
 
 import { TraktRows, TraktSearchRow } from './trakt-rows';
@@ -107,7 +108,7 @@ export function VideoBrowse({ type, noun }: Props) {
       </View>
 
       {!submitted ? <ContinueWatchingRow type={type} /> : null}
-      {!submitted && type !== 'anime' ? <TraktRows type={type} /> : null}
+      {!submitted ? <TraktRows type={type} /> : null}
 
       {submitted && rows.length === 0 ? (
         <EmptyState title="Nothing to search" body={`None of your addons can search ${noun}.`} />
@@ -161,8 +162,10 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
           );
         }
         const hidden = await getHiddenContinue();
-        if (!cancelled)
-          setContinuing(merged.filter((p) => (!type || p.link?.type === type) && !hidden.has(p.key)));
+        // Anime tab: the anime you're in the middle of (Kitsu/MAL ids, or opened from Anime).
+        const anime = type === 'anime' ? await Promise.all(merged.map((p) => isAnime(p.link))) : [];
+        const fits = (p: WatchProgress, i: number) => !type || (type === 'anime' ? anime[i] : p.link?.type === type);
+        if (!cancelled) setContinuing(merged.filter((p, i) => fits(p, i) && !hidden.has(p.key)));
       })();
       return () => {
         cancelled = true;

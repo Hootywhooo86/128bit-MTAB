@@ -38,8 +38,9 @@ export function linkFor(item: TraktItem) {
   return { type: item.kind === 'movie' ? 'movie' : 'series', id: item.imdb };
 }
 
-type RawMovie = { title: string; year?: number; ids: TraktIds };
-type RawShow = { title: string; year?: number; ids: TraktIds };
+/** genres / language only come with ?extended=full. */
+type RawMovie = { title: string; year?: number; ids: TraktIds; genres?: string[]; language?: string };
+type RawShow = RawMovie;
 type RawEpisode = { season: number; number: number; title?: string; ids: TraktIds };
 type Raw = {
   id?: number;
@@ -363,6 +364,16 @@ export const searchTrakt = (kind: Kind, query: string) =>
   cached(`search:${kind}:${query}`, async () =>
     items(await traktApi<Raw[]>('GET', `/search/${kind}?query=${encodeURIComponent(query)}&limit=20`)),
   );
+
+/** Anime only, from your watchlist ("watchlist") or one of your lists ("list:123"), for the Anime tab. */
+export const getAnimeRow = (row: string) =>
+  cached(`anime:${row}`, async () => {
+    const path = row === 'watchlist' ? '/sync/watchlist' : `/users/me/lists/${row.slice(5)}/items`;
+    const rows = await traktApi<Raw[]>('GET', `${path}?extended=full`);
+    const anime = (m?: RawMovie) =>
+      !!m?.genres?.includes('anime') || (m?.language === 'ja' && !!m.genres?.includes('animation'));
+    return items(rows.filter((r) => anime(r.show ?? r.movie)));
+  });
 
 /** "Not interested": hides it from your recommendations. */
 export async function hideRecommendation(kind: Kind, traktId: number) {

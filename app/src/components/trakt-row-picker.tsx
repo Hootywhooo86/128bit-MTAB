@@ -21,7 +21,7 @@ export function TraktRowPicker() {
 
   return (
     <>
-      <SectionTitle>Trakt rows on Shows & Movies</SectionTitle>
+      <SectionTitle>Trakt rows on Shows, Movies & Anime</SectionTitle>
       <Group>
         {TRAKT_ROWS.map((r) => (
           <ToggleRow
@@ -39,6 +39,18 @@ export function TraktRowPicker() {
             subtitle={`Your list · ${l.itemCount} items`}
             value={prefs.traktRows.includes(`list:${l.id}`)}
             onChange={(v) => toggle(`list:${l.id}`, v)}
+          />
+        ))}
+      </Group>
+      <SectionTitle>On the Anime tab</SectionTitle>
+      <Group>
+        {[{ id: 'watchlist', name: 'Your watchlist' }, ...lists.map((l) => ({ id: `list:${l.id}`, name: l.name }))].map((r) => (
+          <ToggleRow
+            key={r.id}
+            title={r.name}
+            subtitle="Just the anime in it"
+            value={prefs.traktRows.includes(`anime:${r.id}`)}
+            onChange={(v) => toggle(`anime:${r.id}`, v)}
           />
         ))}
       </Group>

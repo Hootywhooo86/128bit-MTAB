@@ -29,13 +29,22 @@ const LAST_KEY = '128bit.account.last';
 
 export type Project = { url: string; anonKey: string };
 
-/** Baked into the build from the SUPABASE_URL / SUPABASE_ANON_KEY repo secrets, if set. */
-const BUILT_IN: Project | null =
-  process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
-    ? { url: process.env.EXPO_PUBLIC_SUPABASE_URL, anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY }
-    : null;
+/**
+ * The 128bit account server, the same for the phone and TV apps (and future 128bit apps:
+ * one sign-in, each app with its own data under APP_KEY). The publishable key is meant to
+ * ship in apps; the tables are only reachable through the per-user functions in SETUP_SQL.
+ * The SUPABASE_URL / SUPABASE_ANON_KEY build secrets can still point a build elsewhere.
+ */
+const BUILT_IN: Project = {
+  url: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://wvflpwtaszpstmjpkrhu.supabase.co',
+  anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_dO8uP74cTV1tbuqESgxysw_323C7lWh',
+};
+/** This app's data in the shared account (phone and TV share it). */
+export const APP_KEY = '128bit-play';
 
-export const projectBuiltIn = !!BUILT_IN;
+export const projectBuiltIn = true;
+/** A project pasted on this device that isn't the 128bit account server. */
+export const isOtherProject = (p: Project | null) => !!p && p.url !== BUILT_IN.url;
 
 export async function getProject(): Promise<Project | null> {
   try {
@@ -363,7 +372,7 @@ export function syncNow(): Promise<SyncResult | null> {
 async function doSync(): Promise<SyncResult | null> {
   const s = await getSession();
   if (!isSignedIn(s) || !(await getProject())) return null;
-  const remote = ((await rpc<Doc | null>('get_settings')) ?? { v: 1, sections: {} }) as Doc;
+  const remote = ((await rpc<Doc | null>('get_settings', { app_key: APP_KEY })) ?? { v: 1, sections: {} }) as Doc;
   remote.sections ??= {};
   const times = await readTimes();
   const pulled: string[] = [];
@@ -385,7 +394,7 @@ async function doSync(): Promise<SyncResult | null> {
     }
   }
   dirty.clear();
-  if (pushed.length) await rpc('put_settings', { new_data: remote });
+  if (pushed.length) await rpc('put_settings', { new_data: remote, app_key: APP_KEY });
   await AsyncStorage.multiSet([
     [TIMES_KEY, JSON.stringify(times)],
     [LAST_KEY, String(now)],
@@ -448,11 +457,14 @@ export async function claimTv(code: string) {
 /** Deep link the TV's QR code opens on a phone. */
 export const pairLink = (code: string) => `bit128://settings/account?pair=${code}`;
 
-export const SETUP_SQL = `-- 128bitPlay accounts & sync. Run once in Supabase → SQL Editor.
+export const SETUP_SQL = `-- 128bit accounts & sync. Run once in Supabase → SQL Editor.
+-- One sign-in for every 128bit app; each app keeps its own data (app_key).
 create table if not exists public.user_settings (
-  user_id uuid primary key references auth.users on delete cascade,
+  user_id uuid not null references auth.users on delete cascade,
+  app text not null default '128bit-play',
   data jsonb not null default '{}',
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (user_id, app)
 );
 create table if not exists public.tv_devices (
   device_id uuid primary key references auth.users on delete cascade,
@@ -472,15 +484,15 @@ language sql stable security definer set search_path = public as $$
     auth.uid())
 $$;
 
-create or replace function public.get_settings() returns jsonb
+create or replace function public.get_settings(app_key text default '128bit-play') returns jsonb
 language sql stable security definer set search_path = public as $$
-  select data from user_settings where user_id = settings_owner()
+  select data from user_settings where user_id = settings_owner() and app = app_key
 $$;
 
-create or replace function public.put_settings(new_data jsonb) returns void
+create or replace function public.put_settings(new_data jsonb, app_key text default '128bit-play') returns void
 language sql security definer set search_path = public as $$
-  insert into user_settings (user_id, data, updated_at) values (settings_owner(), new_data, now())
-  on conflict (user_id) do update set data = excluded.data, updated_at = now()
+  insert into user_settings (user_id, app, data, updated_at) values (settings_owner(), app_key, new_data, now())
+  on conflict (user_id, app) do update set data = excluded.data, updated_at = now()
 $$;
 
 create or replace function public.start_tv_pairing(pair_code text) returns void
@@ -509,8 +521,9 @@ language sql stable security definer set search_path = public, auth as $$
    where d.device_id = auth.uid()
 $$;
 
-revoke all on function public.settings_owner(), public.get_settings(), public.put_settings(jsonb),
+revoke all on function public.settings_owner(), public.get_settings(text), public.put_settings(jsonb, text),
   public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() from public, anon;
-grant execute on function public.get_settings(), public.put_settings(jsonb),
+grant execute on function public.get_settings(text), public.put_settings(jsonb, text),
   public.start_tv_pairing(text), public.claim_tv(text), public.tv_status() to authenticated;
+revoke execute on function public.settings_owner() from authenticated;
 `;
