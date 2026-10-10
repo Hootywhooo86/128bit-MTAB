@@ -5,6 +5,8 @@
  *
  * 128bit identifies titles by IMDb id ("tt…"); episodes as "tt…:season:episode".
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { traktApi } from './trakt';
 
 export type Kind = 'movie' | 'show';
@@ -157,6 +159,48 @@ export async function setEpisodeWatched(imdb: string, season: number, episode: n
   invalidate('progress:', 'upnext');
 }
 
+// --- Anime (Kitsu, MAL…) on Trakt -------------------------------------------------
+
+const LINKS_KEY = '128bit.traktLinks';
+const EP_KEY = '128bit.traktEpisodes';
+const readMap = async (k: string): Promise<Record<string, string>> => {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(k)) ?? '{}');
+  } catch {
+    return {};
+  }
+};
+const putMap = async (k: string, key: string, value: string) =>
+  AsyncStorage.setItem(k, JSON.stringify({ ...(await readMap(k)), [key]: value }));
+
+/** Pick this IMDb title for a non-IMDb id ("kitsu:123"); remembered. */
+export const setTraktLink = (id: string, imdb: string) => putMap(LINKS_KEY, id, imdb);
+
+/**
+ * The IMDb id Trakt knows this title by: the id itself, the one the catalog gives, one picked
+ * before, or Trakt's best title match. Null when nothing fits (offer "Link to Trakt").
+ */
+export async function traktLink(
+  id: string,
+  meta?: { name: string; imdb_id?: string; releaseInfo?: string },
+  kind: Kind = 'show',
+): Promise<string | null> {
+  if (/^tt\d+$/.test(id)) return id;
+  const saved = (await readMap(LINKS_KEY))[id];
+  if (saved) return saved;
+  let imdb = meta?.imdb_id && /^tt\d+$/.test(meta.imdb_id) ? meta.imdb_id : null;
+  if (!imdb && meta?.name) {
+    const year = Number(meta.releaseInfo?.slice(0, 4));
+    const hits = (await searchTrakt(kind, meta.name).catch(() => [])).filter((h) => h.imdb);
+    imdb = (hits.find((h) => !year || h.year === year) ?? hits[0])?.imdb ?? null;
+  }
+  if (imdb) await setTraktLink(id, imdb);
+  return imdb;
+}
+
+/** Remember which Trakt episode ("tt…:season:episode") an anime episode id is, for the auto-tick. */
+export const rememberEpisode = (episodeId: string, traktKey: string) => putMap(EP_KEY, episodeId, traktKey);
+
 // An episode played to the end: the show page ticks it straight away.
 const finishedListeners = new Set<(imdb: string, key: string) => void>();
 export function onEpisodeFinished(f: (imdb: string, key: string) => void) {
@@ -169,8 +213,12 @@ export function onEpisodeFinished(f: (imdb: string, key: string) => void) {
  * already records it; otherwise it's added to the history here.
  */
 export async function episodeFinished(key: string, scrobbled: boolean) {
+  const anime = !/^tt\d+:/.test(key);
+  // Anime episodes: the Trakt episode remembered when it was opened from its page.
+  if (anime) key = (await readMap(EP_KEY))[key] ?? key;
   const m = key.match(/^(tt\d+):(\d+):(\d+)$/);
   if (!m) return;
+  scrobbled &&= !anime; // scrobbles only go out for IMDb ids
   finishedListeners.forEach((f) => f(m[1], `${m[2]}:${m[3]}`));
   if (scrobbled) invalidate('progress:', 'upnext');
   else await setEpisodeWatched(m[1], Number(m[2]), Number(m[3]), true);

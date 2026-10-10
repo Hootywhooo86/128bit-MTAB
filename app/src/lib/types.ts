@@ -61,6 +61,8 @@ export type MetaPreview = {
   releaseInfo?: string;
   imdbRating?: string;
   genres?: string[];
+  /** Kitsu and other non-IMDb catalogs often say which IMDb title it is. */
+  imdb_id?: string;
 };
 
 export type Episode = {
@@ -74,6 +76,9 @@ export type Episode = {
   thumbnail?: string;
   overview?: string;
   description?: string;
+  /** Kitsu: the same episode in IMDb/Trakt numbering. */
+  imdbSeason?: number;
+  imdbEpisode?: number;
 };
 
 export type MetaDetail = MetaPreview & { videos?: Episode[]; runtime?: string };

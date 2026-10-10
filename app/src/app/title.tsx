@@ -6,8 +6,8 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DownloadedPlay } from '@/components/downloaded-play';
-import { TraktActions, useTraktConnected } from '@/components/trakt-actions';
-import { getShowProgress, onEpisodeFinished, setEpisodeWatched } from '@/lib/trakt-library';
+import { LinkToTrakt, TraktActions, useTraktConnected } from '@/components/trakt-actions';
+import { getShowProgress, onEpisodeFinished, rememberEpisode, setEpisodeWatched, traktLink } from '@/lib/trakt-library';
 import { StreamList } from '@/components/stream-list';
 import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
@@ -19,6 +19,9 @@ import { setSeriesContext } from '@/lib/video';
 import { Pressable } from '@/components/focusable';
 
 const episodeNumber = (e: Episode) => e.episode ?? e.number ?? 0;
+
+/** The episode in Trakt's numbering (Kitsu gives IMDb season/episode when they differ). */
+const traktEp = (e: Episode) => `${e.imdbSeason ?? e.season}:${e.imdbEpisode ?? episodeNumber(e)}`;
 
 function episodeLabel(e: Episode) {
   const name = e.title ?? e.name;
@@ -44,17 +47,21 @@ export default function TitleScreen() {
   const trakt = useTraktConnected();
   const [watchedEps, setWatchedEps] = useState<Set<string>>(new Set());
   const [epError, setEpError] = useState<string | null>(null);
+  // The IMDb id Trakt knows this by (anime from Kitsu etc. get linked); undefined while looking.
+  const [imdb, setImdb] = useState<string | null | undefined>(/^tt\d+$/.test(id) ? id : undefined);
   useEffect(() => {
-    if (!trakt || type === 'movie' || !/^tt\d+$/.test(id)) return;
-    getShowProgress(id).then((p) => setWatchedEps(new Set(p.done)), () => {});
+    if (!trakt || type === 'movie' || !imdb) return;
+    getShowProgress(imdb).then((p) => setWatchedEps(new Set(p.done)), () => {});
     // Finished in the player: tick it now.
-    return onEpisodeFinished((imdb, key) => {
-      if (imdb === id) setWatchedEps((cur) => new Set(cur).add(key));
+    return onEpisodeFinished((show, key) => {
+      if (show === imdb) setWatchedEps((cur) => new Set(cur).add(key));
     });
-  }, [trakt, type, id]);
-  async function toggleEpisode(season?: number, ep?: number) {
-    if (!trakt || season === undefined || ep === undefined || !/^tt\d+$/.test(id)) return;
-    const key = `${season}:${ep}`;
+  }, [trakt, type, imdb]);
+  async function toggleEpisode(e: Episode) {
+    if (!trakt || !imdb) return;
+    const key = traktEp(e);
+    const [season, ep] = key.split(':').map(Number);
+    if (!Number.isFinite(season) || !Number.isFinite(ep)) return;
     const on = !watchedEps.has(key);
     setWatchedEps((cur) => {
       const next = new Set(cur);
@@ -64,7 +71,7 @@ export default function TitleScreen() {
     });
     try {
       setEpError(null);
-      await setEpisodeWatched(id, season, ep, on);
+      await setEpisodeWatched(imdb, season, ep, on);
     } catch (e) {
       setEpError(e instanceof Error ? e.message : String(e));
     }
@@ -76,6 +83,10 @@ export default function TitleScreen() {
       .then(setMeta)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [type, id, addon]);
+  useEffect(() => {
+    if (!trakt || !meta || imdb) return;
+    traktLink(id, meta, type === 'movie' ? 'movie' : 'show').then(setImdb, () => setImdb(null));
+  }, [trakt, meta, id, type, imdb]);
 
   const seasons = useMemo(() => {
     const set = new Set((meta?.videos ?? []).map((v) => v.season ?? 0));
@@ -141,7 +152,11 @@ export default function TitleScreen() {
           </Body>
         ) : null}
         {extra ? <TmdbDetails data={extra} /> : null}
-        <TraktActions type={type} imdb={id} />
+        {imdb ? (
+          <TraktActions type={type} imdb={imdb} />
+        ) : imdb === null ? (
+          <LinkToTrakt id={id} name={meta.name} kind={type === 'movie' ? 'movie' : 'show'} onLinked={setImdb} />
+        ) : null}
 
         {isSeries ? (
           <>
@@ -161,7 +176,7 @@ export default function TitleScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-            {trakt && /^tt\d+$/.test(id) ? (
+            {trakt && imdb ? (
               <Text style={styles.epSub}>Hold an episode to mark it watched on Trakt.</Text>
             ) : null}
             {epError ? <Text style={[styles.epSub, { color: Colors.danger }]}>{epError}</Text> : null}
@@ -169,8 +184,10 @@ export default function TitleScreen() {
               <Pressable
                 key={e.id}
                 style={styles.episode}
-                onLongPress={() => toggleEpisode(e.season, episodeNumber(e))}
+                onLongPress={() => toggleEpisode(e)}
                 onPress={() => {
+                  // Anime: remember its Trakt episode so finishing it ticks it on Trakt.
+                  if (imdb && imdb !== id) rememberEpisode(e.id, `${imdb}:${traktEp(e)}`);
                   // Watch order for "Next episode": regular seasons in order, specials skipped.
                   setSeriesContext({
                     metaId: id,
@@ -217,7 +234,7 @@ export default function TitleScreen() {
                     </Text>
                   ) : null}
                 </View>
-                {watchedEps.has(`${e.season}:${episodeNumber(e)}`) ? (
+                {watchedEps.has(traktEp(e)) ? (
                   <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
                 ) : null}
               </Pressable>

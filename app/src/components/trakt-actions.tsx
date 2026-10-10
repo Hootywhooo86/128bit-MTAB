@@ -11,6 +11,8 @@ import {
   getListItems,
   getLists,
   rate,
+  searchTrakt,
+  setTraktLink,
   setCollected,
   setFavorite,
   setInList,
@@ -32,6 +34,64 @@ export function useTraktConnected() {
     (async () => setOn((await traktConfigured()) && (await isConnected())))();
   }, []);
   return on;
+}
+
+/** No Trakt match for this anime (or other non-IMDb title) yet: search and pick it once. */
+export function LinkToTrakt({
+  id,
+  name,
+  kind,
+  onLinked,
+}: {
+  id: string;
+  name: string;
+  kind: Kind;
+  onLinked: (imdb: string) => void;
+}) {
+  const styles = useStyles();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(name);
+  const [hits, setHits] = useState<Awaited<ReturnType<typeof searchTrakt>> | null>(null);
+  const search = (q: string) => searchTrakt(kind, q).then((h) => setHits(h.filter((x) => x.imdb)), () => setHits([]));
+  return (
+    <View style={styles.wrap}>
+      <Button
+        label="Link to Trakt"
+        variant="secondary"
+        onPress={() => {
+          setOpen(true);
+          search(query);
+        }}
+      />
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+          <Pressable style={styles.modal} onPress={() => {}}>
+            <Text style={styles.heading}>Which one is it on Trakt?</Text>
+            <Input value={query} onChangeText={setQuery} returnKeyType="search" onSubmitEditing={() => search(query)} />
+            {!hits ? <ActivityIndicator /> : null}
+            <ScrollView style={{ maxHeight: 360 }}>
+              {hits?.map((h) => (
+                <Pressable
+                  key={h.imdb}
+                  style={styles.listRow}
+                  onPress={async () => {
+                    await setTraktLink(id, h.imdb!);
+                    setOpen(false);
+                    onLinked(h.imdb!);
+                  }}>
+                  <Text style={styles.listName}>
+                    {h.title}
+                    {h.year ? ` (${h.year})` : ''}
+                  </Text>
+                </Pressable>
+              ))}
+              {hits && !hits.length ? <Text style={styles.listName}>Nothing found. Try other words.</Text> : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
 }
 
 /** Trakt buttons for a movie or show: watchlist, watched, collection, favorite, rating, lists, check-in. */

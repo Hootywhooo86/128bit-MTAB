@@ -186,7 +186,7 @@ function PlacePicker({
   return (
     <Modal visible={!!addon} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.sheet}>
+        <Pressable style={styles.sheet} onPress={() => {}}>
           <Text style={styles.name}>Where should {addon?.manifest.name} go?</Text>
           <Text style={styles.description}>128bit couldn’t tell from the addon. You can change this later on its card.</Text>
           <View style={styles.places}>
@@ -200,7 +200,7 @@ function PlacePicker({
               </Pressable>
             ))}
           </View>
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );
