@@ -131,6 +131,7 @@ let lastTick = 0;
 let listenedSeconds = 0;
 let lastLockKey = '';
 let sleepMark: number | null = null;
+let lockScreenOn = false;
 let sleepTimer: ReturnType<typeof setTimeout> | null = null;
 
 let audio: AudioPlayer | null = null;
@@ -293,10 +294,18 @@ async function loadChapter(target: PlayableBook, index: number, startAt = 0, aut
     // Opening a book from the library just shows where you are; it plays when you tap Play.
     if (autoPlay) p.play();
     lastLockKey = '';
-    p.setActiveForLockScreen(true, lockScreenInfo(target, index, null), {
-      showSeekForward: true,
-      showSeekBackward: true,
-    });
+    // Set up the lock screen / notification once. Doing it again (new book or chapter) makes
+    // expo-audio rebuild its media session without staying a foreground service, and Android
+    // then stops the app in the background a few minutes later. After that, only update it.
+    if (!lockScreenOn) {
+      lockScreenOn = true;
+      p.setActiveForLockScreen(true, lockScreenInfo(target, index, null), {
+        showSeekForward: true,
+        showSeekBackward: true,
+      });
+    } else {
+      p.updateLockScreenMetadata(lockScreenInfo(target, index, null));
+    }
     finished = false;
     saveProgress(target.key, {
       chapter: index,
