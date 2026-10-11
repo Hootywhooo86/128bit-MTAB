@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - 'app/**'
+      - 'desktop/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
@@ -107,9 +108,51 @@ jobs:
           name: ${{ steps.apk.outputs.name }}
           path: app/${{ steps.apk.outputs.name }}
 
-  # Both APKs on one release, once both builds are done.
+  # "128bitPlay for Windows": the app's web build in an Electron window (desktop/), same sign-in.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+      EXPO_PUBLIC_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+      EXPO_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
+      EXPO_PUBLIC_RELEASES_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Export the web build
+        working-directory: app
+        run: |
+          npm ci
+          npx expo export -p web --output-dir ../desktop/web
+
+      - name: Build the installer
+        working-directory: desktop
+        shell: bash
+        run: |
+          npm ci --no-audit --no-fund --include=dev
+          name="128bit-windows-$(node -p "require('./package.json').version")-build${{ github.run_number }}.exe"
+          npx electron-builder --win nsis --publish never -c.nsis.artifactName="$name"
+          cp "dist/$name" .
+          echo "EXE=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.EXE }}
+          path: desktop/${{ env.EXE }}
+
+  # Both APKs and the Windows installer on one release, once all builds are done.
   release:
-    needs: build
+    needs: [build, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -124,9 +167,9 @@ jobs:
           name: 128bit ${{ needs.build.outputs.version }} (build ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           prerelease: true
-          files: apks/*.apk
+          files: apks/*
           body: |
-            **Phone:** `128bit-…apk` (arm64 phones, Android 7+). **Android TV:** `128bit-tv-…apk` ("128bitPlay TV": Shows, Movies, Anime, Live TV). Built from `${{ github.ref_name }}` at ${{ github.sha }}.
+            **Phone:** `128bit-…apk` (arm64 phones, Android 7+). **Android TV:** `128bit-tv-…apk` ("128bitPlay TV": Shows, Movies, Anime, Live TV). **Windows:** `128bit-windows-…exe` (installs and opens; if SmartScreen warns, tap More info → Run anyway). Built from `${{ github.ref_name }}` at ${{ github.sha }}.
 
             **Install:** open this page on your phone, tap the `.apk` under Assets, then open the download and tap Install.
             Builds are signed with the same key, so new ones install over the old one and keep your settings.

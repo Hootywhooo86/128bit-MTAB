@@ -2,6 +2,8 @@
  * "Check for updates": compares this build with the newest GitHub release of the
  * app (every push builds one). A private repo needs a read-only GitHub token.
  */
+import { Platform } from 'react-native';
+
 import { IS_TV } from '@/constants/tv';
 
 import { secureGet, secureSet } from './storage';
@@ -51,7 +53,9 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
     build,
     name: newest.name,
     pageUrl: newest.html_url,
-    // Each release has the phone APK and the TV APK ("…-tv-…"); pick the one for this app.
-    apkUrl: newest.assets.find((a) => a.name.endsWith('.apk') && /-tv-/.test(a.name) === IS_TV)?.browser_download_url,
+    // Each release has the phone APK, the TV APK ("…-tv-…") and the Windows installer; pick this app's.
+    apkUrl: newest.assets.find((a) =>
+      Platform.OS === 'web' ? a.name.endsWith('.exe') : a.name.endsWith('.apk') && /-tv-/.test(a.name) === IS_TV,
+    )?.browser_download_url,
   };
 }

@@ -1,0 +1,35 @@
+{
+  "name": "128bitplay-desktop",
+  "productName": "128bitPlay",
+  "version": "1.0.0",
+  "description": "128bitPlay for Windows: the app's web build in a desktop window.",
+  "repository": "github:Hootywhooo86/128bit-MTAB",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "web": "cd ../app && npx expo export -p web --output-dir ../desktop/web",
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.4.2",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.hootywhooo86.128bitplay.desktop",
+    "productName": "128bitPlay",
+    "files": [
+      "main.js",
+      "web/**"
+    ],
+    "icon": "../app/assets/images/icon.png",
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
+  },
+  "author": "128bit"
+}
