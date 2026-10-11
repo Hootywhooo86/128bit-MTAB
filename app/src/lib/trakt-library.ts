@@ -173,6 +173,9 @@ const readMap = async (k: string): Promise<Record<string, string>> => {
 const putMap = async (k: string, key: string, value: string) =>
   AsyncStorage.setItem(k, JSON.stringify({ ...(await readMap(k)), [key]: value }));
 
+/** IMDb ids of anime linked to Trakt (so Trakt's own items can be recognised as anime). */
+export const linkedAnimeImdb = async () => new Set(Object.values(await readMap(LINKS_KEY)));
+
 /** Pick this IMDb title for a non-IMDb id ("kitsu:123"); remembered. */
 export const setTraktLink = (id: string, imdb: string) => putMap(LINKS_KEY, id, imdb);
 

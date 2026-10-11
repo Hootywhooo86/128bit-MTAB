@@ -21,7 +21,7 @@ import { useAddons } from '@/lib/hooks';
 import type { CatalogDef, InstalledAddon, MetaPreview } from '@/lib/types';
 import { usePrefs } from '@/lib/prefs';
 import { getPlayback, isConnected, traktConfigured } from '@/lib/trakt';
-import { getPlaybackRows, removePlayback } from '@/lib/trakt-library';
+import { getPlaybackRows, linkedAnimeImdb, removePlayback } from '@/lib/trakt-library';
 import {
   getHiddenContinue,
   getWatchProgress,
@@ -163,7 +163,12 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
         }
         const hidden = await getHiddenContinue();
         // Anime tab: the anime you're in the middle of (Kitsu/MAL ids, or opened from Anime).
-        const anime = type === 'anime' ? await Promise.all(merged.map((p) => isAnime(p.link))) : [];
+        // Trakt's paused items have IMDb ids: anime you've linked (opened from Anime) count too.
+        const linked = type === 'anime' ? await linkedAnimeImdb() : new Set<string>();
+        const anime =
+          type === 'anime'
+            ? await Promise.all(merged.map(async (p) => (await isAnime(p.link)) || linked.has(p.link?.id ?? '')))
+            : [];
         const fits = (p: WatchProgress, i: number) => !type || (type === 'anime' ? anime[i] : p.link?.type === type);
         if (!cancelled) setContinuing(merged.filter((p, i) => fits(p, i) && !hidden.has(p.key)));
       })();
