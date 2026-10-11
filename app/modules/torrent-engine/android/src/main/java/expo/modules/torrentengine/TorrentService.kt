@@ -87,7 +87,10 @@ class TorrentService : Service() {
     else @Suppress("DEPRECATION") Notification.Builder(this)
     return b.setContentTitle("128bitPlay")
       .setContentText(text)
-      .setSmallIcon(android.R.drawable.stat_sys_download)
+      .setSmallIcon(
+        resources.getIdentifier("ic_stat_128bit", "drawable", packageName).takeIf { it != 0 }
+          ?: android.R.drawable.stat_sys_download,
+      )
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setContentIntent(open)

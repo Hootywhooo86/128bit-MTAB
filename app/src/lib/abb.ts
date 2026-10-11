@@ -54,7 +54,7 @@ async function fetchMirror(path: string) {
   let last: unknown;
   for (const host of [workingHost, ...MIRRORS.filter((h) => h !== workingHost)]) {
     try {
-      const res = await fetchWithTimeout(`https://${host}${path}`, 7000);
+      const res = await fetchWithTimeout(`https://${host}${path}`, 15000);
       if (res.status >= 500 && res.status !== 503) throw new Error(`AudiobookBay answered ${res.status}`);
       workingHost = host;
       return res;

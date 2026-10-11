@@ -2,8 +2,8 @@ import { PressStart2P_400Regular, useFonts } from '@expo-google-fonts/press-star
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { AppState, Text, View } from 'react-native';
 
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
@@ -23,6 +23,19 @@ import { PrefsProvider, usePrefs } from '@/lib/prefs';
 
 SplashScreen.preventAutoHideAsync();
 
+/** Something broke while drawing: say so (with a way out) instead of leaving a black screen. */
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', padding: 24, gap: 16 }}>
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800' }}>Something went wrong</Text>
+      <Text style={{ color: '#9e9e9e' }}>{error.message}</Text>
+      <Text onPress={() => retry()} style={{ color: '#FF8A2B', fontSize: 16, fontWeight: '700' }}>
+        Try again
+      </Text>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   return (
     <PrefsProvider>
@@ -36,7 +49,13 @@ function AppNavigator() {
   const { loaded: prefsLoaded } = usePrefs();
   // The 128bit pixel font (headings, player); if it fails to load, the normal font is used.
   const [fontLoaded, fontError] = useFonts({ PressStart2P_400Regular });
-  const loaded = prefsLoaded && (fontLoaded || !!fontError);
+  // Never sit on the black splash: if settings or the font take over 4 s, start anyway.
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  const loaded = timedOut || (prefsLoaded && (fontLoaded || !!fontError));
 
   // Keep the splash screen up until the saved theme is known, so it doesn't flash.
   useEffect(() => {
