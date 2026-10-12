@@ -41,6 +41,40 @@ async function load() {
 
 const save = (q: FamilyEvent[]) => AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(q)).catch(() => {});
 
+/**
+ * Ids and episode numbers for a watched movie/episode, from its key
+ * ("tt0078748", "tt11280740:1:3", "kitsu:46474:5"), so 128bit Tracker files it
+ * under the right title and season and knows when the season is done.
+ */
+export function watchedDetails(
+  key: string,
+  opts: { series?: { episodes: { id: string }[] }; anime?: boolean; poster?: string } = {},
+): Record<string, string | number | undefined> {
+  const out: Record<string, string | number | undefined> = {};
+  const imdb = key.match(/^(tt\d+)(?::(\d+):(\d+))?$/);
+  const kitsu = key.match(/^kitsu:(\d+)(?::(\d+))?$/);
+  if (imdb) {
+    out.imdb = imdb[1];
+    if (imdb[2]) {
+      out.season = Number(imdb[2]);
+      out.number = Number(imdb[3]);
+      const inSeason = (opts.series?.episodes ?? []).filter((e) => e.id.split(':')[1] === imdb[2]).length;
+      if (inSeason) out.season_episodes = inSeason;
+    }
+  } else if (kitsu) {
+    out.kitsu = Number(kitsu[1]);
+    if (kitsu[2]) {
+      out.season = 1;
+      out.number = Number(kitsu[2]);
+      const count = opts.series?.episodes.length;
+      if (count) out.season_episodes = count;
+    }
+  }
+  if (opts.anime) out.anime = 1;
+  if (opts.poster) out.poster = opts.poster;
+  return out;
+}
+
 export async function emitFamilyEvent(type: FamilyEventType, data: FamilyEvent['data']) {
   const q = await load();
   q.push({ id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`, app: 'play', type, at: Date.now(), data });

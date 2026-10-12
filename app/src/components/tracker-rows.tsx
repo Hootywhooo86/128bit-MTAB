@@ -1,0 +1,120 @@
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, Text, View } from 'react-native';
+
+import { Body, Heading } from '@/components/ui';
+import { Spacing, makeStyles, useColors } from '@/constants/theme';
+import { usePrefs } from '@/lib/prefs';
+import {
+  asRowItems,
+  getTrackerListItems,
+  getTrackerLists,
+  getTrackerUpNext,
+  getTrackerWatchlist,
+  kindFor,
+  trackerSignedIn,
+  type TrackerItem,
+} from '@/lib/tracker';
+import { poster, type TraktItem } from '@/lib/trakt-library';
+import type { MetaPreview } from '@/lib/types';
+
+import { PosterTile } from './video-browse';
+import { Pressable } from '@/components/focusable';
+
+type Row = { key: string; title: string; items: TraktItem[] };
+
+/**
+ * Your 128bit Tracker on the Shows / Movies / Anime tabs: Up next, Watchlist,
+ * then every list you marked "Show in 128bitPlay", for whoever is signed in.
+ */
+export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
+  const { prefs } = usePrefs();
+  const styles = useStyles();
+  const Colors = useColors();
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const kind = kindFor(type);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        if (!prefs.trackerRows || !(await trackerSignedIn())) {
+          if (!cancelled) { setSignedIn(false); setRows([]); }
+          return;
+        }
+        if (!cancelled) setSignedIn(true);
+        try {
+          const ofKind = (items: TrackerItem[]) => items.filter((i) => i.type === kind);
+          const out: Row[] = [];
+          if (kind !== 'movie') {
+            const up = ofKind(await getTrackerUpNext());
+            if (up.length) out.push({ key: 'upnext', title: 'Up next', items: await asRowItems(up) });
+          }
+          const wl = await getTrackerWatchlist(kind);
+          if (wl.length) out.push({ key: 'watchlist', title: 'Watchlist', items: await asRowItems(wl) });
+          for (const list of await getTrackerLists(kind)) {
+            const items = (await getTrackerListItems(list.id)).filter((i) => list.kind !== 'mixed' || i.type === kind);
+            if (items.length) out.push({ key: `list:${list.id}`, title: list.name, items: await asRowItems(items) });
+          }
+          if (!cancelled) setRows(out.filter((r) => r.items.length));
+        } catch {
+          if (!cancelled) setRows([]); // Tracker not set up on this account server yet
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [kind, prefs.trackerRows]),
+  );
+
+  if (!prefs.trackerRows || !signedIn || rows === null) return null;
+  if (!rows.length) {
+    return (
+      <View style={styles.hint}>
+        <Body muted>Build your lists in 128bit Tracker (Library → + New list, “Show in 128bitPlay”) and they show up here.</Body>
+      </View>
+    );
+  }
+  return (
+    <>
+      {rows.map((r) => (
+        <View key={r.key} style={{ gap: Spacing.two }}>
+          <View style={styles.head}>
+            <Heading style={{ flex: 1 }}>{r.title} · Tracker</Heading>
+            {r.key === 'upnext' ? (
+              <Pressable onPress={() => router.push('/tracker')} hitSlop={8}>
+                <Text style={{ color: Colors.accent, fontWeight: '700' }}>Calendar</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <FlatList
+            horizontal
+            initialNumToRender={6}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            data={r.items.slice(0, 40)}
+            keyExtractor={(i) => `${i.imdb}:${i.subtitle ?? ''}`}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+            renderItem={({ item }) => {
+              const meta: MetaPreview = {
+                id: item.imdb!,
+                type: type === 'anime' ? (item.kind === 'movie' ? 'movie' : 'series') : type,
+                name: item.kind === 'episode' && item.subtitle ? `${item.title} · ${item.subtitle}` : item.title,
+                poster: poster(item.imdb),
+                releaseInfo: item.year ? String(item.year) : undefined,
+              };
+              return <PosterTile meta={meta} />;
+            }}
+          />
+        </View>
+      ))}
+    </>
+  );
+}
+
+const useStyles = makeStyles(() => ({
+  head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.three },
+  hint: { paddingHorizontal: Spacing.three },
+}));
