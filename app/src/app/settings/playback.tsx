@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Linking, PermissionsAndroid, Platform } from 'react-native';
 
 import { ChoiceRow, Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { usePrefs } from '@/lib/prefs';
@@ -44,6 +44,7 @@ export default function PlaybackSettings() {
               onChange={(v) => setPref('defaultRate', v)}
             />
             <BatteryRow />
+            <NotificationRow />
             <ToggleRow
               title="Auto-play next chapter"
               subtitle="Keep going when a chapter ends."
@@ -171,6 +172,36 @@ function BatteryRow() {
       }
       value={ok ? 'On' : 'Turn on'}
       onPress={ok ? undefined : askBatteryUnrestricted}
+    />
+  );
+}
+
+const NOTIFY = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+const needsNotifyPermission = Platform.OS === 'android' && Number(Platform.Version) >= 33;
+
+/** Player notification and lock-screen controls need notification permission on Android 13+. */
+function NotificationRow() {
+  const [ok, setOk] = useState(true);
+  useEffect(() => {
+    if (!needsNotifyPermission) return;
+    const check = () => PermissionsAndroid.check(NOTIFY).then(setOk, () => {});
+    check();
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && check());
+    return () => sub.remove();
+  }, []);
+  if (ok) return null;
+  return (
+    <Row
+      icon="notifications-outline"
+      title="Player notification is off"
+      subtitle="Turn on notifications to get play/pause controls on the lock screen and in your notifications."
+      value="Turn on"
+      onPress={async () => {
+        // Android stops asking after two "Don't allow"s: then open the app's settings instead.
+        const r = await PermissionsAndroid.request(NOTIFY);
+        if (r === PermissionsAndroid.RESULTS.GRANTED) setOk(true);
+        else Linking.openSettings();
+      }}
     />
   );
 }

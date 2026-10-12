@@ -127,7 +127,7 @@ async function noticeOnce() {
 
 // --- The TorBox-shaped calls ------------------------------------------------------------
 
-/** Android 13+: ask once so the "Downloading…" notification can show. */
+/** Android 13+: ask so the player and "Downloading…" notifications can show (no-op once allowed). */
 async function askNotifications() {
   if (Platform.OS !== 'android' || Number(Platform.Version) < 33) return;
   const perm = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
@@ -142,8 +142,12 @@ export const askBatteryUnrestricted = () => engine?.askBatteryUnrestricted();
 
 const BATTERY_ASKED = '128bit.batteryAsked';
 
-/** First audiobook play: ask once for Unrestricted battery so books never get paused in the background. */
+/**
+ * Playing a book: the player notification and lock-screen controls need notification permission
+ * (Android 13+), then ask once for Unrestricted battery so books never get paused in the background.
+ */
 export async function askBackgroundPlaybackOnce() {
+  await askNotifications().catch(() => {});
   if (batteryUnrestricted() || (await AsyncStorage.getItem(BATTERY_ASKED))) return;
   await AsyncStorage.setItem(BATTERY_ASKED, '1');
   askBatteryUnrestricted();
