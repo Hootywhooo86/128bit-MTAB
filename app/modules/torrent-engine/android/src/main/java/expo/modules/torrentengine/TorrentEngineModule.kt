@@ -1,6 +1,11 @@
 package expo.modules.torrentengine
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -71,6 +76,24 @@ class TorrentEngineModule : Module() {
     AsyncFunction("setOptions") { wifiOnly: Boolean?, vpnOnly: Boolean?, seedRatioPct: Int? ->
       TorrentHolder.setOptions(context, wifiOnly, vpnOnly, seedRatioPct)
       mapOf("blocked" to TorrentHolder.blockedReason)
+    }
+
+    /** True when Android's battery saver can't pause the app in the background ("Unrestricted"). */
+    Function("batteryUnrestricted") {
+      (context.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /** Asks Android to let the app run unrestricted in the background (system Allow / Deny dialog). */
+    @SuppressLint("BatteryLife")
+    Function("askBatteryUnrestricted") {
+      val ask = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))
+      try {
+        context.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      } catch (_: Exception) {
+        // Some phones hide that dialog: open the battery settings list instead.
+        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
+      Unit
     }
   }
 }

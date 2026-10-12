@@ -1,8 +1,79 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
+index 992239b..5ff4de2 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
+@@ -77,12 +77,19 @@ class AudioModule : Module() {
+   }
+ 
+   private var audioFocusRequest: AudioFocusRequest? = null
++  private var lastFocusRegrab = 0L
+   private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+     appContext.mainQueue.launch {
+       when (focusChange) {
++        // 128bitPlay: another app took over audio. Keep playing (only you or a call pause a book) and
++        // take focus back, so calls still reach us. An app fighting back gets one try per 10 s.
+         AudioManager.AUDIOFOCUS_LOSS -> {
+           focusAcquired = false
+-          allPlayables.forEach { it.pause() }
++          val now = System.currentTimeMillis()
++          if (allPlayables.any { it.isPlaying } && now - lastFocusRegrab > 10_000) {
++            lastFocusRegrab = now
++            requestAudioFocus()
++          }
+         }
+ 
+         AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+@@ -95,21 +102,11 @@ class AudioModule : Module() {
+           }
+         }
+ 
++        // 128bitPlay: a notification sound or directions: turn down for a moment, never pause.
+         AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+-          if (interruptionMode == InterruptionMode.DUCK_OTHERS) {
+-            allPlayables.forEach { playable ->
+-              if (playable.previousVolume != playable.volume) {
+-                playable.previousVolume = playable.volume
+-              }
+-              playable.setVolume(playable.previousVolume * 0.5f)
+-            }
+-          } else {
+-            allPlayables.forEach { playable ->
+-              if (playable.isPlaying) {
+-                playable.isPaused = true
+-                playable.pause()
+-              }
+-            }
++          // previousVolume stays your volume, so it comes back on AUDIOFOCUS_GAIN.
++          allPlayables.forEach { playable ->
++            if (!playable.isMuted) playable.player.volume = playable.previousVolume * 0.3f
+           }
+         }
+ 
+@@ -147,8 +144,9 @@ class AudioModule : Module() {
+ 
+     val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+       val requestType = interruptionMode?.let {
++        // 128bitPlay: long listening, so ask for lasting focus (transient focus gets taken back sooner).
+         if (it == InterruptionMode.DO_NOT_MIX) {
+-          AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
++          AudioManager.AUDIOFOCUS_GAIN
+         } else {
+           AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+         }
+@@ -169,7 +167,7 @@ class AudioModule : Module() {
+     } else {
+       @Suppress("DEPRECATION")
+       val requestType = if (interruptionMode == InterruptionMode.DO_NOT_MIX) {
+-        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
++        AudioManager.AUDIOFOCUS_GAIN
+       } else {
+         AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+       }
 diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
-index c76a9fd..6f486f4 100644
+index c76a9fd..54e50d0 100644
 --- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
 +++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioPlayer.kt
-@@ -32,9 +32,11 @@ class AudioPlayer(
+@@ -32,11 +32,17 @@ class AudioPlayer(
    appContext: AppContext,
    source: MediaSource?,
    updateInterval: Double,
@@ -15,8 +86,14 @@ index c76a9fd..6f486f4 100644
 +  player = ExoPlayer.Builder(context, levelTap.renderersFactory(context))
      .setLooper(context.mainLooper)
      .setAudioAttributes(AudioAttributes.DEFAULT, false)
++    // 128bitPlay: hold a CPU + Wi-Fi lock while playing, so streamed books don't stall with the screen off.
++    .setWakeMode(C.WAKE_MODE_NETWORK)
++    // Headphones / Bluetooth disconnected: pause instead of playing out loud.
++    .setHandleAudioBecomingNoisy(true)
      .setSeekForwardIncrementMs(SEEK_JUMP_INTERVAL_MS)
-@@ -164,20 +166,9 @@ class AudioPlayer(
+     .setSeekBackIncrementMs(SEEK_JUMP_INTERVAL_MS)
+     .apply {
+@@ -164,20 +170,9 @@ class AudioPlayer(
    }
  
    fun setSamplingEnabled(enabled: Boolean) {

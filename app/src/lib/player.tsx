@@ -38,6 +38,7 @@ import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } f
 import { httpRangeReader, readMp4Chapters } from './mp4-chapters';
 import { usePrefs } from './prefs';
 import { addToLibrary, bookFraction, getProgress, saveProgress } from './storage';
+import { askBackgroundPlaybackOnce } from './torrent-device';
 import type { Chapter, PlayableBook } from './types';
 
 const SAVE_EVERY_MS = 10_000;
@@ -322,6 +323,7 @@ async function loadChapter(target: PlayableBook, index: number, startAt = 0, aut
 }
 
 async function playBook(nextBook: PlayableBook, chapter?: number, autoPlay = true) {
+  if (autoPlay) askBackgroundPlaybackOnce().catch(() => {});
   // No cover (e.g. a TorBox download)? Find one, for the app and the lock screen.
   if (!nextBook.cover) {
     const cover = await Promise.race([

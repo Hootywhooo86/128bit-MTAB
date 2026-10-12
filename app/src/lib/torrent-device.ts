@@ -46,6 +46,8 @@ type Engine = {
   remove(id: number, deleteFiles: boolean): Promise<void>;
   wake(): Promise<void>;
   setOptions(wifiOnly: boolean | null, vpnOnly: boolean | null, seedRatioPct: number | null): Promise<{ blocked: string | null }>;
+  batteryUnrestricted(): boolean;
+  askBatteryUnrestricted(): void;
 };
 
 const engine = requireOptionalNativeModule<Engine>('TorrentEngine');
@@ -130,6 +132,21 @@ async function askNotifications() {
   if (Platform.OS !== 'android' || Number(Platform.Version) < 33) return;
   const perm = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
   if (!(await PermissionsAndroid.check(perm))) await PermissionsAndroid.request(perm);
+}
+
+/** Android's battery saver can't pause the app in the background (true where it doesn't apply). */
+export const batteryUnrestricted = () => engine?.batteryUnrestricted() ?? true;
+
+/** Opens Android's "Let 128bitPlay always run in the background?" dialog. */
+export const askBatteryUnrestricted = () => engine?.askBatteryUnrestricted();
+
+const BATTERY_ASKED = '128bit.batteryAsked';
+
+/** First audiobook play: ask once for Unrestricted battery so books never get paused in the background. */
+export async function askBackgroundPlaybackOnce() {
+  if (batteryUnrestricted() || (await AsyncStorage.getItem(BATTERY_ASKED))) return;
+  await AsyncStorage.setItem(BATTERY_ASKED, '1');
+  askBatteryUnrestricted();
 }
 
 /** App opened: carry on with saved torrents (Android 15 limits background time per day). */

@@ -1,5 +1,9 @@
-import { ChoiceRow, Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
+
+import { ChoiceRow, Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { usePrefs } from '@/lib/prefs';
+import { askBatteryUnrestricted, batteryUnrestricted } from '@/lib/torrent-device';
 import { SUBTITLE_LANGUAGES, languageName } from '@/lib/subtitles';
 import { IS_TV } from '@/constants/tv';
 
@@ -39,6 +43,7 @@ export default function PlaybackSettings() {
               options={RATES}
               onChange={(v) => setPref('defaultRate', v)}
             />
+            <BatteryRow />
             <ToggleRow
               title="Auto-play next chapter"
               subtitle="Keep going when a chapter ends."
@@ -144,5 +149,28 @@ export default function PlaybackSettings() {
         />
       </Group>
     </SettingsPage>
+  );
+}
+
+/** Android's battery saver can pause background apps; "Unrestricted" keeps books playing. */
+function BatteryRow() {
+  const [ok, setOk] = useState(batteryUnrestricted);
+  // Re-check when you come back from Android's dialog.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && setOk(batteryUnrestricted()));
+    return () => sub.remove();
+  }, []);
+  return (
+    <Row
+      icon="battery-charging-outline"
+      title="Always play in the background"
+      subtitle={
+        ok
+          ? 'On: Android can\'t pause your book to save battery.'
+          : 'Off: Android may pause your book to save battery. Tap and choose Allow.'
+      }
+      value={ok ? 'On' : 'Turn on'}
+      onPress={ok ? undefined : askBatteryUnrestricted}
+    />
   );
 }
