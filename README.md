@@ -37,6 +37,7 @@ Anime catalogs that addons label as ordinary shows or movies (Kitsu, Crunchyroll
 | [`app/`](app) | The mobile app (Expo SDK 57, iOS, Android and web) |
 | [`addons/librivox/`](addons/librivox) | Example addon: free public-domain LibriVox audiobooks from archive.org |
 | [`docs/ADDON_PROTOCOL.md`](docs/ADDON_PROTOCOL.md) | The addon JSON format, if you want to write your own |
+| [`docs/FAMILY_EVENTS.md`](docs/FAMILY_EVENTS.md) | The 128bit family event feed that 128bit Tracker reads |
 
 ## How streams are played
 
@@ -217,9 +218,11 @@ No TorBox key? The phone and TV apps download torrents themselves with a built-i
 
 ### Account & sync (your own Supabase project)
 
-**Settings → Account & sync** signs you in on every phone and TV so your setup follows you: add-ons (in order), settings, Live TV playlists, TorBox / TMDB / MDBList keys, Trakt and Simkl sign-ins, Continue watching, and on phones also books (library, positions, wanted) and comics (library, progress, follows). Changes are sent a few seconds after you make them and fetched each time the app opens; **Sync now** does both. The TV only takes the video parts and leaves books/comics in the account untouched.
+**Settings → Account & sync** signs you in to your **128bit family account** (Continue with Google, Continue with Apple, or email and password; the same account as 128bitfit and 128bit Tracker). The family project is built into the app (`FAMILY_PROJECT` in `app/src/lib/account.ts`; the `SUPABASE_URL` / `SUPABASE_ANON_KEY` repo secrets override it). **Delete account** removes it from every 128bit app.
 
-Setup, once (free):
+It signs you in on every phone and TV so your setup follows you: add-ons (in order), settings, Live TV playlists, TorBox / TMDB / MDBList keys, Trakt and Simkl sign-ins, Continue watching, and on phones also books (library, positions, wanted) and comics (library, progress, follows). Changes are sent a few seconds after you make them and fetched each time the app opens; **Sync now** does both. The TV only takes the video parts and leaves books/comics in the account untouched.
+
+Running your own project instead (setup, once, free):
 
 1. Create a project at [supabase.com](https://supabase.com) → **New project**.
 2. **SQL Editor** → paste the setup SQL (**Settings → Account & sync → Copy setup SQL** in the app, or `SETUP_SQL` in `app/src/lib/account.ts`) → **Run**.
@@ -228,6 +231,10 @@ Setup, once (free):
 5. On the phone: **Create account** (email + password). On the TV: Settings → Account & sync shows a code and a QR code; scan the QR with the phone (or enter the code under **Sign in a TV**) and the TV fills in.
 
 Your settings and keys are stored in your own project; the tables can only be reached through the setup functions, each account sees only its own row, and a paired TV sees only its owner's.
+
+### 128bit Tracker (family timeline)
+
+Signed in, 128bitPlay also posts what you finish to your account's **family feed**: books finished, movies and episodes watched, comic chapters read. [128bit Tracker](https://github.com/hootywhooo86/128bittracker) signs in to the same Supabase project and shows them on its timeline next to the other 128bit apps. Events wait on the phone until you're signed in. Already set up? Run the setup SQL again; it only adds the feed. Format: [`docs/FAMILY_EVENTS.md`](docs/FAMILY_EVENTS.md).
 
 ## Install on your phone
 
