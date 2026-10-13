@@ -55,16 +55,9 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
             return items.filter((i) => !seen.has(showKey(i)) && !!seen.add(showKey(i)));
           };
           const out: Row[] = [];
-          // Continue: partway through, on this device or any other (newest first, so the latest season wins).
+          // Play's own Continue watching covers what you're partway through: no second row here,
+          // but those shows stay out of Up next (newest first, so the latest season wins).
           const cont = onePerShow(ofKind(await getTrackerInProgress().catch(() => [])));
-          if (cont.length) {
-            const items = cont.map((i) => ({
-              ...i,
-              title: `${i.title} · ${Math.round(i.now?.pct ?? i.pct ?? 0)}%`,
-              next: i.now?.episode ? { season: i.season ?? 1, number: i.now.episode } : undefined,
-            }));
-            out.push({ key: 'continue', title: 'Continue', items: await asRowItems(items) });
-          }
           if (kind !== 'movie') {
             // Shows already in Continue don't show again here.
             const up = onePerShow(ofKind(await getTrackerUpNext()), new Set(cont.map(showKey)));
