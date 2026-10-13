@@ -31,6 +31,7 @@ import {
 } from '@/lib/subtitles';
 import { MANUAL_SKIP_S, MANUAL_WINDOW_S, getSegments, type Segment } from '@/lib/skip';
 import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
+import { watchedDetails } from '@/lib/family';
 import { simklScrobble } from '@/lib/simkl';
 import { scrobble } from '@/lib/trakt';
 import { episodeFinished } from '@/lib/trakt-library';
@@ -360,7 +361,9 @@ export default function WatchScreen() {
         known.current.time / known.current.duration > 0.9
       ) {
         counted = true;
-        markWatched(entry);
+        isAnime(item.link)
+          .catch(() => false)
+          .then((anime) => markWatched(entry, watchedDetails(item.key, { series: item.series, anime, poster: item.poster })));
         // Tick the episode on Trakt (scrobbling records it itself, past 80%).
         if (kind === 'episode') {
           if (prefs.traktScrobble) scrobble('stop', item.key, item.link?.type, 95).catch(() => {});

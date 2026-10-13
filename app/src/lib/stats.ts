@@ -106,18 +106,17 @@ export async function addWatching(
 }
 
 /** Counted as watched once you get near the end. */
-export async function markWatched(item: {
-  key: string;
-  title: string;
-  subtitle?: string;
-  kind: WatchKind;
-}) {
+export async function markWatched(
+  item: { key: string; title: string; subtitle?: string; kind: WatchKind },
+  /** What 128bit Tracker needs to file it: the title's ids, the season's length, anime or not. */
+  extra: Record<string, string | number | undefined> = {},
+) {
   const s = await getStats();
   const w = (s.watched[item.key] ??= { ...item, seconds: 0, at: Date.now() });
   if (!w.finished) {
     w.finishedAt = Date.now();
-    if (item.kind === 'movie') emitFamilyEvent('movie.watched', { title: item.title });
-    if (item.kind === 'episode') emitFamilyEvent('episode.watched', { show: item.title, episode: item.subtitle });
+    if (item.kind === 'movie') emitFamilyEvent('movie.watched', { title: item.title, ...extra });
+    if (item.kind === 'episode') emitFamilyEvent('episode.watched', { show: item.title, episode: item.subtitle, ...extra });
   }
   w.finished = true;
   scheduleSave();

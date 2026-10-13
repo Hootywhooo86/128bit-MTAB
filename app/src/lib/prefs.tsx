@@ -43,6 +43,8 @@ export type Prefs = {
   traktContinueWatching: boolean;
   /** Trakt rows on the Shows / Movies tabs, in order ("trending", "list:123", …). */
   traktRows: string[];
+  /** 128bit Tracker rows (Up next, Watchlist, your lists) on the Shows / Movies / Anime tabs. */
+  trackerRows: boolean;
   /** 3-letter code, e.g. "eng". */
   subtitleLanguage: string;
   autoSubtitles: boolean;
@@ -83,6 +85,7 @@ export const DEFAULT_PREFS: Prefs = {
   traktScrobble: true,
   traktContinueWatching: true,
   traktRows: ['upnext', 'watchlist'],
+  trackerRows: true,
   subtitleLanguage: 'eng',
   autoSubtitles: false,
   subtitleSize: 'medium',

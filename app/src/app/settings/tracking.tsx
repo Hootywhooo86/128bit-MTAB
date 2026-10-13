@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Text, TextInput } from 'react-native';
 
-import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
+import { Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { TraktRowPicker } from '@/components/trakt-row-picker';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
 import { HardcoverCard } from '@/components/hardcover-card';
@@ -112,6 +112,17 @@ export default function TrackingSettings() {
 
   return (
     <SettingsPage>
+      <SectionTitle>128bit Tracker</SectionTitle>
+      <Group>
+        <ToggleRow
+          title="Tracker rows"
+          subtitle="Up next, Watchlist and your 128bit Tracker lists (marked “Show in 128bitPlay”) on Shows, Movies and Anime. Uses your 128bit account: everyone sees their own."
+          value={prefs.trackerRows}
+          onChange={(v) => setPref('trackerRows', v)}
+        />
+        <Row icon="calendar-outline" title="Up next & coming up" subtitle="New episodes and releases for what you track" onPress={() => router.push('/tracker')} />
+      </Group>
+
       <LinearGradient
         colors={['#8E2DE2', '#D6206A', '#ED1C24']}
         start={{ x: 0, y: 0 }}
