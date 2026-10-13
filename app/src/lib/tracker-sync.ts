@@ -1,7 +1,8 @@
 /**
  * Everything you read, watch and listen to here, in your 128bit Tracker: audiobooks
  * (listening and finished), comics (chapters read), movies and show seasons (watched and
- * in progress), plus Wanted books as planned. Sent with the 128bit sign-in to
+ * in progress, down to how far into each one: meta.pct and meta.now), plus Wanted books
+ * as planned. Sent with the 128bit sign-in to
  * track_items, which only ever moves things forward (128bittracker/supabase/tracker.sql),
  * so running it again is harmless. Runs after sign-in, then at most every 30 minutes
  * while the app is open, and from Settings → Tracking → "Send my history now".
@@ -38,6 +39,7 @@ export type HistoryItem = {
 };
 
 const iso = (ms?: number) => (ms ? new Date(ms).toISOString() : undefined);
+const pctOf = (part: number, whole: number) => (whole > 0 ? Math.max(0, Math.min(100, Math.round((part / whole) * 100))) : 0);
 
 /** "tt0078748" / "tt11280740:1:3" / "kitsu:46474:5" → ids, season, episode. */
 export function parseKey(key: string) {
@@ -70,7 +72,10 @@ export async function collectHistory(): Promise<HistoryItem[]> {
       type: 'book', title: b.title, creator: b.author, poster: b.cover,
       status: finished ? 'done' : 'active',
       finished_at: finished ? iso(st?.finishedAt ?? p?.updatedAt) : undefined,
-      meta: { format: 'audiobook', listened_pct: p ? Math.round(p.fraction * 100) : finished ? 100 : undefined },
+      meta: (() => {
+        const pct = finished ? 100 : p ? Math.round(p.fraction * 100) : undefined;
+        return { format: 'audiobook', listened_pct: pct, pct };
+      })(),
     });
   }
   for (const w of await getWanted().catch(() => [])) {
@@ -81,11 +86,20 @@ export async function collectHistory(): Promise<HistoryItem[]> {
   // Comics: chapters read.
   const comicProgress = await getAllComicProgress();
   for (const c of await getComicLibrary()) {
-    const read = comicProgress[c.id]?.read.length ?? stats.comics[c.id]?.chapters ?? 0;
+    const cp = comicProgress[c.id];
+    const read = cp?.read.length ?? stats.comics[c.id]?.chapters ?? 0;
+    const total = Number(c.lastChapter);
+    const reading = cp && !cp.read.includes(cp.chapterId) ? cp : undefined;
+    const meta: Record<string, unknown> = {};
+    if (total > 0) meta.pct = pctOf(read, total);
+    // The chapter you're in the middle of, and the page.
+    if (reading) meta.now = { chapter: reading.chapterLabel.replace(/^(ch(apter)?\.?\s*)/i, '').slice(0, 40), page: reading.page + 1, pages: reading.pages || undefined, pct: pctOf(reading.page + 1, reading.pages), at: iso(reading.updatedAt) };
     out.push({
       type: 'comic', title: c.title, creator: c.author, poster: c.cover,
-      status: read > 0 ? 'active' : 'planned', progress: read || undefined,
-      started_at: read ? iso(comicProgress[c.id]?.updatedAt) : undefined,
+      status: read > 0 || reading ? 'active' : 'planned', progress: read || undefined,
+      progress_total: total > 0 && Number.isInteger(total) ? total : undefined,
+      started_at: read || reading ? iso(cp?.updatedAt) : undefined,
+      meta: Object.keys(meta).length ? meta : undefined,
     });
   }
 
@@ -97,7 +111,7 @@ export async function collectHistory(): Promise<HistoryItem[]> {
     const k = parseKey(key);
     if (w.kind === 'movie') {
       if (!w.finished && w.seconds < 60) continue;
-      movie.set(key, { type: 'movie', title: w.title, ids: k?.ids, status: w.finished ? 'done' : 'active', finished_at: w.finished ? iso(w.finishedAt) : undefined });
+      movie.set(key, { type: 'movie', title: w.title, ids: k?.ids, status: w.finished ? 'done' : 'active', finished_at: w.finished ? iso(w.finishedAt) : undefined, meta: w.finished ? { pct: 100 } : undefined });
       continue;
     }
     if (!k?.season || !k.episode) continue;
@@ -109,11 +123,26 @@ export async function collectHistory(): Promise<HistoryItem[]> {
     item.progress = Math.max(item.progress ?? 0, watchedUpTo);
     seasons.set(sKey, item);
   }
-  // Continue watching: movies you're partway through.
+  // Continue watching: exactly how far into each movie and episode.
   for (const p of await getWatchProgress().catch(() => [])) {
-    if (p.link?.type !== 'movie' || movie.has(p.key)) continue;
     const k = parseKey(p.key);
-    movie.set(p.key, { type: 'movie', title: p.title, poster: p.poster, ids: k?.ids, status: 'active' });
+    const pct = pctOf(p.position, p.duration);
+    const now = { pct, position_s: Math.round(p.position), duration_s: Math.round(p.duration), at: iso(p.updatedAt) };
+    if (p.link?.type === 'movie') {
+      const prev = movie.get(p.key);
+      if (prev?.status === 'done') continue; // already watched; a rewatch doesn't undo it
+      movie.set(p.key, { ...(prev ?? { type: 'movie', title: p.title, ids: k?.ids, status: 'active' }), poster: prev?.poster ?? p.poster, meta: { pct, now } });
+      continue;
+    }
+    if (!k?.season || !k.episode || !p.title) continue;
+    const sKey = `${p.title.toLowerCase()}|${k.season}`;
+    const anime = k.anime || (await isAnime({ type: 'series', id: String(k.ids.imdb ?? '') }).catch(() => false));
+    const item = seasons.get(sKey) ?? { type: anime ? 'anime' : 'show', title: p.title, poster: p.poster, ids: k.ids, season: k.season, status: 'active', progress: k.episode - 1 };
+    if (k.episode > (item.progress ?? 0)) {
+      const prevNow = (item.meta?.now as { at?: string } | undefined)?.at;
+      if (!prevNow || (now.at ?? '') > prevNow) item.meta = { ...item.meta, now: { ...now, episode: k.episode } };
+    }
+    seasons.set(sKey, item);
   }
   out.push(...movie.values(), ...seasons.values());
   return out.filter((i) => i.title);
