@@ -24,6 +24,9 @@ export type TrackerItem = {
   season?: number | null;
   ids: { imdb?: string; tmdb?: number; tvdb?: number; anilist?: number; mal?: number; kitsu?: number | string; trakt?: number };
   next?: { season: number; number: number };
+  /** 0..100 through the whole title, and where you are right now (from any device). */
+  pct?: number | null;
+  now?: { pct?: number; episode?: number; chapter?: string; page?: number; position_s?: number; duration_s?: number; at?: string } | null;
 };
 
 export type TrackerList = { id: string; name: string; kind: TrackerKind; item_count: number; show_in_play: boolean };
@@ -60,6 +63,11 @@ export function getTrackerListItems(listId: string) {
 
 export function getTrackerWatchlist(kind?: TrackerKind) {
   return cached(`watchlist:${kind ?? ''}`, () => rpc<TrackerItem[]>('get_watchlist', { kind: kind ?? null, max_rows: 60 }));
+}
+
+/** Everything you're partway through, on any device, most recent first. */
+export function getTrackerInProgress() {
+  return cached('inprogress', () => rpc<TrackerItem[]>('get_in_progress', { max_rows: 40 }));
 }
 
 export function getTrackerUpNext() {
