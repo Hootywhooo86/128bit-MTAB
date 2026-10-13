@@ -72,7 +72,7 @@ export function reportBookProgress(
   const pct = finished ? 100 : Math.round(fraction * 100);
   if (!finished && pct < 1) return;
   send(book.key, {
-    type: 'book', title: book.title, creator: book.author, poster: book.cover,
+    type: 'book', title: book.title, creator: book.author, poster: book.cover, ids: { play: book.key },
     status: finished ? 'done' : 'active',
     meta: { format: 'audiobook', listened_pct: pct, pct },
   }, urgent || finished);
@@ -93,7 +93,7 @@ export function reportComicProgress(
   };
   if (total > 0) meta.pct = pctOf(read, total);
   send(`comic:${comic.id}`, {
-    type: 'comic', title: comic.title, creator: comic.author, poster: comic.cover,
+    type: 'comic', title: comic.title, creator: comic.author, poster: comic.cover, ids: { play: comic.id },
     status: 'active', progress: read || undefined,
     progress_total: total > 0 && Number.isInteger(total) ? total : undefined,
     meta,

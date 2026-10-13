@@ -60,7 +60,7 @@ export async function collectHistory(): Promise<HistoryItem[]> {
     if (!started) continue;
     seenBooks.add(b.title.toLowerCase());
     out.push({
-      type: 'book', title: b.title, creator: b.author, poster: b.cover,
+      type: 'book', title: b.title, creator: b.author, poster: b.cover, ids: { play: key },
       status: finished ? 'done' : 'active',
       finished_at: finished ? iso(st?.finishedAt ?? p?.updatedAt) : undefined,
       meta: (() => {
@@ -86,7 +86,7 @@ export async function collectHistory(): Promise<HistoryItem[]> {
     // The chapter you're in the middle of, and the page.
     if (reading) meta.now = { chapter: reading.chapterLabel.replace(/^(ch(apter)?\.?\s*)/i, '').slice(0, 40), page: reading.page + 1, pages: reading.pages || undefined, pct: pctOf(reading.page + 1, reading.pages), at: iso(reading.updatedAt) };
     out.push({
-      type: 'comic', title: c.title, creator: c.author, poster: c.cover,
+      type: 'comic', title: c.title, creator: c.author, poster: c.cover, ids: { play: c.id },
       status: read > 0 || reading ? 'active' : 'planned', progress: read || undefined,
       progress_total: total > 0 && Number.isInteger(total) ? total : undefined,
       started_at: read || reading ? iso(cp?.updatedAt) : undefined,
