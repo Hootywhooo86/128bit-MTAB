@@ -7,8 +7,9 @@ import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePrefs } from '@/lib/prefs';
 import {
   asRowItems,
+  getAllTrackerLists,
   getTrackerListItems,
-  getTrackerLists,
+  listPlaces,
   getTrackerInProgress,
   getTrackerUpNext,
   getTrackerWatchlist,
@@ -64,8 +65,11 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
           }
           const wl = await getTrackerWatchlist(kind);
           if (wl.length) out.push({ key: 'watchlist', title: 'Watchlist', items: await asRowItems(wl) });
-          for (const list of await getTrackerLists(kind)) {
-            const items = (await getTrackerListItems(list.id)).filter((i) => list.kind !== 'mixed' || i.type === kind);
+          // Your lists, on whichever tabs you put them (Settings → Tracking → Where your lists go).
+          const places = prefs.trackerListPlaces ?? {};
+          for (const list of (await getAllTrackerLists()).filter((l) => listPlaces(l, places).includes(type))) {
+            const placed = !!places[list.id];
+            const items = (await getTrackerListItems(list.id)).filter((i) => placed || list.kind !== 'mixed' || i.type === kind);
             if (items.length) out.push({ key: `list:${list.id}`, title: list.name, items: await asRowItems(items) });
           }
           if (!cancelled) setRows(out.filter((r) => r.items.length));
@@ -76,14 +80,14 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
       return () => {
         cancelled = true;
       };
-    }, [kind, prefs.trackerRows]),
+    }, [kind, type, prefs.trackerRows, prefs.trackerListPlaces]),
   );
 
   if (!prefs.trackerRows || !signedIn || rows === null) return null;
   if (!rows.length) {
     return (
       <View style={styles.hint}>
-        <Body muted>Build your lists in 128bit Tracker (Library → + New list, “Show in 128bitPlay”) and they show up here.</Body>
+        <Body muted>Build your lists in 128bit Tracker (Library → + New list) and choose where they go in Settings → Tracking → Where your lists go.</Body>
       </View>
     );
   }

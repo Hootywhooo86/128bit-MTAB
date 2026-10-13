@@ -57,6 +57,19 @@ export function getTrackerLists(kind: TrackerKind) {
   return cached(`lists:${kind}`, () => rpc<TrackerList[]>('get_lists', { kind, play_only: true }));
 }
 
+/** Every list you've made in Tracker, whatever its kind (for choosing where each goes). */
+export function getAllTrackerLists() {
+  return cached('lists:all', () => rpc<TrackerList[]>('get_lists', { kind: null, play_only: false }));
+}
+
+/** Tabs a list shows on: the ones you picked here, else Tracker's own kind + "Show in 128bitPlay". */
+export function listPlaces(list: TrackerList, places: Record<string, string[]>): string[] {
+  if (places[list.id]) return places[list.id];
+  if (!list.show_in_play) return [];
+  if (list.kind === 'mixed') return ['movie', 'series', 'anime'];
+  return list.kind === 'movie' ? ['movie'] : list.kind === 'anime' ? ['anime'] : list.kind === 'show' ? ['series'] : [];
+}
+
 export function getTrackerListItems(listId: string) {
   return cached(`list:${listId}`, () => rpc<TrackerItem[]>('get_list_items', { list_id: listId, page: 1, per_page: 60 }));
 }

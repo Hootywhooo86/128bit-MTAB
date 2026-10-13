@@ -45,6 +45,11 @@ export type Prefs = {
   traktRows: string[];
   /** 128bit Tracker rows (Up next, Watchlist, your lists) on the Shows / Movies / Anime tabs. */
   trackerRows: boolean;
+  /**
+   * Which tabs each 128bit Tracker list shows on, by list id: any of 'movie', 'series', 'anime'
+   * ([] = nowhere). Lists not in here follow Tracker (their kind, "Show in 128bitPlay").
+   */
+  trackerListPlaces: Record<string, string[]>;
   /** 3-letter code, e.g. "eng". */
   subtitleLanguage: string;
   autoSubtitles: boolean;
@@ -86,6 +91,7 @@ export const DEFAULT_PREFS: Prefs = {
   traktContinueWatching: true,
   traktRows: ['upnext', 'watchlist'],
   trackerRows: true,
+  trackerListPlaces: {},
   subtitleLanguage: 'eng',
   autoSubtitles: false,
   subtitleSize: 'medium',
