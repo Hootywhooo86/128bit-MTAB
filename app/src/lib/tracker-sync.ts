@@ -15,6 +15,7 @@ import { getDownloadedBooks } from './downloads';
 import { getStats } from './stats';
 import { getLibrary, getProgressMany } from './storage';
 import { invalidateTracker } from './tracker';
+import { parseKey, pctOf } from './tracker-live';
 import { getWatchProgress, isAnime } from './video';
 import { getWanted } from './wanted';
 
@@ -39,16 +40,6 @@ export type HistoryItem = {
 };
 
 const iso = (ms?: number) => (ms ? new Date(ms).toISOString() : undefined);
-const pctOf = (part: number, whole: number) => (whole > 0 ? Math.max(0, Math.min(100, Math.round((part / whole) * 100))) : 0);
-
-/** "tt0078748" / "tt11280740:1:3" / "kitsu:46474:5" → ids, season, episode. */
-export function parseKey(key: string) {
-  const imdb = key.match(/^(tt\d+)(?::(\d+):(\d+))?$/);
-  if (imdb) return { ids: { imdb: imdb[1] } as Record<string, string | number>, season: imdb[2] ? Number(imdb[2]) : undefined, episode: imdb[3] ? Number(imdb[3]) : undefined, anime: false };
-  const kitsu = key.match(/^kitsu:(\d+)(?::(\d+))?$/);
-  if (kitsu) return { ids: { kitsu: Number(kitsu[1]) } as Record<string, string | number>, season: kitsu[2] ? 1 : undefined, episode: kitsu[2] ? Number(kitsu[2]) : undefined, anime: true };
-  return null;
-}
 
 /** Everything on this phone, as Tracker items. */
 export async function collectHistory(): Promise<HistoryItem[]> {

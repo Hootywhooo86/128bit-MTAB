@@ -9,6 +9,7 @@ import {
   asRowItems,
   getTrackerListItems,
   getTrackerLists,
+  getTrackerInProgress,
   getTrackerUpNext,
   getTrackerWatchlist,
   kindFor,
@@ -47,6 +48,16 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
         try {
           const ofKind = (items: TrackerItem[]) => items.filter((i) => i.type === kind);
           const out: Row[] = [];
+          // Continue: partway through, on this device or any other (with how far).
+          const cont = ofKind(await getTrackerInProgress().catch(() => []));
+          if (cont.length) {
+            const items = cont.map((i) => ({
+              ...i,
+              title: `${i.title} · ${Math.round(i.now?.pct ?? i.pct ?? 0)}%`,
+              next: i.now?.episode ? { season: i.season ?? 1, number: i.now.episode } : undefined,
+            }));
+            out.push({ key: 'continue', title: 'Continue', items: await asRowItems(items) });
+          }
           if (kind !== 'movie') {
             const up = ofKind(await getTrackerUpNext());
             if (up.length) out.push({ key: 'upnext', title: 'Up next', items: await asRowItems(up) });

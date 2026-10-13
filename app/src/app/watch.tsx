@@ -33,6 +33,7 @@ import { MANUAL_SKIP_S, MANUAL_WINDOW_S, getSegments, type Segment } from '@/lib
 import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
 import { watchedDetails } from '@/lib/family';
 import { simklScrobble } from '@/lib/simkl';
+import { reportWatchProgress } from '@/lib/tracker-live';
 import { scrobble } from '@/lib/trakt';
 import { episodeFinished } from '@/lib/trakt-library';
 import {
@@ -407,6 +408,19 @@ export default function WatchScreen() {
     return () => {
       sub.remove();
       send('stop');
+    };
+  }, [item, player]);
+
+  // And 128bit Tracker: where you are, every few minutes and right away on pause / leaving.
+  useEffect(() => {
+    if (!item || item.live) return;
+    const send = (urgent: boolean) => reportWatchProgress(item, known.current.time, known.current.duration, urgent);
+    const sub = player.addListener('playingChange', ({ isPlaying }) => send(!isPlaying));
+    const tick = setInterval(() => send(false), 60_000);
+    return () => {
+      sub.remove();
+      clearInterval(tick);
+      send(true);
     };
   }, [item, player]);
 

@@ -35,6 +35,7 @@ import {
   getWeebCentralPages,
   isWeebCentral,
 } from './weebcentral';
+import { reportComicProgress } from './tracker-live';
 
 const API = 'https://api.mangadex.org';
 const COVERS = 'https://uploads.mangadex.org/covers';
@@ -326,6 +327,7 @@ export async function saveComicProgress(
     updatedAt: Date.now(),
   };
   await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+  reportComicProgress(comic, chapterLabel(chapter), page, pages, readIds.size, finished);
   if (isSw(chapter.id)) markChapter(swId(chapter.id), page, finished).catch(() => {});
   // "Delete after reading": earlier finished chapters leave the phone (not the one on screen).
   if (finished && (await readPrefs()).comicDeleteRead) {

@@ -32,6 +32,7 @@ import {
 import { absReportProgress, absResumePoint, isAbsBook } from './audiobookshelf';
 import { findCover } from './covers';
 import { hardcoverProgress } from './hardcover';
+import { reportBookProgress } from './tracker-live';
 import { addListening, markBookFinished } from './stats';
 import { addBookmark as storeBookmark } from './bookmarks';
 import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
@@ -224,6 +225,7 @@ function onStatus(s: AudioStatus) {
     if (isAbsBook(book)) absReportProgress(book, chapterIndex, s.currentTime, false);
     // Every few minutes while listening, and right away when you pause.
     hardcoverProgress(book, fraction, false, !s.playing);
+    reportBookProgress(book, fraction, false, !s.playing);
   }
 
   // Statistics: listening time, counted while playing.
@@ -255,6 +257,7 @@ function onFinish() {
   saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
   if (isAbsBook(book)) absReportProgress(book, chapterIndex, getAudio().duration, true);
   hardcoverProgress(book, 1, true);
+  reportBookProgress(book, 1, true);
   markBookFinished(book);
 }
 
