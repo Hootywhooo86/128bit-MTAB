@@ -35,6 +35,7 @@ import {
   getWeebCentralPages,
   isWeebCentral,
 } from './weebcentral';
+import { sessionTick } from './sessions';
 import { reportComicProgress } from './tracker-live';
 
 const API = 'https://api.mangadex.org';
@@ -328,6 +329,12 @@ export async function saveComicProgress(
   };
   await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
   reportComicProgress(comic, chapterLabel(chapter), page, pages, readIds.size, finished);
+  // Reading time for the timeline: the gap since the last page turn (a long gap was a break).
+  const since = (Date.now() - (prev?.updatedAt ?? Date.now())) / 1000;
+  sessionTick(`comic:${comic.id}`, 'read.session', { comic: comic.title, chapter: chapterLabel(chapter), poster: comic.cover }, {
+    seconds: prev && since > 0 && since < 180 ? since : 0,
+    chapter: finished && !prev?.read.includes(chapter.id),
+  });
   if (isSw(chapter.id)) markChapter(swId(chapter.id), page, finished).catch(() => {});
   // "Delete after reading": earlier finished chapters leave the phone (not the one on screen).
   if (finished && (await readPrefs()).comicDeleteRead) {

@@ -33,6 +33,7 @@ import { absReportProgress, absResumePoint, isAbsBook } from './audiobookshelf';
 import { findCover } from './covers';
 import { hardcoverProgress } from './hardcover';
 import { reportBookProgress } from './tracker-live';
+import { sessionEnd, sessionTick } from './sessions';
 import { addListening, markBookFinished } from './stats';
 import { addBookmark as storeBookmark } from './bookmarks';
 import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
@@ -233,6 +234,10 @@ function onStatus(s: AudioStatus) {
     if (lastTick) listenedSeconds += Math.min(5, (now - lastTick) / 1000);
     lastTick = now;
     if (listenedSeconds >= 10) {
+      sessionTick(book.key, 'listen.session', { title: book.title, author: book.author, poster: book.cover }, {
+        seconds: listenedSeconds,
+        pct: bookFraction(book, chapterIndex, s.currentTime, s.duration) * 100,
+      });
       addListening(book, Math.round(listenedSeconds));
       listenedSeconds = 0;
     }
@@ -258,6 +263,8 @@ function onFinish() {
   if (isAbsBook(book)) absReportProgress(book, chapterIndex, getAudio().duration, true);
   hardcoverProgress(book, 1, true);
   reportBookProgress(book, 1, true);
+  sessionTick(book.key, 'listen.session', { title: book.title, author: book.author, poster: book.cover }, { finished: true });
+  sessionEnd(book.key);
   markBookFinished(book);
 }
 
