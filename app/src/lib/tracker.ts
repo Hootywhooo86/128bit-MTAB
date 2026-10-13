@@ -9,7 +9,7 @@ import { getSession, isSignedIn, onAccount, rpc } from './account';
 import { imdbIdFor } from './tmdb';
 import type { TraktItem } from './trakt-library';
 
-export type TrackerKind = 'movie' | 'show' | 'anime' | 'book' | 'game' | 'mixed';
+export type TrackerKind = 'movie' | 'show' | 'anime' | 'book' | 'comic' | 'game' | 'mixed';
 
 export type TrackerItem = {
   id: string;
@@ -76,9 +76,27 @@ export function getTrackerProgress(imdb: string) {
   return rpc<TrackerItem[]>('get_item_progress', { ids: { imdb } });
 }
 
-export async function addToTrackerList(listId: string, item: { type: string; title: string; year?: number; poster?: string; imdb: string }) {
+/** A title as 128bit Tracker knows it. ids: whatever this app knows ({imdb}, {kitsu}); books and comics go by title. */
+export type TrackerRef = {
+  type: 'movie' | 'show' | 'anime' | 'book' | 'comic';
+  title: string;
+  creator?: string;
+  year?: number;
+  poster?: string;
+  ids?: Record<string, string | number>;
+};
+const refBody = (r: TrackerRef) => ({
+  type: r.type, title: r.title, creator: r.creator ?? null, year: r.year ?? null, poster: r.poster ?? null, ids: r.ids ?? {},
+});
+
+/** This title in your Tracker library, or null. */
+export function findInTracker(ref: TrackerRef) {
+  return rpc<TrackerItem | null>('find_item', { item: refBody(ref) });
+}
+
+export async function addToTrackerList(listId: string, ref: TrackerRef) {
   invalidateTracker();
-  return rpc<{ item_id: string }>('add_to_list', { list_id: listId, item: { type: item.type, title: item.title, year: item.year ?? null, poster: item.poster ?? null, ids: { imdb: item.imdb } } });
+  return rpc<{ item_id: string }>('add_to_list', { list_id: listId, item: refBody(ref) });
 }
 
 export async function removeFromTrackerList(listId: string, itemId: string) {
@@ -91,9 +109,10 @@ export async function createTrackerList(name: string, kind: TrackerKind) {
   return rpc<{ id: string }>('create_list', { name, kind, show_in_play: true });
 }
 
-export async function setTrackerWatchlist(item: { type: string; title: string; year?: number; poster?: string; imdb: string }, on: boolean) {
+/** Add to Tracker (planned), or take it off again while it's still only planned. */
+export async function setTrackerWatchlist(ref: TrackerRef, on: boolean) {
   invalidateTracker();
-  return rpc<{ item_id: string | null }>('set_watchlist', { item: { type: item.type, title: item.title, year: item.year ?? null, poster: item.poster ?? null, ids: { imdb: item.imdb } }, wanted: on });
+  return rpc<{ item_id: string | null }>('set_watchlist', { item: refBody(ref), wanted: on });
 }
 
 export async function rateInTracker(itemId: string, rating: number | null) {

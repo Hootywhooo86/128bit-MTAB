@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { Body, Button, EmptyState, Title } from '@/components/ui';
+import { TrackerActions } from '@/components/tracker-actions';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   chapterLabel,
@@ -174,6 +175,9 @@ export default function ComicScreen() {
                 ) : null}
               </View>
             </View>
+            <TrackerActions
+              item={{ type: 'comic', title: comic.title, creator: comic.author, year: Number(comic.year) || undefined, poster: comic.cover }}
+            />
             {resume ? (
               <Button
                 label={
