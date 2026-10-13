@@ -122,6 +122,12 @@ export default function TrackingSettings() {
           value={prefs.trackerRows}
           onChange={(v) => setPref('trackerRows', v)}
         />
+        <Row
+          icon="albums-outline"
+          title="Where your lists go"
+          subtitle="Put each Tracker list on Movies, Shows and/or Anime"
+          onPress={() => router.push('/settings/tracker-lists')}
+        />
         <Row icon="calendar-outline" title="Up next & coming up" subtitle="New episodes and releases for what you track" onPress={() => router.push('/tracker')} />
         <Row
           icon="cloud-upload-outline"
