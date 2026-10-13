@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Text, TextInput } from 'react-native';
 
+import { syncHistoryToTracker } from '@/lib/tracker-sync';
 import { Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { TraktRowPicker } from '@/components/trakt-row-picker';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
@@ -28,6 +29,7 @@ export default function TrackingSettings() {
   const styles = useStyles();
   const { prefs, setPref } = usePrefs();
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [historyNote, setHistoryNote] = useState<string | null>(null);
   const [configured, setConfigured] = useState(traktBuiltIn);
   const [editKeys, setEditKeys] = useState(false);
   const [clientId, setClientId] = useState('');
@@ -121,6 +123,16 @@ export default function TrackingSettings() {
           onChange={(v) => setPref('trackerRows', v)}
         />
         <Row icon="calendar-outline" title="Up next & coming up" subtitle="New episodes and releases for what you track" onPress={() => router.push('/tracker')} />
+        <Row
+          icon="cloud-upload-outline"
+          title="Send my history to Tracker now"
+          subtitle={historyNote ?? 'Audiobooks, comics, movies and shows you’ve read or watched here, plus what you’re in the middle of. Also happens on its own.'}
+          onPress={async () => {
+            setHistoryNote('Sending…');
+            const r = await syncHistoryToTracker(true);
+            setHistoryNote(r ? `Done: ${r.added} new, ${r.updated} updated in your Tracker` : 'Sign in first (Settings → Account)');
+          }}
+        />
       </Group>
 
       <LinearGradient
