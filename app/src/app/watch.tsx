@@ -34,6 +34,7 @@ import { addWatching, markWatched, type WatchKind } from '@/lib/stats';
 import { watchedDetails } from '@/lib/family';
 import { simklScrobble } from '@/lib/simkl';
 import { reportWatchProgress } from '@/lib/tracker-live';
+import { sessionEnd, sessionTick } from '@/lib/sessions';
 import { scrobble } from '@/lib/trakt';
 import { episodeFinished } from '@/lib/trakt-library';
 import {
@@ -345,6 +346,14 @@ export default function WatchScreen() {
     if (!item) return;
     const kind: WatchKind = item.live ? 'live' : item.link?.type === 'movie' ? 'movie' : 'episode';
     const entry = { key: item.key, title: item.title, subtitle: item.subtitle, kind };
+    // One timeline entry per sitting: how long, from where to where, finished or not.
+    const session = item.live
+      ? null
+      : {
+          kind,
+          ...(kind === 'movie' ? { title: item.title } : { show: item.title, episode: item.subtitle }),
+          ...watchedDetails(item.key, { series: item.series, poster: item.poster }),
+        };
     let counted = false;
     const tick = setInterval(() => {
       let playing = false;
@@ -355,6 +364,10 @@ export default function WatchScreen() {
       }
       if (!playing) return;
       addWatching(entry, 10);
+      if (session) {
+        const { time, duration } = known.current;
+        sessionTick(item.key, 'watch.session', session, { seconds: 10, pct: duration > 0 ? (time / duration) * 100 : undefined });
+      }
       if (
         !counted &&
         !item.live &&
@@ -362,6 +375,7 @@ export default function WatchScreen() {
         known.current.time / known.current.duration > 0.9
       ) {
         counted = true;
+        if (session) sessionTick(item.key, 'watch.session', session, { finished: true });
         isAnime(item.link)
           .catch(() => false)
           .then((anime) => markWatched(entry, watchedDetails(item.key, { series: item.series, anime, poster: item.poster })));
@@ -372,7 +386,10 @@ export default function WatchScreen() {
         }
       }
     }, 10_000);
-    return () => clearInterval(tick);
+    return () => {
+      clearInterval(tick);
+      sessionEnd(item.key);
+    };
   }, [item, player, prefs.traktScrobble]);
 
   // Tell Trakt what's playing (start / pause / stop).

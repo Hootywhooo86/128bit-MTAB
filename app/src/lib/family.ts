@@ -13,7 +13,15 @@ import { getSession, isSignedIn, onAccount, rpc } from './account';
 const QUEUE_KEY = '128bit.family.queue';
 const MAX_QUEUED = 500;
 
-export type FamilyEventType = 'book.finished' | 'movie.watched' | 'episode.watched' | 'chapter.read';
+export type FamilyEventType =
+  | 'book.finished'
+  | 'movie.watched'
+  | 'episode.watched'
+  | 'chapter.read'
+  /** One sitting: { minutes, from_pct, to_pct, finished?, started_at, … } (lib/sessions.ts). */
+  | 'watch.session'
+  | 'listen.session'
+  | 'read.session';
 
 export type FamilyEvent = {
   /** Unique per event, so a retried send never doubles up. */
