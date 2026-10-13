@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { Button, Cover, ProgressBar } from '@/components/ui';
+import { TrackerActions } from '@/components/tracker-actions';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { formatMinutes } from '@/lib/audible';
 import { offlineSupported } from '@/lib/downloads';
@@ -170,6 +171,7 @@ export default function BookDetailsScreen() {
         {facts.length ? <Text style={styles.meta}>{facts.join('  ·  ')}</Text> : null}
         {info.series ? <Text style={styles.meta}>{info.series}</Text> : null}
       </View>
+      <TrackerActions item={{ type: 'book', title: info.title, creator: info.author, poster: info.cover }} />
 
       <View style={styles.actions}>
         {entry === undefined ? (

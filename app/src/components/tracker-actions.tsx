@@ -1,66 +1,89 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, View } from 'react-native';
 
 import { Button, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { usePrefs } from '@/lib/prefs';
 import {
   addToTrackerList,
   createTrackerList,
+  findInTracker,
   getTrackerLists,
-  getTrackerProgress,
-  kindFor,
   rateInTracker,
   setTrackerWatchlist,
   trackerSignedIn,
   type TrackerItem,
+  type TrackerKind,
   type TrackerList,
+  type TrackerRef,
 } from '@/lib/tracker';
 import { Pressable } from '@/components/focusable';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
+const STATUS: Record<string, string> = { planned: 'In your Tracker', active: 'In progress', done: 'Finished', on_hold: 'On hold', dropped: 'Dropped' };
+
+/** A Play title id → the ids Tracker matches on. */
+export function idsFor(id?: string | null): Record<string, string | number> {
+  if (!id) return {};
+  if (/^tt\d+$/.test(id)) return { imdb: id };
+  const kitsu = id.match(/^kitsu:(\d+)$/);
+  if (kitsu) return { kitsu: Number(kitsu[1]) };
+  return {};
+}
+
 /**
- * 128bit Tracker buttons for a movie or show: Watchlist, Add to list, Rate.
- * Saved to the signed-in account's own Tracker library.
+ * Add to 128bit Tracker, for anything in Play: movies, shows, anime, books,
+ * comics. Add (or take off), put it on your lists, rate it. Saved to the
+ * signed-in account's own Tracker.
  */
-export function TrackerActions({ type, imdb, title, year, poster }: { type: string; imdb: string; title: string; year?: number; poster?: string }) {
+export function TrackerActions({ item }: { item: TrackerRef }) {
   const Colors = useColors();
   const styles = useStyles();
-  const { prefs } = usePrefs();
-  const [on, setOn] = useState(false);
-  const [items, setItems] = useState<TrackerItem[]>([]);
+  const [state, setState] = useState<'loading' | 'signed-out' | 'ready' | 'unavailable'>('loading');
+  const [found, setFound] = useState<TrackerItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState<'lists' | 'rate' | null>(null);
   const [lists, setLists] = useState<TrackerList[] | null>(null);
   const [newName, setNewName] = useState('');
-  const kind = kindFor(type === 'movie' ? 'movie' : type === 'anime' ? 'anime' : 'series');
-  const itemType = kind === 'movie' ? 'movie' : kind;
-  const ref = { type: itemType, title, year, poster, imdb };
+  const [added, setAdded] = useState<string | null>(null);
+  const key = `${item.type}|${item.title}|${JSON.stringify(item.ids ?? {})}`;
 
   const load = useCallback(async () => {
     const signedIn = await trackerSignedIn();
-    if (!signedIn || !/^tt\d+$/.test(imdb)) return setOn(false);
+    if (!signedIn) return setState('signed-out');
     try {
-      setItems(await getTrackerProgress(imdb));
-      setOn(true);
+      setFound(await findInTracker(item));
+      setState('ready');
     } catch {
-      setOn(false); // Tracker not set up on this account server
+      setState('unavailable'); // Tracker not set up on this account server yet
     }
-  }, [imdb]);
+    // item is described by key
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
   useEffect(() => {
     (async () => load())();
   }, [load]);
 
-  if (!on || !prefs.trackerRows) return null;
-  const whole = items.find((i) => i.season == null) ?? items[0];
-  const planned = !!whole && whole.status === 'planned';
-  const run = async (fn: () => Promise<unknown>) => {
+  if (state === 'loading' || state === 'unavailable' || !item.title) return null;
+  if (state === 'signed-out') {
+    return (
+      <Pressable onPress={() => router.push('/settings/account')} style={styles.hint}>
+        <Ionicons name="add-circle-outline" size={18} color={Colors.textSecondary} />
+        <Text style={styles.muted}>Sign in (Settings → Account) to add this to 128bit Tracker</Text>
+      </Pressable>
+    );
+  }
+
+  const inTracker = !!found;
+  const kind: TrackerKind = item.type;
+  const run = async (fn: () => Promise<unknown>, note?: string) => {
     setBusy(true);
     try {
       await fn();
       await load();
+      if (note) setAdded(note);
     } finally {
       setBusy(false);
     }
@@ -75,34 +98,37 @@ export function TrackerActions({ type, imdb, title, year, poster }: { type: stri
   return (
     <View style={styles.wrap}>
       <Text style={styles.heading}>128bit Tracker</Text>
-      {whole && whole.status !== 'planned' ? (
+      {found ? (
         <Text style={styles.muted}>
-          {whole.status === 'done' ? 'Finished' : whole.status === 'active' ? 'In progress' : whole.status}
-          {whole.season ? ` · season ${whole.season}` : ''}
-          {whole.progress_total ? ` · ${whole.progress}/${whole.progress_total}` : ''}
+          {STATUS[found.status] ?? found.status}
+          {found.progress_total ? ` · ${found.progress}/${found.progress_total}` : ''}
         </Text>
       ) : null}
+      {added ? <Text style={[styles.muted, { color: Colors.accent }]}>{added}</Text> : null}
       <View style={{ flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' }}>
-        {button(planned ? 'bookmark' : 'bookmark-outline', 'Watchlist', () => run(() => setTrackerWatchlist(ref, !planned)), planned)}
+        {inTracker && found?.status !== 'planned'
+          ? button('checkmark-circle', 'In Tracker', () => {}, true)
+          : button(inTracker ? 'checkmark-circle' : 'add-circle-outline', inTracker ? 'In Tracker' : 'Add to Tracker',
+              () => run(() => setTrackerWatchlist(item, !inTracker), inTracker ? 'Taken off your Tracker' : 'Added to your Tracker'), inTracker)}
         {button('list', 'Lists', async () => {
           setModal('lists');
           setLists(null);
           setLists(await getTrackerLists(kind).catch(() => []));
         })}
-        {whole ? button(whole.rating ? 'star' : 'star-outline', whole.rating ? `${whole.rating}/10` : 'Rate', () => setModal('rate'), !!whole.rating) : null}
+        {found ? button(found.rating ? 'star' : 'star-outline', found.rating ? `${found.rating}/10` : 'Rate', () => setModal('rate'), !!found.rating) : null}
         {busy ? <ActivityIndicator color={Colors.accent} /> : null}
       </View>
 
       <Modal visible={modal !== null} transparent animationType="fade" onRequestClose={() => setModal(null)}>
         <Pressable style={styles.backdrop} onPress={() => setModal(null)}>
           <Pressable style={styles.modal} onPress={() => {}}>
-            {modal === 'rate' && whole ? (
+            {modal === 'rate' && found ? (
               <>
-                <Text style={styles.heading}>Rate {title}</Text>
+                <Text style={styles.heading}>Rate {item.title}</Text>
                 <View style={styles.grid}>
                   {Array.from({ length: 10 }, (_, n) => n + 1).map((n) => (
-                    <Pressable key={n} style={[styles.num, whole.rating === n && styles.buttonOn]} onPress={() => { setModal(null); run(() => rateInTracker(whole.id, n)); }}>
-                      <Text style={[styles.numText, whole.rating === n && { color: Colors.accentText }]}>{n}</Text>
+                    <Pressable key={n} style={[styles.num, found.rating === n && styles.buttonOn]} onPress={() => { setModal(null); run(() => rateInTracker(found.id, n)); }}>
+                      <Text style={[styles.numText, found.rating === n && { color: Colors.accentText }]}>{n}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -114,7 +140,7 @@ export function TrackerActions({ type, imdb, title, year, poster }: { type: stri
                 {lists === null ? <ActivityIndicator color={Colors.accent} /> : null}
                 <ScrollView style={{ maxHeight: 320 }}>
                   {(lists ?? []).map((l) => (
-                    <Pressable key={l.id} style={styles.listRow} onPress={() => { setModal(null); run(() => addToTrackerList(l.id, ref)); }}>
+                    <Pressable key={l.id} style={styles.listRow} onPress={() => { setModal(null); run(() => addToTrackerList(l.id, item), `Added to ${l.name}`); }}>
                       <Ionicons name="add-circle-outline" size={22} color={Colors.accent} />
                       <Text style={styles.listName}>{l.name}</Text>
                       <Text style={styles.muted}>{l.item_count}</Text>
@@ -130,7 +156,7 @@ export function TrackerActions({ type, imdb, title, year, poster }: { type: stri
                     if (!name) return;
                     setModal(null);
                     setNewName('');
-                    run(async () => addToTrackerList((await createTrackerList(name, kind)).id, ref));
+                    run(async () => addToTrackerList((await createTrackerList(name, kind)).id, item), `Added to ${name}`);
                   }}
                 />
               </>
@@ -146,6 +172,7 @@ const useStyles = makeStyles((Colors) => ({
   wrap: { gap: Spacing.two },
   heading: { color: Colors.text, fontSize: 17, fontWeight: '800' },
   muted: { color: Colors.textSecondary, fontSize: 12 },
+  hint: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.one },
   button: {
     alignItems: 'center',
     gap: 4,

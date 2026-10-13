@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { PlayableActions } from '@/components/playable-actions';
+import { TrackerActions } from '@/components/tracker-actions';
 import {
   Body,
   Card,
@@ -114,6 +115,7 @@ export default function BookScreen() {
           {book.duration ? <Body muted>{book.duration}</Body> : null}
         </View>
       </View>
+      <TrackerActions item={{ type: 'book', title: book.title, creator: book.author, poster: book.cover }} />
       {book.description ? (
         <Body muted numberOfLines={8}>
           {book.description}

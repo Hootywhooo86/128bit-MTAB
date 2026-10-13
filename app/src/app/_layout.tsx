@@ -7,6 +7,7 @@ import { AppState, Text, View } from 'react-native';
 
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
+import { syncHistoryToTracker } from '@/lib/tracker-sync';
 import { startAccountSync } from '@/lib/account';
 import { applyDeviceTorrentPrefs, cleanUpDeviceTorrents, wakeDeviceTorrents } from '@/lib/torrent-device';
 import { installDefaultAddons } from '@/lib/addons';
@@ -101,6 +102,7 @@ function AppNavigator() {
   useEffect(() => {
     const tick = () => {
       runVideoQueue().catch(() => {});
+      syncHistoryToTracker(); // what you watched, read and listened to → 128bit Tracker (every 30 min)
       if (IS_TV) return; // audiobooks and comics are phone-only
       runAutoDownloads().catch(() => {});
       watchSeries().catch(() => {}); // once a day
