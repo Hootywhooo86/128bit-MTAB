@@ -33,8 +33,8 @@ in 128bittracker's `docs/EVENTS.md` and `src/events.ts`; keep them in step.
 | `movie.watched` | A movie is watched to near the end (once per movie) | `title` |
 | `episode.watched` | An episode is watched to near the end (once per episode) | `show`, `episode` |
 | `chapter.read` | The last page of a comic chapter | `comic` |
-| `watch.session` | A sitting with a movie or episode ends (you leave, switch, finish, or stay paused 10 min); at least a minute or finished | `kind` (`movie`/`episode`), `title` or `show` + `episode`, `imdb`/`kitsu`, `season`, `number`, `minutes`, `from_pct`, `to_pct`, `finished`, `started_at` |
-| `listen.session` | Same, for an audiobook | `title`, `author`, `minutes`, `from_pct`, `to_pct`, `finished`, `started_at` |
+| `watch.session` | A sitting with a movie or episode ends (you leave, switch, finish, or stay paused 10 min); at least a minute or finished | `kind` (`movie`/`episode`), `title` or `show` + `episode`, `imdb`/`kitsu`, `season`, `number`, `minutes`, `from_pct`, `to_pct`, `from_s`, `to_s` (seconds into the video), `finished`, `started_at` |
+| `listen.session` | Same, for an audiobook | `title`, `author`, `minutes`, `from_pct`, `to_pct`, `from_chapter` + `from_s`, `to_chapter` + `to_s` (where in the book), `finished`, `started_at` |
 | `read.session` | Same, for a comic (ends after a switch or 10 min without a page turn) | `comic`, `chapter` (the last one), `chapters` (finished this sitting), `minutes`, `started_at` |
 
 Live TV sends nothing.

@@ -15,6 +15,9 @@ type Open = {
   seconds: number;
   fromPct?: number;
   toPct?: number;
+  /** Where in the video / audiobook (seconds; chapter for audiobooks), first and last seen. */
+  from?: { s: number; ch?: number };
+  to?: { s: number; ch?: number };
   finished: boolean;
   chapters: number;
   startedAt: number;
@@ -25,13 +28,21 @@ const open = new Map<string, Open>();
 
 /**
  * Count time on a title. `seconds`: played/read since the last call; `pct`: where
- * you are now (0..100); `finished`: you reached the end (or finished a chapter).
+ * you are now (0..100); `pos`: seconds into the video (or the audiobook chapter `ch`);
+ * `finished`: you reached the end (or finished a chapter).
  */
 export function sessionTick(
   key: string,
   type: FamilyEventType,
   data: FamilyEvent['data'],
-  { seconds = 0, pct, finished = false, chapter = false }: { seconds?: number; pct?: number; finished?: boolean; chapter?: boolean },
+  {
+    seconds = 0,
+    pct,
+    pos,
+    ch,
+    finished = false,
+    chapter = false,
+  }: { seconds?: number; pct?: number; pos?: number; ch?: number; finished?: boolean; chapter?: boolean },
 ) {
   // Something else started: the other one's sitting is over.
   for (const k of [...open.keys()]) if (k !== key && open.get(k)!.type === type) sessionEnd(k);
@@ -45,6 +56,11 @@ export function sessionTick(
   if (pct != null && Number.isFinite(pct)) {
     if (s.fromPct == null) s.fromPct = pct;
     s.toPct = pct;
+  }
+  if (pos != null && Number.isFinite(pos)) {
+    const at = { s: Math.round(pos), ch };
+    if (!s.from) s.from = at;
+    s.to = at;
   }
   if (chapter) s.chapters += 1;
   if (finished) s.finished = true;
@@ -67,6 +83,11 @@ export function sessionEnd(key: string) {
     to_pct: s.finished && s.type !== 'read.session' ? 100 : round(s.toPct),
     finished: s.finished ? 1 : undefined,
     chapters: s.chapters || undefined,
+    // Where you started and stopped inside it, so a stream that drops can be picked up again.
+    from_s: s.from?.s,
+    to_s: s.to?.s,
+    from_chapter: s.from?.ch != null ? s.from.ch + 1 : undefined,
+    to_chapter: s.to?.ch != null ? s.to.ch + 1 : undefined,
     started_at: new Date(s.startedAt).toISOString(),
   }).catch(() => {});
 }

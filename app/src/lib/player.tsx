@@ -237,6 +237,8 @@ function onStatus(s: AudioStatus) {
       sessionTick(book.key, 'listen.session', { title: book.title, author: book.author, poster: book.cover }, {
         seconds: listenedSeconds,
         pct: bookFraction(book, chapterIndex, s.currentTime, s.duration) * 100,
+        pos: s.currentTime,
+        ch: chapterIndex,
       });
       addListening(book, Math.round(listenedSeconds));
       listenedSeconds = 0;

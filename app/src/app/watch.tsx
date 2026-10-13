@@ -366,7 +366,7 @@ export default function WatchScreen() {
       addWatching(entry, 10);
       if (session) {
         const { time, duration } = known.current;
-        sessionTick(item.key, 'watch.session', session, { seconds: 10, pct: duration > 0 ? (time / duration) * 100 : undefined });
+        sessionTick(item.key, 'watch.session', session, { seconds: 10, pct: duration > 0 ? (time / duration) * 100 : undefined, pos: time });
       }
       if (
         !counted &&
@@ -375,7 +375,7 @@ export default function WatchScreen() {
         known.current.time / known.current.duration > 0.9
       ) {
         counted = true;
-        if (session) sessionTick(item.key, 'watch.session', session, { finished: true });
+        if (session) sessionTick(item.key, 'watch.session', session, { finished: true, pos: known.current.time });
         isAnime(item.link)
           .catch(() => false)
           .then((anime) => markWatched(entry, watchedDetails(item.key, { series: item.series, anime, poster: item.poster })));
@@ -388,6 +388,7 @@ export default function WatchScreen() {
     }, 10_000);
     return () => {
       clearInterval(tick);
+      if (session && known.current.time > 0) sessionTick(item.key, 'watch.session', session, { pos: known.current.time });
       sessionEnd(item.key);
     };
   }, [item, player, prefs.traktScrobble]);
