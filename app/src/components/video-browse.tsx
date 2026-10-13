@@ -34,6 +34,7 @@ import {
 } from '@/lib/video';
 
 import { TraktRows, TraktSearchRow } from './trakt-rows';
+import { TrackerRows } from './tracker-rows';
 import { Pressable } from '@/components/focusable';
 
 type Props = { type: 'movie' | 'series' | 'anime'; noun: string };
@@ -108,6 +109,7 @@ export function VideoBrowse({ type, noun }: Props) {
       </View>
 
       {!submitted ? <ContinueWatchingRow type={type} /> : null}
+      {!submitted ? <TrackerRows type={type} /> : null}
       {!submitted ? <TraktRows type={type} /> : null}
 
       {submitted && rows.length === 0 ? (

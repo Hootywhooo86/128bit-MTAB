@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import makeQr from 'qrcode-generator';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Body, Button, Input } from '@/components/ui';
@@ -11,6 +11,7 @@ import { IS_TV } from '@/constants/tv';
 import {
   SETUP_SQL,
   claimTv,
+  deleteAccount,
   finishTvPairing,
   getProject,
   getSession,
@@ -22,6 +23,7 @@ import {
   signIn,
   signOut,
   signUp,
+  startProviderSignIn,
   startTvPairing,
   syncNow,
   tvLinkedTo,
@@ -95,8 +97,9 @@ export default function AccountSettings() {
       <Body muted style={styles.intro}>
         Sign in on your phone, another phone or the TV app and your add-ons, settings, Live TV
         playlists, TorBox/Trakt/Simkl connections and Continue watching come with you
-        {IS_TV ? '' : ' (plus books and comics on phones)'}. It all lives in your own free Supabase
-        project.
+        {IS_TV ? '' : ' (plus books and comics on phones)'}. It&apos;s your 128bit family account: the
+        same sign-in works in 128bitfit, 128bit Tracker and the rest, and what you finish shows on
+        Tracker&apos;s timeline.
       </Body>
 
       {!project ? (
@@ -135,6 +138,31 @@ export default function AccountSettings() {
                 return 'Signed out. Your settings stay on this device.';
               })}
             />
+            {signedIn ? (
+              <Row
+                icon="trash"
+                title="Delete account"
+                subtitle="Removes it from every 128bit app; this device keeps its own copy"
+                danger
+                onPress={() =>
+                  Alert.alert(
+                    'Delete your 128bit family account?',
+                    'Your synced settings, timeline and keys are deleted for good, in every 128bit app. What is on this device stays.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => run(async () => {
+                          await deleteAccount();
+                          return 'Account deleted.';
+                        }),
+                      },
+                    ],
+                  )
+                }
+              />
+            ) : null}
           </Group>
           {signedIn && !IS_TV ? <PairTv initial={pair} /> : null}
         </>
@@ -236,7 +264,19 @@ function SignInForm({ busy, run }: { busy: boolean; run: (fn: () => Promise<stri
   const [password, setPassword] = useState('');
   return (
     <View style={styles.box}>
-      <Text style={styles.heading}>{IS_TV ? 'OR SIGN IN HERE' : 'SIGN IN'}</Text>
+      <Text style={styles.heading}>{IS_TV ? 'OR SIGN IN HERE' : '128BIT FAMILY ACCOUNT'}</Text>
+      {IS_TV ? null : (
+        <>
+          <Button label="Continue with Google" disabled={busy} onPress={() => run(() => startProviderSignIn('google'))} />
+          <Button
+            label="Continue with Apple"
+            variant="secondary"
+            disabled={busy}
+            onPress={() => run(() => startProviderSignIn('apple'))}
+          />
+          <Body muted style={{ fontSize: 13 }}>Or with email:</Body>
+        </>
+      )}
       <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
       <Input placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
       <Button label="Sign in" disabled={busy || !email || !password} onPress={() => run(() => signIn(email, password))} />

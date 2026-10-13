@@ -8,6 +8,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { DownloadedPlay } from '@/components/downloaded-play';
 import { LinkToTrakt, TraktActions, useTraktConnected } from '@/components/trakt-actions';
 import { getShowProgress, onEpisodeFinished, rememberEpisode, setEpisodeWatched, traktLink } from '@/lib/trakt-library';
+import { TrackerActions } from '@/components/tracker-actions';
 import { StreamList } from '@/components/stream-list';
 import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
@@ -152,6 +153,13 @@ export default function TitleScreen() {
           </Body>
         ) : null}
         {extra ? <TmdbDetails data={extra} /> : null}
+        <TrackerActions
+          type={type}
+          imdb={imdb || id}
+          title={meta.name}
+          year={Number(String(meta.releaseInfo ?? '').slice(0, 4)) || undefined}
+          poster={meta.poster}
+        />
         {imdb ? (
           <TraktActions type={type} imdb={imdb} />
         ) : imdb === null ? (

@@ -6,6 +6,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { emitFamilyEvent } from './family';
+
 const KEY = '128bit.stats';
 
 export type Day = { listen: number; watch: number; chapters: number };
@@ -77,7 +79,10 @@ export async function addListening(
 export async function markBookFinished(book: { key: string; title: string; author?: string }) {
   const s = await getStats();
   const b = (s.books[book.key] ??= { title: book.title, author: book.author, seconds: 0 });
-  if (!b.finished) b.finishedAt = Date.now();
+  if (!b.finished) {
+    b.finishedAt = Date.now();
+    emitFamilyEvent('book.finished', { title: book.title, author: book.author });
+  }
   b.finished = true;
   scheduleSave();
 }
@@ -101,15 +106,18 @@ export async function addWatching(
 }
 
 /** Counted as watched once you get near the end. */
-export async function markWatched(item: {
-  key: string;
-  title: string;
-  subtitle?: string;
-  kind: WatchKind;
-}) {
+export async function markWatched(
+  item: { key: string; title: string; subtitle?: string; kind: WatchKind },
+  /** What 128bit Tracker needs to file it: the title's ids, the season's length, anime or not. */
+  extra: Record<string, string | number | undefined> = {},
+) {
   const s = await getStats();
   const w = (s.watched[item.key] ??= { ...item, seconds: 0, at: Date.now() });
-  if (!w.finished) w.finishedAt = Date.now();
+  if (!w.finished) {
+    w.finishedAt = Date.now();
+    if (item.kind === 'movie') emitFamilyEvent('movie.watched', { title: item.title, ...extra });
+    if (item.kind === 'episode') emitFamilyEvent('episode.watched', { show: item.title, episode: item.subtitle, ...extra });
+  }
   w.finished = true;
   scheduleSave();
 }
@@ -119,6 +127,7 @@ export async function addChapterRead(comic: { id: string; title: string }) {
   today(s).chapters += 1;
   const c = (s.comics[comic.id] ??= { title: comic.title, chapters: 0 });
   c.chapters += 1;
+  emitFamilyEvent('chapter.read', { comic: comic.title });
   scheduleSave();
 }
 
