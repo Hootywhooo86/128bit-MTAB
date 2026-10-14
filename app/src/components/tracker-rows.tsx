@@ -58,7 +58,7 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
           // Play's own Continue watching covers what you're partway through: no second row here,
           // but those shows stay out of Up next (newest first, so the latest season wins).
           const cont = onePerShow(ofKind(await getTrackerInProgress().catch(() => [])));
-          if (kind !== 'movie') {
+          if (kind !== 'movie' && prefs.trackerUpNext) {
             // Shows already in Continue don't show again here.
             const up = onePerShow(ofKind(await getTrackerUpNext()), new Set(cont.map(showKey)));
             if (up.length) out.push({ key: 'upnext', title: 'Up next', items: await asRowItems(up) });
@@ -74,7 +74,8 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
             if (items.length) listRows.push({ key: `list:${list.id}`, title: list.name, items: await asRowItems(items) });
           }
           // Watchlist: what you plan to watch that isn't already on one of those lists.
-          const wl = (await getTrackerWatchlist(kind)).filter((i) => !inLists.has(i.id));
+          // Off unless you turn it on: your own lists are what shows here.
+          const wl = prefs.trackerWatchlist ? (await getTrackerWatchlist(kind)).filter((i) => !inLists.has(i.id)) : [];
           if (wl.length) out.push({ key: 'watchlist', title: 'Watchlist', items: await asRowItems(wl) });
           out.push(...listRows);
           if (!cancelled) setRows(out.filter((r) => r.items.length));
@@ -85,7 +86,7 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
       return () => {
         cancelled = true;
       };
-    }, [kind, type, prefs.trackerRows, prefs.trackerListPlaces]),
+    }, [kind, type, prefs.trackerRows, prefs.trackerListPlaces, prefs.trackerUpNext, prefs.trackerWatchlist]),
   );
 
   if (!prefs.trackerRows || !signedIn || rows === null) return null;

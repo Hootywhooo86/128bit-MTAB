@@ -118,7 +118,7 @@ export default function TrackingSettings() {
       <Group>
         <ToggleRow
           title="Tracker rows"
-          subtitle="Up next, Watchlist and your 128bit Tracker lists (marked “Show in 128bitPlay”) on Shows, Movies and Anime. Uses your 128bit account: everyone sees their own."
+          subtitle="Your 128bit Tracker lists (and Up next) on Shows, Movies and Anime. Uses your 128bit account: everyone sees their own."
           value={prefs.trackerRows}
           onChange={(v) => setPref('trackerRows', v)}
         />

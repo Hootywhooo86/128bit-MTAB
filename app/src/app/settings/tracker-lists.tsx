@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Pressable } from '@/components/focusable';
-import { Group, SectionTitle, SettingsPage } from '@/components/settings-ui';
+import { Group, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { Body } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePrefs } from '@/lib/prefs';
@@ -50,6 +50,21 @@ export default function TrackerListsSettings() {
         Pick the tabs each list shows on. A list on no tab stays in Tracker only. Saved to your 128bit account, so it
         follows you to every device.
       </Body>
+      <SectionTitle>Automatic rows</SectionTitle>
+      <Group>
+        <ToggleRow
+          title="Up next"
+          subtitle="The next episode of shows you're watching (Shows and Anime)"
+          value={prefs.trackerUpNext}
+          onChange={(v) => setPref('trackerUpNext', v)}
+        />
+        <ToggleRow
+          title="Watchlist"
+          subtitle="Everything planned in Tracker that isn't on one of your lists"
+          value={prefs.trackerWatchlist}
+          onChange={(v) => setPref('trackerWatchlist', v)}
+        />
+      </Group>
       <SectionTitle>Your Tracker lists</SectionTitle>
       {error ? <Body muted>{error}</Body> : null}
       {!lists && !error ? <ActivityIndicator color={Colors.accent} /> : null}
