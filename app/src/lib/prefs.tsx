@@ -50,6 +50,9 @@ export type Prefs = {
    * ([] = nowhere). Lists not in here follow Tracker (their kind, "Show in 128bitPlay").
    */
   trackerListPlaces: Record<string, string[]>;
+  /** Tracker's automatic rows: Up next (shows) and Watchlist (everything planned). Your own lists are separate. */
+  trackerUpNext: boolean;
+  trackerWatchlist: boolean;
   /** 3-letter code, e.g. "eng". */
   subtitleLanguage: string;
   autoSubtitles: boolean;
@@ -92,6 +95,8 @@ export const DEFAULT_PREFS: Prefs = {
   traktRows: ['upnext', 'watchlist'],
   trackerRows: true,
   trackerListPlaces: {},
+  trackerUpNext: true,
+  trackerWatchlist: false,
   subtitleLanguage: 'eng',
   autoSubtitles: false,
   subtitleSize: 'medium',
