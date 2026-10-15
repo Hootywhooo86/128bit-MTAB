@@ -173,6 +173,7 @@ function AppNavigator() {
           <Stack.Screen name="settings/sources" options={{ title: 'Download sources' }} />
           <Stack.Screen name="settings/layout" options={{ title: 'Layout' }} />
           <Stack.Screen name="settings/tracking" options={{ title: 'Tracking' }} />
+          <Stack.Screen name="settings/tracker-lists" options={{ title: 'Tracker lists' }} />
           <Stack.Screen name="settings/playback" options={{ title: 'Playback' }} />
           <Stack.Screen name="settings/downloads" options={{ title: 'Downloads' }} />
           <Stack.Screen name="settings/integrations" options={{ title: 'Integrations' }} />

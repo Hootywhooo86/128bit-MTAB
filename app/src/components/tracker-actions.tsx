@@ -9,7 +9,7 @@ import {
   addToTrackerList,
   createTrackerList,
   findInTracker,
-  getTrackerLists,
+  getAllTrackerLists,
   rateInTracker,
   setTrackerWatchlist,
   trackerSignedIn,
@@ -113,7 +113,10 @@ export function TrackerActions({ item }: { item: TrackerRef }) {
         {button('list', 'Lists', async () => {
           setModal('lists');
           setLists(null);
-          setLists(await getTrackerLists(kind).catch(() => []));
+          // Every list you've made, whatever its kind or tab: this title's kind first.
+          const all = await getAllTrackerLists().catch(() => [] as TrackerList[]);
+          const rank = (l: TrackerList) => (l.kind === kind ? 0 : l.kind === 'mixed' ? 1 : 2);
+          setLists([...all].sort((a, b) => rank(a) - rank(b)));
         })}
         {found ? button(found.rating ? 'star' : 'star-outline', found.rating ? `${found.rating}/10` : 'Rate', () => setModal('rate'), !!found.rating) : null}
         {busy ? <ActivityIndicator color={Colors.accent} /> : null}
