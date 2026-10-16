@@ -146,7 +146,10 @@ function AppNavigator() {
             contentStyle: { backgroundColor: Colors.background },
           }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="title" options={{ title: '' }} />
+          <Stack.Screen
+            name="title"
+            options={{ title: '', headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }}
+          />
           <Stack.Screen name="streams" options={{ title: '' }} />
           <Stack.Screen
             name="watch"
