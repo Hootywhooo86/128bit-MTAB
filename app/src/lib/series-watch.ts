@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { readPrefs } from './prefs';
+import { dayKey } from './stats';
 import { getLibrary } from './storage';
 import { addWanted, getWanted, grabBook, wantedId } from './wanted';
 
@@ -62,7 +63,7 @@ export async function watchSeries(force = false) {
     }
     await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(seen));
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = dayKey(); // local day, not UTC's
     for (const [asin, { seq, auto }] of series) {
       const { product } = await get<{ product: { relationships?: { asin: string; sequence?: string }[] } }>(
         `${API}/${asin}?response_groups=relationships`,

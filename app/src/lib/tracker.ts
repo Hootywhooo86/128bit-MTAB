@@ -88,8 +88,27 @@ export function getTrackerUpNext() {
 }
 
 export type CalendarEntry = { date: string; kind: string; title: string; detail?: string | null; item?: TrackerItem | null };
+/** The phone's time zone (e.g. "America/Edmonton"), so "today" is your today, not UTC's. */
+export const localTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+};
+
 export function getTrackerCalendar(days = 30) {
-  return cached(`calendar:${days}`, () => rpc<CalendarEntry[]>('get_calendar', { days }));
+  return cached(`calendar:${days}`, async () => {
+    const tz = localTimeZone();
+    if (tz) {
+      try {
+        return await rpc<CalendarEntry[]>('get_calendar_local', { days, tz });
+      } catch {
+        // Older account server without get_calendar_local: the UTC one.
+      }
+    }
+    return rpc<CalendarEntry[]>('get_calendar', { days });
+  });
 }
 
 /** This title in your Tracker library (seasons of a show are one item each). */
