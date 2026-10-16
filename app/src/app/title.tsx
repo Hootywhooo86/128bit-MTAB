@@ -16,6 +16,7 @@ import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/componen
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMeta } from '@/lib/addons';
+import { kitsuMeta } from '@/lib/kitsu';
 import { getActiveAddons } from '@/lib/storage';
 import type { Episode, MetaDetail } from '@/lib/types';
 import { setSeriesContext } from '@/lib/video';
@@ -88,6 +89,8 @@ export default function TitleScreen() {
   useEffect(() => {
     getActiveAddons()
       .then((addons) => fetchMeta(addons, type, id, addon))
+      // A Kitsu search result no addon can show: Kitsu's own details (so Tracker buttons work).
+      .catch((e) => (id.startsWith('kitsu:') ? kitsuMeta(id) : Promise.reject(e)))
       .then(setMeta)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [type, id, addon]);
