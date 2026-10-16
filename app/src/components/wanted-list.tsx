@@ -11,15 +11,19 @@ import {
   findMatches,
   getWanted,
   markSent,
+  markStarted,
+  playable,
   removeWanted,
   stillWanted,
   syncWantedWithTracker,
   torboxState,
+  updateWanted,
   type Match,
   type TorboxState,
   type WantedBook,
 } from '@/lib/wanted';
 import { Pressable } from '@/components/focusable';
+import { usePlayer } from '@/lib/player';
 
 function confirmRemove(title: string, onYes: () => void) {
   if (Platform.OS === 'web') {
@@ -41,8 +45,10 @@ export function WantedList({ onCount }: { onCount?: (n: number) => void }) {
   const [author, setAuthor] = useState('');
   const [round, setRound] = useState(0);
 
-  // Sent to TorBox / downloaded: those are in the Library now.
+  // Everything you haven't started (sent to TorBox and ready included); started or on the
+  // phone: that's in the Library.
   const load = useCallback(async () => {
+    await markStarted().catch(() => {});
     const l = (await getWanted()).filter(stillWanted);
     setList(l);
     onCount?.(l.length);
@@ -152,6 +158,15 @@ function WantedRow({
   }, [book, fresh]);
 
   const best = matches?.[0];
+  const { openBook } = usePlayer();
+  // Ready in TorBox: tap plays it (starting it is what moves it to the Library).
+  async function playReady() {
+    if (tb?.state !== 'ready') return;
+    const pb = playable(book, tb.item);
+    await updateWanted(book.id, { libraryKey: pb.key });
+    await openBook(pb);
+    router.push('/player');
+  }
   const openSearch = () =>
     router.push({
       pathname: '/audiobooks/details',
@@ -161,7 +176,7 @@ function WantedRow({
   return (
     <Pressable
       style={styles.row}
-      onPress={openSearch}
+      onPress={tb?.state === 'ready' ? playReady : openSearch}
       onLongPress={() =>
         confirmRemove(book.title, async () => {
           await removeWanted(book.id);
@@ -183,7 +198,7 @@ function WantedRow({
           </Text>
         ) : book.torbox && tb?.state === 'ready' ? (
           <Text style={[styles.meta, { color: Colors.success }]}>
-            Ready in TorBox · tap to play or download
+            Ready in TorBox · tap to play
           </Text>
         ) : book.torbox && tb?.state === 'gone' ? (
           <Text style={[styles.meta, { color: Colors.danger }]}>TorBox item gone · tap to send again</Text>

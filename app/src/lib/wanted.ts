@@ -17,7 +17,7 @@ import { addToTrackerList, getStarterLists, invalidateTracker, removeFromTracker
 import { cleanTitle, getSources, isCatalog, matchScore, searchSource } from './sources';
 import { downloadBook } from './downloads';
 import { bookFromTorboxItem } from './resolve';
-import { addToLibrary } from './storage';
+import { addToLibrary, getLibrary, getProgressMany } from './storage';
 import { addMagnet, getItem, magnetFromHash, type TorboxItem } from './torbox';
 import { canGetTorrents } from './torrent-device';
 import type { PlayableBook } from './types';
@@ -43,14 +43,39 @@ export type WantedBook = {
   /** Save it to the phone as soon as TorBox has finished. */
   autoDownload?: boolean;
   downloaded?: boolean;
-  /** Ready in TorBox and put in the Library. */
+  /** Old builds put ready books straight in the Library; kept so they can be found there. */
   inLibrary?: boolean;
+  /** The Library book it plays as (TorBox / phone), once it's been played or downloaded. */
+  libraryKey?: string;
+  /** You've started listening: from here on it's a Library book, not a Wanted one. */
+  started?: boolean;
   /** Its item on the Tracker Audiobooks list (unset: not sent there yet). */
   trackerItemId?: string;
 };
 
-/** Still wanted: not yet sent to TorBox or downloaded (those are in the Library). */
-export const stillWanted = (w: WantedBook) => !w.sentAt && !w.downloaded && !w.inLibrary;
+/**
+ * Still wanted: you haven't started it (sent to TorBox and ready still counts as wanted;
+ * it moves to the Library once you start listening, or when it's downloaded to the phone).
+ */
+export const stillWanted = (w: WantedBook) => !w.started && !w.downloaded;
+
+const norm2 = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Marks Wanted books you've started listening to (their Library book has progress). */
+export async function markStarted() {
+  const wanted = await getWanted();
+  const open = wanted.filter((w) => !w.started && (w.libraryKey || w.inLibrary || w.torbox || w.downloaded));
+  if (!open.length) return;
+  const library = await getLibrary();
+  const keyOf = (w: WantedBook) => w.libraryKey ?? library.find((b) => norm2(b.title) === norm2(w.title))?.key;
+  const keys = open.map(keyOf).filter((k): k is string => !!k);
+  const progress = await getProgressMany(keys);
+  for (const w of open) {
+    const k = keyOf(w);
+    const p = k ? progress[k] : undefined;
+    if (p && (p.finished || p.fraction > 0)) await updateWanted(w.id, { started: true, libraryKey: k });
+  }
+}
 
 export type WantedInput = Partial<Omit<WantedBook, 'id' | 'addedAt'>> & { title: string };
 
@@ -180,10 +205,9 @@ async function pushToTracker(w: WantedBook) {
 /** Got it (TorBox / phone): "listening" in Tracker, and on the Audiobooks list. */
 async function trackGrabbed(w: WantedBook, playKey?: string) {
   if (!isSignedIn(await getSession())) return;
+  // Still planned in Tracker: it only becomes "listening" once you start it (the player does that).
   if (!w.trackerItemId) await pushToTracker(w).catch(() => {});
-  await rpc('track_items', {
-    items: [{ ...bookRef(w, playKey), status: 'active', meta: { format: 'audiobook' } }],
-  });
+  if (playKey) await rpc('track_items', { items: [{ ...bookRef(w, playKey), status: 'planned', meta: { format: 'audiobook' } }] });
   invalidateTracker();
 }
 
@@ -321,7 +345,7 @@ export async function downloadWanted(
 ) {
   const book = playable(w, item);
   await addToLibrary(book);
-  await updateWanted(w.id, { inLibrary: true });
+  await updateWanted(w.id, { libraryKey: book.key });
   trackGrabbed(w, book.key).catch(() => {});
   await downloadBook(book, onProgress);
   await updateWanted(w.id, { downloaded: true, autoDownload: false });
@@ -331,8 +355,9 @@ export async function downloadWanted(
 let autoRunning = false;
 
 /**
- * Every minute: books sent to TorBox that are ready go into the Library (and to the
- * phone, for "download when ready"); ones TorBox lost go back to Wanted.
+ * Every minute: books sent to TorBox that are ready go to the phone when you asked for
+ * "download when ready" (otherwise they wait in Wanted as "Ready in TorBox"); ones TorBox
+ * lost go back to looking.
  */
 export async function runAutoDownloads() {
   if (autoRunning) return;
@@ -340,17 +365,11 @@ export async function runAutoDownloads() {
   try {
     for (const w of await getWanted()) {
       if (!w.torbox || w.downloaded) continue;
-      if (w.inLibrary && !w.autoDownload) continue;
+      if (!w.autoDownload) continue;
       const s = await torboxState(w);
       if (s.state === 'ready') {
-        if (w.autoDownload) await downloadWanted(w, s.item).catch(() => {});
-        else {
-          const book = playable(w, s.item);
-          await addToLibrary(book);
-          await updateWanted(w.id, { inLibrary: true });
-          trackGrabbed(w, book.key).catch(() => {});
-        }
-      } else if (s.state === 'gone' && !w.inLibrary) {
+        await downloadWanted(w, s.item).catch(() => {});
+      } else if (s.state === 'gone' && !w.started) {
         await updateWanted(w.id, { torbox: undefined, sentAt: undefined, sentName: undefined });
       }
     }
