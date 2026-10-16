@@ -37,7 +37,7 @@ import {
   type Progress,
 } from '@/lib/storage';
 import type { PlayableBook } from '@/lib/types';
-import { getWanted, runAutoDownloads, stillWanted, torboxState, type TorboxState, type WantedBook } from '@/lib/wanted';
+import { getWanted, markStarted, runAutoDownloads, stillWanted, torboxState, type TorboxState, type WantedBook } from '@/lib/wanted';
 import { Pressable } from '@/components/focusable';
 
 type Tab = 'library' | 'downloads' | 'wanted';
@@ -107,6 +107,7 @@ export default function AudiobooksScreen() {
   }, [navigation]);
 
   const load = useCallback(async () => {
+    await markStarted().catch(() => {});
     const [lib, dl, favs, wanted] = await Promise.all([
       getLibrary(),
       getDownloadedBooks(),
@@ -114,7 +115,8 @@ export default function AudiobooksScreen() {
       getWanted(),
     ]);
     setWantedCount(wanted.filter(stillWanted).length);
-    setComing(wanted.filter((w) => !!w.sentAt && !w.inLibrary && !w.downloaded));
+    // Sent to TorBox but not started: those wait in Wanted now, not here.
+    setComing([]);
     setLibrary(lib);
     setDownloads(dl);
     setFavorites(favs);
@@ -160,7 +162,17 @@ export default function AudiobooksScreen() {
 
   // Downloads = only books still coming down; finished ones are in the Library.
   const downloading = downloads.filter((b) => live.has(b.key) || !isBookDownloaded(b));
-  const shelf = [...library, ...downloads.filter((b) => !library.some((l) => l.key === b.key) && !downloading.includes(b))];
+  const onPhone = downloads.filter((b) => !downloading.includes(b));
+  // The Library is books you have and are into: started, finished, on the phone, or favourites.
+  // Not started yet? It waits in Wanted (your Tracker Audiobooks list) until you press play.
+  const begun = (b: PlayableBook) => {
+    const p = progress[b.key];
+    return !!p && (p.finished || p.fraction > 0);
+  };
+  const shelf = [
+    ...library.filter((b) => begun(b) || favorites.includes(b.key) || onPhone.some((d) => d.key === b.key)),
+    ...onPhone.filter((b) => !library.some((l) => l.key === b.key)),
+  ];
   const source = tab === 'library' ? shelf : downloading;
   const showComing = tab === 'library' && (filter === 'all' || filter === 'progress') && coming.length > 0;
   const books =
