@@ -2,27 +2,51 @@ import { PressStart2P_400Regular, useFonts } from '@expo-google-fonts/press-star
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
 import { syncHistoryToTracker } from '@/lib/tracker-sync';
-import { startAccountSync } from '@/lib/account';
+import { onAccount, startAccountSync, syncNow } from '@/lib/account';
+import { flushFamilyEvents } from '@/lib/family';
+import { getStarterLists, invalidateTracker } from '@/lib/tracker';
 import { applyDeviceTorrentPrefs, cleanUpDeviceTorrents, wakeDeviceTorrents } from '@/lib/torrent-device';
 import { installDefaultAddons } from '@/lib/addons';
 import { PlayerProvider } from '@/lib/player';
 import { installDefaultFeeds } from '@/lib/feeds';
 import { installDefaultSources } from '@/lib/sources';
 import { checkFollows, runComicQueue } from '@/lib/comic-grab';
-import { syncHardcover } from '@/lib/hardcover';
 import { getSuwayomi } from '@/lib/suwayomi';
 import { runVideoQueue } from '@/lib/video-downloads';
-import { runAutoDownloads } from '@/lib/wanted';
+import { runAutoDownloads, syncWantedWithTracker } from '@/lib/wanted';
 import { watchSeries } from '@/lib/series-watch';
-import { PrefsProvider, usePrefs } from '@/lib/prefs';
+import { PrefsProvider, readPrefs, usePrefs } from '@/lib/prefs';
 
 SplashScreen.preventAutoHideAsync();
+
+/** A full push to 128bit Tracker on opening the app, at most this often. */
+const OPEN_SYNC_MS = 3 * 60_000;
+let lastOpenSync = 0;
+
+/**
+ * Opening the app (or coming back to it): send waiting timeline events, bring Tracker up
+ * to date, pull settings from your other devices, and refetch Tracker rows.
+ */
+function syncOnOpen() {
+  flushFamilyEvents().catch(() => {});
+  invalidateTracker();
+  getStarterLists().catch(() => {});
+  if (!IS_TV) syncWantedWithTracker().catch(() => {}); // Wanted ⇄ Tracker Audiobooks list
+  if (Date.now() - lastOpenSync >= OPEN_SYNC_MS) {
+    lastOpenSync = Date.now();
+    syncHistoryToTracker(true).catch(() => {});
+  }
+}
+
+/** Starter lists already put on a tab once (so taking one off a tab sticks). */
+const PLACED_KEY = '128bit.tracker.starterPlaced';
 
 /** Something broke while drawing: say so (with a way out) instead of leaving a black screen. */
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
@@ -88,15 +112,55 @@ function AppNavigator() {
     return () => sub.remove();
   }, []);
 
-  // Hardcover: bring audiobook progress in line both ways each time the app is opened.
+  // Everything in step each time the app is opened or comes back to the front.
+  // (Account settings sync on 'active' is startAccountSync's own listener; at launch it runs too.)
   useEffect(() => {
-    if (IS_TV) return;
-    syncHardcover().catch(() => {});
+    syncOnOpen();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') syncHardcover().catch(() => {});
+      if (state === 'active') {
+        syncOnOpen();
+        syncNow().catch(() => {});
+      }
     });
     return () => sub.remove();
   }, []);
+
+  // Your Movies / Shows / Anime lists on their tabs, unless you've placed them yourself.
+  const { setPref } = usePrefs();
+  const [starterTick, setStarterTick] = useState(0);
+  useEffect(() => onAccount(() => setStarterTick((n) => n + 1)), []);
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    let cancelled = false;
+    (async () => {
+      const lists = await getStarterLists();
+      if (!lists || cancelled) return;
+      const placed = new Set<string>(JSON.parse((await AsyncStorage.getItem(PLACED_KEY).catch(() => null)) ?? '[]'));
+      // Saved prefs, not this render's (the effect only reruns on sign-in / sync).
+      const places = { ...((await readPrefs()).trackerListPlaces ?? {}) };
+      let changed = false;
+      for (const [id, tabs] of [
+        [lists.movie, ['movie']],
+        [lists.show, ['series']],
+        [lists.anime, ['anime']],
+      ] as const) {
+        if (!id || placed.has(id)) continue;
+        placed.add(id);
+        if (!places[id]) {
+          places[id] = [...tabs];
+          changed = true;
+        }
+      }
+      if (cancelled) return;
+      if (changed) setPref('trackerListPlaces', places);
+      AsyncStorage.setItem(PLACED_KEY, JSON.stringify([...placed])).catch(() => {});
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Only on launch, sign-in and syncs (not on every prefs change).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefsLoaded, starterTick]);
 
   // Wanted books marked "download when ready": check TorBox every minute while the app is open.
   useEffect(() => {
@@ -146,7 +210,10 @@ function AppNavigator() {
             contentStyle: { backgroundColor: Colors.background },
           }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="title" options={{ title: '' }} />
+          <Stack.Screen
+            name="title"
+            options={{ title: '', headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }}
+          />
           <Stack.Screen name="streams" options={{ title: '' }} />
           <Stack.Screen
             name="watch"

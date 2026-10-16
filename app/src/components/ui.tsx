@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -78,7 +78,7 @@ export function Button({
   );
 }
 
-export function Input(props: TextInputProps) {
+export function Input(props: TextInputProps & { ref?: Ref<TextInput> }) {
   const Colors = useColors();
   const styles = useStyles();
   return (

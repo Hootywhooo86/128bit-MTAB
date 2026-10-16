@@ -5,6 +5,8 @@
  * (lib/family.ts); this file reads Tracker back. Functions:
  * 128bittracker/supabase/tracker.sql (API: 128bittracker/docs/TRACKER-RPC.md).
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { getSession, isSignedIn, onAccount, rpc } from './account';
 import { imdbIdFor } from './tmdb';
 import type { TraktItem } from './trakt-library';
@@ -49,6 +51,52 @@ export async function trackerSignedIn() {
   return isSignedIn(await getSession());
 }
 
+/** The five lists every account starts with (Tracker's `starter_lists()`), by kind. */
+export type StarterLists = { movie: string; show: string; anime: string; audiobooks: string; comic: string };
+
+const STARTER_KEY = '128bit.tracker.starterLists';
+let starter: { user: string; lists: StarterLists } | null = null;
+let starterAsked: string | null = null;
+let starterRunning: Promise<StarterLists | null> | null = null;
+
+/**
+ * Makes sure your five lists exist (Movies, Shows, Anime, Audiobooks, Comics) and gives
+ * their ids. Asks the account server once per launch and account (it creates or reuses
+ * them, so asking again is harmless); otherwise the saved answer. Null when signed out.
+ */
+export function getStarterLists(): Promise<StarterLists | null> {
+  starterRunning ??= (async () => {
+    const s = await getSession();
+    if (!isSignedIn(s)) return null;
+    const user = s.user.id;
+    if (!starter || starter.user !== user) {
+      try {
+        const saved = JSON.parse((await AsyncStorage.getItem(STARTER_KEY)) ?? 'null') as typeof starter;
+        if (saved?.user === user) starter = saved;
+      } catch {
+        // nothing saved
+      }
+    }
+    if (starterAsked !== user || !starter || starter.user !== user) {
+      try {
+        const lists = await rpc<StarterLists>('starter_lists', {});
+        if (lists?.audiobooks) {
+          if (starterAsked !== user) cache.clear(); // the lists may be new
+          starter = { user, lists };
+          starterAsked = user;
+          AsyncStorage.setItem(STARTER_KEY, JSON.stringify(starter)).catch(() => {});
+        }
+      } catch {
+        // Older account server, or offline: the saved ids (if any).
+      }
+    }
+    return starter?.user === user ? starter.lists : null;
+  })().finally(() => {
+    starterRunning = null;
+  });
+  return starterRunning;
+}
+
 /** Tracker's own kinds for a Play tab. */
 export const kindFor = (type: 'movie' | 'series' | 'anime'): TrackerKind => (type === 'movie' ? 'movie' : type === 'anime' ? 'anime' : 'show');
 
@@ -88,8 +136,27 @@ export function getTrackerUpNext() {
 }
 
 export type CalendarEntry = { date: string; kind: string; title: string; detail?: string | null; item?: TrackerItem | null };
+/** The phone's time zone (e.g. "America/Edmonton"), so "today" is your today, not UTC's. */
+export const localTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+};
+
 export function getTrackerCalendar(days = 30) {
-  return cached(`calendar:${days}`, () => rpc<CalendarEntry[]>('get_calendar', { days }));
+  return cached(`calendar:${days}`, async () => {
+    const tz = localTimeZone();
+    if (tz) {
+      try {
+        return await rpc<CalendarEntry[]>('get_calendar_local', { days, tz });
+      } catch {
+        // Older account server without get_calendar_local: the UTC one.
+      }
+    }
+    return rpc<CalendarEntry[]>('get_calendar', { days });
+  });
 }
 
 /** This title in your Tracker library (seasons of a show are one item each). */

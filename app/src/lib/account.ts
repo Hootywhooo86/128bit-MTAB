@@ -308,7 +308,7 @@ const SECTIONS: Record<string, Section> = {
     keys: ['128bit.mdblist.sources'],
     secure: ['128bit.torboxKey', '128bit.tmdb', '128bit.mdblist', '128bit.githubToken'],
   },
-  tracking: { secure: ['128bit.trakt', '128bit.traktApp', '128bit.simkl', '128bit.simklApp', '128bit.hardcover'] },
+  tracking: { secure: ['128bit.trakt', '128bit.traktApp', '128bit.simkl', '128bit.simklApp'] },
   books: {
     keys: ['128bit.library', '128bit.favorites', '128bit.wanted', '128bit.feeds', '128bit.sources', '128bit.audiobookSearches'],
     prefixes: ['128bit.progress.'],

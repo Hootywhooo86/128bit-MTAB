@@ -1,7 +1,9 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -14,6 +16,7 @@ import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/componen
 import { Body, EmptyState, Heading, Title } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMeta } from '@/lib/addons';
+import { kitsuMeta } from '@/lib/kitsu';
 import { getActiveAddons } from '@/lib/storage';
 import type { Episode, MetaDetail } from '@/lib/types';
 import { setSeriesContext } from '@/lib/video';
@@ -39,6 +42,11 @@ export default function TitleScreen() {
     id: string;
     addon?: string;
   }>();
+  // The backdrop runs from the very top (behind the status bar and a see-through header),
+  // 16:9 of the screen width (at least 260, and no more than ~60% of a TV screen).
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const heroHeight = Math.round(Math.min(Math.max(260, (width * 9) / 16), Math.max(260, height * 0.6)));
   const [meta, setMeta] = useState<MetaDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
@@ -81,6 +89,8 @@ export default function TitleScreen() {
   useEffect(() => {
     getActiveAddons()
       .then((addons) => fetchMeta(addons, type, id, addon))
+      // A Kitsu search result no addon can show: Kitsu's own details (so Tracker buttons work).
+      .catch((e) => (id.startsWith('kitsu:') ? kitsuMeta(id) : Promise.reject(e)))
       .then(setMeta)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [type, id, addon]);
@@ -102,7 +112,7 @@ export default function TitleScreen() {
   if (!meta) {
     return (
       <View style={styles.center}>
-        <Stack.Screen options={{ title: '' }} />
+        <Stack.Screen options={heroHeader} />
         {error ? (
           <EmptyState title="Couldn’t load this title" body={error} />
         ) : (
@@ -118,9 +128,12 @@ export default function TitleScreen() {
     .join('  ·  ');
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: Spacing.five }}>
-      <Stack.Screen options={{ title: '', headerTransparent: true }} />
-      <View style={styles.hero}>
+    <ScrollView
+      style={styles.screen}
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={{ paddingBottom: Spacing.five }}>
+      <Stack.Screen options={heroHeader} />
+      <View style={[styles.hero, { height: heroHeight + insets.top }]}>
         {meta.background || extra?.backdrop || meta.poster ? (
           <Image
             source={{ uri: meta.background ?? extra?.backdrop ?? meta.poster }}
@@ -128,7 +141,13 @@ export default function TitleScreen() {
             contentFit="cover"
           />
         ) : null}
-        <View style={styles.heroShade} />
+        {/* Dark only at the top (so the back button shows) and the bottom (into the page). */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', Colors.background]}
+          locations={[0, 0.3, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
       </View>
 
       <View style={styles.body}>
@@ -269,6 +288,14 @@ export default function TitleScreen() {
   );
 }
 
+/** A see-through header over the backdrop (the back button floats on the image). */
+const heroHeader = {
+  title: '',
+  headerTransparent: true,
+  headerStyle: { backgroundColor: 'transparent' },
+  headerShadowVisible: false,
+} as const;
+
 const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   center: {
@@ -277,13 +304,10 @@ const useStyles = makeStyles((Colors) => ({
     justifyContent: 'center',
     backgroundColor: Colors.background,
   },
-  hero: { height: 240, backgroundColor: Colors.surface },
-  heroShade: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(10,10,10,0.45)',
-  },
-  body: { padding: Spacing.three, gap: Spacing.three, marginTop: -80 },
-  header: { flexDirection: 'row', gap: Spacing.three },
+  hero: { backgroundColor: Colors.surface, overflow: 'hidden' },
+  // The poster sits on the backdrop's bottom edge; the title and year beside it, below the image.
+  body: { padding: Spacing.three, gap: Spacing.three, marginTop: -56 },
+  header: { flexDirection: 'row', gap: Spacing.three, alignItems: 'flex-end' },
   poster: {
     width: 100,
     height: 150,

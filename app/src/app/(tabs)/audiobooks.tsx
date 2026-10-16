@@ -14,7 +14,7 @@ import { AudiobookSearch } from '@/components/audiobook-search';
 import { BookRow } from '@/components/book-row';
 import { HeaderButtons } from '@/components/header-buttons';
 import { WantedList } from '@/components/wanted-list';
-import { Button, EmptyState, formatBytes } from '@/components/ui';
+import { Button, Cover, EmptyState, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   bookDownloads,
@@ -37,7 +37,7 @@ import {
   type Progress,
 } from '@/lib/storage';
 import type { PlayableBook } from '@/lib/types';
-import { getWanted } from '@/lib/wanted';
+import { getWanted, runAutoDownloads, stillWanted, torboxState, type TorboxState, type WantedBook } from '@/lib/wanted';
 import { Pressable } from '@/components/focusable';
 
 type Tab = 'library' | 'downloads' | 'wanted';
@@ -84,6 +84,8 @@ export default function AudiobooksScreen() {
   const [progress, setProgress] = useState<Record<string, Progress>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
   const [wantedCount, setWantedCount] = useState(0);
+  // Sent to TorBox, not ready yet: in the Library already, with how far along they are.
+  const [coming, setComing] = useState<WantedBook[]>([]);
   const [searching, setSearching] = useState(false);
   // Books downloading right now (live bytes / speed).
   const [live, setLive] = useState<Map<string, BookDownload>>(() => bookDownloads());
@@ -111,7 +113,8 @@ export default function AudiobooksScreen() {
       getFavorites(),
       getWanted(),
     ]);
-    setWantedCount(wanted.length);
+    setWantedCount(wanted.filter(stillWanted).length);
+    setComing(wanted.filter((w) => !!w.sentAt && !w.inLibrary && !w.downloaded));
     setLibrary(lib);
     setDownloads(dl);
     setFavorites(favs);
@@ -132,6 +135,8 @@ export default function AudiobooksScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
+      // Anything TorBox finished meanwhile goes on the shelf.
+      if (Platform.OS !== 'web') runAutoDownloads().then(load, () => {});
     }, [load]),
   );
 
@@ -157,6 +162,7 @@ export default function AudiobooksScreen() {
   const downloading = downloads.filter((b) => live.has(b.key) || !isBookDownloaded(b));
   const shelf = [...library, ...downloads.filter((b) => !library.some((l) => l.key === b.key) && !downloading.includes(b))];
   const source = tab === 'library' ? shelf : downloading;
+  const showComing = tab === 'library' && (filter === 'all' || filter === 'progress') && coming.length > 0;
   const books =
     tab === 'downloads'
       ? source
@@ -181,7 +187,7 @@ export default function AudiobooksScreen() {
             </Text>
             <Text style={styles.segmentCount}>
               {plural(
-                t === 'library' ? shelf.length : t === 'downloads' ? downloading.length : wantedCount,
+                t === 'library' ? shelf.length + coming.length : t === 'downloads' ? downloading.length : wantedCount,
               )}
             </Text>
             <View style={[styles.underline, tab === t && { backgroundColor: Colors.accent }]} />
@@ -189,7 +195,7 @@ export default function AudiobooksScreen() {
         ))}
       </View>
 
-      {tab === 'library' && library.length > 0 ? (
+      {tab === 'library' && shelf.length + coming.length > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -218,8 +224,17 @@ export default function AudiobooksScreen() {
           paddingBottom: Spacing.five,
           flexGrow: 1,
         }}
+        ListHeaderComponent={
+          showComing ? (
+            <View style={{ gap: Spacing.two, paddingBottom: Spacing.two }}>
+              {coming.map((w) => (
+                <ComingRow key={w.id} book={w} />
+              ))}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          tab === 'library' ? (
+          showComing ? null : tab === 'library' ? (
             shelf.length ? (
               <EmptyState title="Nothing here" body="No books match this filter." />
             ) : (
@@ -270,7 +285,58 @@ export default function AudiobooksScreen() {
   );
 }
 
+/** A book sent to TorBox that isn't ready yet: how far along, and tap for its page. */
+function ComingRow({ book }: { book: WantedBook }) {
+  const Colors = useColors();
+  const styles = useStyles();
+  const [tb, setTb] = useState<TorboxState | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    torboxState(book).then((s) => !cancelled && setTb(s), () => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [book]);
+  return (
+    <Pressable
+      style={styles.coming}
+      onPress={() =>
+        router.push({
+          pathname: '/audiobooks/details',
+          params: { title: book.title, author: book.author ?? '', cover: book.cover ?? '' },
+        })
+      }>
+      <Cover uri={book.cover} size={56} title={book.title} author={book.author} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.comingTitle} numberOfLines={2}>
+          {book.title}
+        </Text>
+        {book.author ? <Text style={styles.comingMeta}>{book.author}</Text> : null}
+        <Text style={[styles.comingMeta, { color: tb?.state === 'gone' ? Colors.danger : Colors.accent }]}>
+          {tb?.state === 'downloading'
+            ? `Coming from TorBox · ${Math.round(tb.progress * 100)}%`
+            : tb?.state === 'ready'
+              ? 'Ready in TorBox · tap to play or download'
+              : tb?.state === 'gone'
+                ? 'TorBox item gone · tap to send again'
+                : 'Sent to TorBox'}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 const useStyles = makeStyles((Colors) => ({
+  coming: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.two,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+  },
+  comingTitle: { color: Colors.text, fontSize: 15, fontWeight: '600' },
+  comingMeta: { color: Colors.textSecondary, fontSize: 12 },
   screen: { flex: 1, backgroundColor: Colors.background },
   segments: {
     flexDirection: 'row',

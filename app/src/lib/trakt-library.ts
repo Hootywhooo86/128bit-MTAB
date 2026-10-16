@@ -7,6 +7,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { dayKey } from './stats';
 import { traktApi } from './trakt';
 
 export type Kind = 'movie' | 'show';
@@ -357,7 +358,7 @@ export async function setInList(id: number, kind: Kind, imdb: string, on: boolea
 
 /** Episodes of your shows airing from today for `days` days. */
 export async function getCalendar(days = 14): Promise<TraktItem[]> {
-  const start = new Date().toISOString().slice(0, 10);
+  const start = dayKey(); // today where you are, not in UTC
   return items(await traktApi<Raw[]>('GET', `/calendars/my/shows/${start}/${days}`));
 }
 

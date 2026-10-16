@@ -2,7 +2,7 @@
  * Everything you read, watch and listen to here, in your 128bit Tracker: audiobooks
  * (listening and finished), comics (chapters read), movies and show seasons (watched and
  * in progress, down to how far into each one: meta.pct and meta.now), plus Wanted books
- * as planned. Sent with the 128bit sign-in to
+ * as planned (or active once sent to TorBox). Sent with the 128bit sign-in to
  * track_items, which only ever moves things forward (128bittracker/supabase/tracker.sql),
  * so running it again is harmless. Runs after sign-in, then at most every 30 minutes
  * while the app is open, and from Settings → Tracking → "Send my history now".
@@ -17,7 +17,7 @@ import { getLibrary, getProgressMany } from './storage';
 import { invalidateTracker } from './tracker';
 import { parseKey, pctOf } from './tracker-live';
 import { getWatchProgress, isAnime } from './video';
-import { getWanted } from './wanted';
+import { getWanted, stillWanted } from './wanted';
 
 const LAST_KEY = '128bit.trackerHistory.last';
 const PRINT_KEY = '128bit.trackerHistory.print';
@@ -71,7 +71,8 @@ export async function collectHistory(): Promise<HistoryItem[]> {
   }
   for (const w of await getWanted().catch(() => [])) {
     if (seenBooks.has(w.title.toLowerCase())) continue;
-    out.push({ type: 'book', title: w.title, creator: w.author, poster: w.cover, status: 'planned', meta: { format: 'audiobook' } });
+    // Sent to TorBox / downloaded: you have it (Library), so it's "listening", not planned.
+    out.push({ type: 'book', title: w.title, creator: w.author, poster: w.cover, status: stillWanted(w) ? 'planned' : 'active', meta: { format: 'audiobook' } });
   }
 
   // Comics: chapters read.

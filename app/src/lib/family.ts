@@ -83,9 +83,21 @@ export function watchedDetails(
   return out;
 }
 
-export async function emitFamilyEvent(type: FamilyEventType, data: FamilyEvent['data']) {
+export const newEventId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/**
+ * Queue an event. `id`: reuse one to replace an earlier event (a sitting's hourly checkpoint
+ * and its final line share an id, so the timeline shows one line); `at`: when it happened.
+ */
+export async function emitFamilyEvent(
+  type: FamilyEventType,
+  data: FamilyEvent['data'],
+  { id = newEventId(), at = Date.now() }: { id?: string; at?: number } = {},
+) {
   const q = await load();
-  q.push({ id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`, app: 'play', type, at: Date.now(), data });
+  const same = q.findIndex((e) => e.id === id);
+  if (same >= 0) q.splice(same, 1);
+  q.push({ id, app: 'play', type, at, data });
   if (q.length > MAX_QUEUED) q.splice(0, q.length - MAX_QUEUED);
   await save(q);
   if (timer) clearTimeout(timer);

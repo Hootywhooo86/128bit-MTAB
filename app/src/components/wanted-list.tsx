@@ -1,27 +1,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Platform, Text, View } from 'react-native';
+import { Alert, FlatList, Platform, Text, View } from 'react-native';
 
 import { TorboxButton } from '@/components/torbox-button';
 import { Body, Button, Cover, EmptyState, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
-import { getHardcoverToken } from '@/lib/hardcover';
 import {
   addWanted,
   findMatches,
   getWanted,
-  importHardcoverWanted,
   markSent,
   removeWanted,
+  stillWanted,
+  syncWantedWithTracker,
   torboxState,
   type Match,
   type TorboxState,
   type WantedBook,
 } from '@/lib/wanted';
 import { Pressable } from '@/components/focusable';
-
-let importedThisSession = false;
 
 function confirmRemove(title: string, onYes: () => void) {
   if (Platform.OS === 'web') {
@@ -41,46 +39,22 @@ export function WantedList({ onCount }: { onCount?: (n: number) => void }) {
   const [list, setList] = useState<WantedBook[] | null>(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
-  const [hardcover, setHardcover] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
   const [round, setRound] = useState(0);
 
+  // Sent to TorBox / downloaded: those are in the Library now.
   const load = useCallback(async () => {
-    const l = await getWanted();
+    const l = (await getWanted()).filter(stillWanted);
     setList(l);
     onCount?.(l.length);
   }, [onCount]);
 
-  const sync = useCallback(async () => {
-    setSyncing(true);
-    setNote(null);
-    try {
-      const n = await importHardcoverWanted();
-      setNote(n ? `Added ${n} from Hardcover Want to Read` : 'Up to date with Hardcover');
-      await load();
-    } catch (e) {
-      setNote(`Hardcover: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setSyncing(false);
-    }
-  }, [load]);
-
+  // Your Tracker Audiobooks list is Wanted: bring both in step each time you look.
   useFocusEffect(
     useCallback(() => {
       load();
+      syncWantedWithTracker().then(load, () => {});
     }, [load]),
   );
-
-  useEffect(() => {
-    getHardcoverToken().then((t) => {
-      setHardcover(!!t);
-      if (t && !importedThisSession) {
-        importedThisSession = true;
-        sync();
-      }
-    });
-  }, [sync]);
 
   async function add() {
     if (!title.trim()) return;
@@ -98,8 +72,9 @@ export function WantedList({ onCount }: { onCount?: (n: number) => void }) {
       ListHeaderComponent={
         <View style={styles.card}>
           <Body muted style={{ fontSize: 13 }}>
-            Books you want. 128bit looks for each on AudiobookBay and your download sources; tap
-            TorBox on a match to get it.
+            Books you want (your 128bit Tracker Audiobooks list). 128bit looks for each on
+            AudiobookBay and your download sources; tap TorBox on a match to get it, and it moves to
+            your Library.
           </Body>
           <Input placeholder="Title" value={title} onChangeText={setTitle} />
           <Input
@@ -110,12 +85,6 @@ export function WantedList({ onCount }: { onCount?: (n: number) => void }) {
           />
           <Button label="Add to Wanted" onPress={add} disabled={!title.trim()} />
           <View style={styles.actions}>
-            {hardcover ? (
-              <Pressable onPress={sync} disabled={syncing} hitSlop={8} style={styles.link}>
-                {syncing ? <ActivityIndicator size="small" color={Colors.accent} /> : null}
-                <Text style={styles.linkText}>Sync Hardcover Want to Read</Text>
-              </Pressable>
-            ) : null}
             {list?.length ? (
               <Pressable onPress={() => setRound(round + 1)} hitSlop={8} style={styles.link}>
                 <Ionicons name="refresh" size={16} color={Colors.accent} />
@@ -123,7 +92,6 @@ export function WantedList({ onCount }: { onCount?: (n: number) => void }) {
               </Pressable>
             ) : null}
           </View>
-          {note ? <Body muted style={{ fontSize: 12 }}>{note}</Body> : null}
         </View>
       }
       ListEmptyComponent={
