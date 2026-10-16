@@ -355,6 +355,7 @@ export default function WatchScreen() {
           ...watchedDetails(item.key, { series: item.series, poster: item.poster }),
         };
     let counted = false;
+    let statSeconds = 0;
     const tick = setInterval(() => {
       let playing = false;
       try {
@@ -363,10 +364,27 @@ export default function WatchScreen() {
         return; // released
       }
       if (!playing) return;
-      addWatching(entry, 10);
       if (session) {
         const { time, duration } = known.current;
-        sessionTick(item.key, 'watch.session', session, { seconds: 10, pct: duration > 0 ? (time / duration) * 100 : undefined, pos: time });
+        let rate = 1;
+        try {
+          rate = player.playbackRate || 1;
+        } catch {
+          // released
+        }
+        // The sitting's time comes from the position (lib/sessions.ts); stats get the same.
+        statSeconds += sessionTick(item.key, 'watch.session', session, {
+          seconds: 10,
+          pct: duration > 0 ? (time / duration) * 100 : undefined,
+          pos: time,
+          dur: duration || undefined,
+          rate,
+        });
+        const whole = Math.floor(statSeconds);
+        statSeconds -= whole;
+        if (whole > 0) addWatching(entry, whole);
+      } else {
+        addWatching(entry, 10);
       }
       if (
         !counted &&
@@ -388,7 +406,10 @@ export default function WatchScreen() {
     }, 10_000);
     return () => {
       clearInterval(tick);
-      if (session && known.current.time > 0) sessionTick(item.key, 'watch.session', session, { pos: known.current.time });
+      if (session && known.current.time > 0) {
+        const left = sessionTick(item.key, 'watch.session', session, { pos: known.current.time, playing: false });
+        if (left >= 1) addWatching(entry, Math.round(left));
+      }
       sessionEnd(item.key);
     };
   }, [item, player, prefs.traktScrobble]);

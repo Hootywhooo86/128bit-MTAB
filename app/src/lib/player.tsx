@@ -31,9 +31,8 @@ import {
 
 import { absReportProgress, absResumePoint, isAbsBook } from './audiobookshelf';
 import { findCover } from './covers';
-import { hardcoverProgress } from './hardcover';
 import { reportBookProgress } from './tracker-live';
-import { sessionEnd, sessionTick } from './sessions';
+import { onSessionTime, registerSessionProbe, sessionEnd, sessionTick } from './sessions';
 import { addListening, markBookFinished } from './stats';
 import { addBookmark as storeBookmark } from './bookmarks';
 import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
@@ -132,6 +131,11 @@ let lastSave = 0;
 let finished = false;
 let lastTick = 0;
 let listenedSeconds = 0;
+/** Listening sittings (lib/sessions.ts): when we last looked, and whether it was playing. */
+let lastSample = 0;
+let lastPlaying = false;
+/** Right after a resume seek the position is still settling: don't record it yet. */
+let settleUntil = 0;
 let lastLockKey = '';
 let sleepMark: number | null = null;
 let lockScreenOn = false;
@@ -187,9 +191,12 @@ function onStatus(s: AudioStatus) {
     const to = pendingSeek;
     pendingSeek = null;
     p.seekTo(to);
+    settleUntil = Date.now() + 1500;
   }
   if (!book) return;
   if (s.didJustFinish) {
+    // The file ended: its last second is where this part of the sitting stopped.
+    listenSample({ pos: s.duration || s.currentTime, dur: s.duration });
     onFinish();
     return;
   }
@@ -225,28 +232,100 @@ function onStatus(s: AudioStatus) {
     });
     if (isAbsBook(book)) absReportProgress(book, chapterIndex, s.currentTime, false);
     // Every few minutes while listening, and right away when you pause.
-    hardcoverProgress(book, fraction, false, !s.playing);
     reportBookProgress(book, fraction, false, !s.playing);
   }
 
-  // Statistics: listening time, counted while playing.
+  // Statistics and the timeline: tick time while playing (the fallback), and a look at
+  // the position every 10 s, on play/pause, and around jumps (lib/sessions.ts turns
+  // positions into real time — ticks alone miss everything played with the screen off).
   if (s.playing) {
     if (lastTick) listenedSeconds += Math.min(5, (now - lastTick) / 1000);
     lastTick = now;
-    if (listenedSeconds >= 10) {
-      sessionTick(book.key, 'listen.session', { title: book.title, author: book.author, poster: book.cover }, {
-        seconds: listenedSeconds,
-        pct: bookFraction(book, chapterIndex, s.currentTime, s.duration) * 100,
-        pos: s.currentTime,
-        ch: chapterIndex,
-      });
-      addListening(book, Math.round(listenedSeconds));
-      listenedSeconds = 0;
-    }
   } else {
     lastTick = 0;
   }
+  if (s.isLoaded && pendingSeek === null && now >= settleUntil) {
+    if (s.playing !== lastPlaying || (s.playing && now - lastSample >= 10_000)) {
+      listenSample({ pos: s.currentTime, dur: s.duration, playing: s.playing });
+    }
+  }
 }
+
+/** Book details for the stats, by key (a sitting can end after you switched books). */
+const listenedBooks = new Map<string, { key: string; title: string; author?: string }>();
+/** Fractions of a second waiting to be added to the stats. */
+const pendingStats = new Map<string, number>();
+
+/** Where the book is now → the listening sitting (and so the stats, via onSessionTime). */
+function listenSample(
+  extra: { pos?: number; dur?: number; playing?: boolean; jumped?: boolean; finished?: boolean } = {},
+) {
+  const { book, chapterIndex, rate } = state;
+  if (!book) return;
+  const p = getAudio();
+  let pos = extra.pos;
+  let dur = extra.dur;
+  try {
+    pos ??= p.currentTime;
+    dur ??= p.duration;
+  } catch {
+    // released
+  }
+  listenedBooks.set(book.key, { key: book.key, title: book.title, author: book.author });
+  sessionTick(book.key, 'listen.session', { title: book.title, author: book.author, poster: book.cover }, {
+    seconds: listenedSeconds,
+    pct: pos != null ? bookFraction(book, chapterIndex, pos, dur ?? 0) * 100 : undefined,
+    pos,
+    ch: chapterIndex,
+    dur,
+    rate,
+    playing: extra.playing ?? true,
+    jumped: extra.jumped,
+    finished: extra.finished,
+  });
+  listenedSeconds = 0;
+  lastSample = Date.now();
+  lastPlaying = extra.playing ?? true;
+}
+
+/** About to seek or switch chapters: record where we were, and start fresh after. */
+function markJump() {
+  const { book } = state;
+  if (!book) return;
+  let playing = false;
+  try {
+    if (!getAudio().isLoaded) return;
+    playing = getAudio().playing;
+  } catch {
+    return;
+  }
+  listenSample({ playing, jumped: true });
+  // Look again as soon as the new position is in.
+  lastSample = 0;
+  settleUntil = Date.now() + 1500;
+}
+
+// Play's "time listened" gets exactly what the timeline sittings get.
+onSessionTime('listen.session', (key, seconds) => {
+  const b = listenedBooks.get(key) ?? (state.book?.key === key ? state.book : null);
+  if (!b) return;
+  const total = (pendingStats.get(key) ?? 0) + seconds;
+  const whole = Math.floor(total);
+  pendingStats.set(key, total - whole);
+  if (whole > 0) addListening(b, whole);
+});
+
+// When a timer fires late (screen was off) or the app comes back: where is the book now?
+registerSessionProbe('listen.session', (key) => {
+  const { book, chapterIndex, rate } = state;
+  if (!book || book.key !== key || !audio) return null;
+  try {
+    if (!audio.isLoaded) return null;
+    return { pos: audio.currentTime, ch: chapterIndex, dur: audio.duration, playing: audio.playing, rate };
+  } catch {
+    return null;
+  }
+});
 
 /** A file ended: stop for the sleep timer, go to the next one, or finish the book. */
 function onFinish() {
@@ -257,15 +336,15 @@ function onFinish() {
     return;
   }
   if (chapterIndex + 1 < book.chapters.length) {
-    if (options.autoNextChapter) loadChapter(book, chapterIndex + 1);
+    if (options.autoNextChapter) loadChapter(book, chapterIndex + 1, 0, true, true);
     return;
   }
   finished = true;
   saveProgress(book.key, { chapter: 0, position: 0, fraction: 1, finished: true });
   if (isAbsBook(book)) absReportProgress(book, chapterIndex, getAudio().duration, true);
-  hardcoverProgress(book, 1, true);
   reportBookProgress(book, 1, true);
-  sessionTick(book.key, 'listen.session', { title: book.title, author: book.author, poster: book.cover }, { finished: true });
+  const end = getAudio().duration;
+  listenSample({ pos: end, dur: end, playing: false, finished: true });
   sessionEnd(book.key);
   markBookFinished(book);
 }
@@ -294,10 +373,12 @@ async function detectMarks(target: PlayableBook, index: number, uri: string) {
   updateDownloadedBook(updated);
 }
 
-async function loadChapter(target: PlayableBook, index: number, startAt = 0, autoPlay = true) {
+async function loadChapter(target: PlayableBook, index: number, startAt = 0, autoPlay = true, auto = false) {
   const chapter = target.chapters[index];
   if (!chapter) return;
   const p = getAudio();
+  // You picked another chapter (not the next one playing on): a jump, not listening.
+  if (!auto && state.book?.key === target.key) markJump();
   update({ loading: true, error: null, chapterIndex: index });
   try {
     const uri = await chapterUrl(target.key, chapter);
@@ -372,6 +453,7 @@ async function jumpTo(index: number, position: number) {
   if (!book) return;
   const p = getAudio();
   if (index === chapterIndex && p.isLoaded) {
+    markJump();
     p.seekTo(position);
     if (!p.playing) p.play();
   } else {
@@ -385,7 +467,10 @@ function next() {
   const p = getAudio();
   const marks = book.chapters[chapterIndex]?.marks ?? [];
   const mark = currentMark(book.chapters[chapterIndex], p.currentTime);
-  if (mark && mark.index + 1 < marks.length) p.seekTo(marks[mark.index + 1].start);
+  if (mark && mark.index + 1 < marks.length) {
+    markJump();
+    p.seekTo(marks[mark.index + 1].start);
+  }
   else if (chapterIndex + 1 < book.chapters.length) loadChapter(book, chapterIndex + 1);
 }
 
@@ -397,6 +482,7 @@ function previous() {
   const marks = book.chapters[chapterIndex]?.marks ?? [];
   const mark = currentMark(book.chapters[chapterIndex], p.currentTime);
   const chapterStart = mark?.start ?? 0;
+  if (p.isLoaded) markJump();
   if (p.currentTime - chapterStart > RESTART_THRESHOLD_S) p.seekTo(chapterStart);
   else if (mark && mark.index > 0) p.seekTo(marks[mark.index - 1].start);
   else if (chapterIndex > 0) loadChapter(book, chapterIndex - 1);
@@ -508,9 +594,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     hasNext,
     hasPrevious: !!book,
     toggle: () => (player.playing ? player.pause() : player.play()),
-    seekTo: (s) => player.seekTo(Math.max(0, s)),
-    seekBy: (s) =>
-      player.seekTo(Math.min(Math.max(0, player.currentTime + s), player.duration || Infinity)),
+    seekTo: (s) => {
+      markJump();
+      player.seekTo(Math.max(0, s));
+    },
+    seekBy: (s) => {
+      markJump();
+      player.seekTo(Math.min(Math.max(0, player.currentTime + s), player.duration || Infinity));
+    },
     setRate,
     setSleep,
     addBookmark: async (note?: string) => {
