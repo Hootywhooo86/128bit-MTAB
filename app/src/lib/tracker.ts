@@ -23,9 +23,12 @@ export type TrackerItem = {
   progress: number;
   progress_total?: number | null;
   rating?: number | null;
+  /** A show: the season you're on, and each season's episodes watched ({"1": {p: 10, n: 10, done}}). */
   season?: number | null;
+  seasons?: Record<string, { p: number; n?: number; a?: string; done?: string }> | null;
   ids: { imdb?: string; tmdb?: number; tvdb?: number; anilist?: number; mal?: number; kitsu?: number | string; trakt?: number };
-  next?: { season: number; number: number };
+  /** Up next; air_date when that episode hasn't aired yet (a new season coming). */
+  next?: { season: number; number: number; air_date?: string };
   /** 0..100 through the whole title, and where you are right now (from any device). */
   pct?: number | null;
   now?: { pct?: number; episode?: number; chapter?: string; page?: number; position_s?: number; duration_s?: number; at?: string } | null;
@@ -159,9 +162,30 @@ export function getTrackerCalendar(days = 30) {
   });
 }
 
-/** This title in your Tracker library (seasons of a show are one item each). */
+/** This title in your Tracker library (a show is one item, its seasons inside). */
 export function getTrackerProgress(imdb: string) {
   return rpc<TrackerItem[]>('get_item_progress', { ids: { imdb } });
+}
+
+/**
+ * Which episodes of a show Tracker says you've watched, as "season:episode" keys,
+ * by any id Play knows it by ({imdb} or {kitsu}). Older libraries had one item per season.
+ */
+export async function getTrackerWatchedEpisodes(ids: Record<string, string | number>): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!(await trackerSignedIn())) return out;
+  const items = await rpc<TrackerItem[]>('get_item_progress', { ids });
+  for (const i of items) {
+    const seasons = i.seasons && Object.keys(i.seasons).length ? i.seasons : { [String(i.season ?? 1)]: { p: i.progress } };
+    for (const [s, x] of Object.entries(seasons)) for (let e = 1; e <= Math.floor(x.p ?? 0); e++) out.add(`${s}:${e}`);
+  }
+  return out;
+}
+
+/** "Oct 30" (or "Oct 30, 2027" another year) for an upcoming episode. */
+export function airDay(day: string) {
+  const d = new Date(`${day}T12:00:00`);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 }
 
 /** A title as 128bit Tracker knows it. ids: whatever this app knows ({imdb}, {kitsu}); books and comics go by title. */
@@ -227,7 +251,8 @@ export async function asRowItems(items: TrackerItem[]): Promise<TraktItem[]> {
       imdb,
       season: ep?.season,
       episode: ep?.number,
-      subtitle: ep ? `S${ep.season} E${ep.number}` : undefined,
+      // A new season coming: when it starts ("S2 E1 · Oct 30").
+      subtitle: ep ? `S${ep.season} E${ep.number}${ep.air_date && ep.air_date > new Date().toISOString().slice(0, 10) ? ` · ${airDay(ep.air_date)}` : ''}` : undefined,
     });
   }
   return out;

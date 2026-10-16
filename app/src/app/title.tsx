@@ -1,11 +1,10 @@
 import { Image } from 'expo-image';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { DownloadedPlay } from '@/components/downloaded-play';
 import { LinkToTrakt, TraktActions, useTraktConnected } from '@/components/trakt-actions';
@@ -19,7 +18,10 @@ import { fetchMeta } from '@/lib/addons';
 import { kitsuMeta } from '@/lib/kitsu';
 import { getActiveAddons } from '@/lib/storage';
 import type { Episode, MetaDetail } from '@/lib/types';
-import { setSeriesContext } from '@/lib/video';
+import { getWatchProgress, setSeriesContext } from '@/lib/video';
+import { getStats } from '@/lib/stats';
+import { getTrackerWatchedEpisodes } from '@/lib/tracker';
+import { PixelCheck } from '@/components/pixel-check';
 import { Pressable } from '@/components/focusable';
 
 const episodeNumber = (e: Episode) => e.episode ?? e.number ?? 0;
@@ -85,6 +87,35 @@ export default function TitleScreen() {
       setEpError(e instanceof Error ? e.message : String(e));
     }
   }
+
+  // Watched marks without Trakt: what you finished here, how far into each episode, and
+  // what your 128bit Tracker says (Tracker counts episodes watched anywhere).
+  const [doneHere, setDoneHere] = useState<Set<string>>(new Set());
+  const [partial, setPartial] = useState<Map<string, number>>(new Map());
+  const [trackerEps, setTrackerEps] = useState<Set<string>>(new Set());
+  useFocusEffect(
+    useCallback(() => {
+      if (type === 'movie') return;
+      let cancelled = false;
+      (async () => {
+        const stats = await getStats().catch(() => null);
+        const done = new Set(Object.entries(stats?.watched ?? {}).filter(([, w]) => w.finished).map(([k]) => k));
+        const part = new Map<string, number>();
+        for (const p of await getWatchProgress().catch(() => [])) if (p.duration > 0) part.set(p.key, Math.min(1, p.position / p.duration));
+        if (!cancelled) {
+          setDoneHere(done);
+          setPartial(part);
+        }
+        const ids: Record<string, string | number> | null = /^tt\d+$/.test(id) ? { imdb: id } : id.startsWith('kitsu:') ? { kitsu: Number(id.split(':')[1]) } : null;
+        if (ids) getTrackerWatchedEpisodes(ids).then((s) => !cancelled && setTrackerEps(s), () => {});
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [id, type]),
+  );
+  const isWatched = (e: Episode) =>
+    watchedEps.has(traktEp(e)) || doneHere.has(e.id) || trackerEps.has(`${e.season ?? 1}:${episodeNumber(e)}`);
 
   useEffect(() => {
     getActiveAddons()
@@ -249,6 +280,12 @@ export default function TitleScreen() {
                       contentFit="cover"
                     />
                   ) : null}
+                  {/* Part-way through: how far, along the bottom of the picture. */}
+                  {!isWatched(e) && (partial.get(e.id) ?? 0) > 0.01 ? (
+                    <View style={styles.thumbBar}>
+                      <View style={[styles.thumbBarFill, { width: `${Math.round((partial.get(e.id) ?? 0) * 100)}%` }]} />
+                    </View>
+                  ) : null}
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.epTitle} numberOfLines={2}>
@@ -263,9 +300,7 @@ export default function TitleScreen() {
                     </Text>
                   ) : null}
                 </View>
-                {watchedEps.has(traktEp(e)) ? (
-                  <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
-                ) : null}
+                {isWatched(e) ? <PixelCheck /> : null}
               </Pressable>
             ))}
           </>
@@ -330,6 +365,8 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: Colors.surfaceRaised,
     overflow: 'hidden',
   },
+  thumbBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.5)' },
+  thumbBarFill: { height: 4, backgroundColor: Colors.accent },
   epTitle: { color: Colors.text, fontWeight: '600' },
   epSub: { color: Colors.textSecondary, fontSize: 12 },
 }));

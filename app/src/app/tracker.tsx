@@ -5,7 +5,7 @@ import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { Body, EmptyState, Heading } from '@/components/ui';
 import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import { Pressable } from '@/components/focusable';
-import { asRowItems, getTrackerCalendar, getTrackerUpNext, trackerSignedIn, type CalendarEntry, type TrackerItem } from '@/lib/tracker';
+import { airDay, asRowItems, getTrackerCalendar, getTrackerUpNext, trackerSignedIn, type CalendarEntry, type TrackerItem } from '@/lib/tracker';
 
 /** Your 128bit Tracker: Up next and everything coming up (new episodes, releases). */
 export default function TrackerScreen() {
@@ -56,6 +56,7 @@ export default function TrackerScreen() {
             <Text style={styles.sub}>
               S{i.next?.season} E{i.next?.number}
               {i.progress_total ? ` of ${i.progress_total}` : ''}
+              {i.next?.air_date && i.next.air_date > new Date().toISOString().slice(0, 10) ? ` · airs ${airDay(i.next.air_date)}` : ''}
             </Text>
           </Pressable>
         ))
