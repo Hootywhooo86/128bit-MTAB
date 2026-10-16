@@ -18,7 +18,7 @@ export default function SettingsScreen() {
         <Row
           icon="sync"
           title="Tracking"
-          subtitle={IS_TV ? 'Trakt and Simkl for what you watch.' : 'Trakt and Simkl for what you watch, Hardcover for books.'}
+          subtitle="Trakt and Simkl for what you watch."
           onPress={() => router.push('/settings/tracking')}
         />
         <Row

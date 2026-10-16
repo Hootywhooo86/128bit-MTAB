@@ -20,7 +20,7 @@ import { installDefaultSources } from '@/lib/sources';
 import { checkFollows, runComicQueue } from '@/lib/comic-grab';
 import { getSuwayomi } from '@/lib/suwayomi';
 import { runVideoQueue } from '@/lib/video-downloads';
-import { runAutoDownloads } from '@/lib/wanted';
+import { runAutoDownloads, syncWantedWithTracker } from '@/lib/wanted';
 import { watchSeries } from '@/lib/series-watch';
 import { PrefsProvider, readPrefs, usePrefs } from '@/lib/prefs';
 
@@ -38,6 +38,7 @@ function syncOnOpen() {
   flushFamilyEvents().catch(() => {});
   invalidateTracker();
   getStarterLists().catch(() => {});
+  if (!IS_TV) syncWantedWithTracker().catch(() => {}); // Wanted ⇄ Tracker Audiobooks list
   if (Date.now() - lastOpenSync >= OPEN_SYNC_MS) {
     lastOpenSync = Date.now();
     syncHistoryToTracker(true).catch(() => {});

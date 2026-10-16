@@ -8,7 +8,6 @@ import { syncHistoryToTracker } from '@/lib/tracker-sync';
 import { Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { TraktRowPicker } from '@/components/trakt-row-picker';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
-import { HardcoverCard } from '@/components/hardcover-card';
 import { SimklCard } from '@/components/simkl-card';
 import { usePrefs } from '@/lib/prefs';
 import {
@@ -23,7 +22,6 @@ import {
   type DeviceCode,
 } from '@/lib/trakt';
 import { Pressable } from '@/components/focusable';
-import { IS_TV } from '@/constants/tv';
 
 export default function TrackingSettings() {
   const styles = useStyles();
@@ -255,13 +253,6 @@ export default function TrackingSettings() {
 
       <SectionTitle>Simkl</SectionTitle>
       <SimklCard />
-
-      {IS_TV ? null : (
-        <>
-          <SectionTitle>Books</SectionTitle>
-          <HardcoverCard />
-        </>
-      )}
     </SettingsPage>
   );
 }

@@ -12,7 +12,7 @@ The bottom row is **Books · Shows · Movies · Anime · Sports · Comics**; the
 | **Sports** | Live sports from `sport` addons (Live Now, Today, per sport), plus TV channels from M3U playlists and Stremio `tv`/`channel` addons, plus a **Sports** section for `sport` addons (Live Now, Today, per sport), with filters and search. |
 | **Audiobooks** | **Library** (progress %, Not started / Complete, favourites, filters), **Downloads** (books saved to the phone) and **Wanted** (books you want, auto-matched on AudiobookBay). Search for new books from addons, **Pageturner download sources** (send a result to TorBox with one tap), your TorBox cloud or your **Audiobookshelf** server. Chapters inside `.m4b` files, bookmarks with notes, sleep timer (minutes or end of chapter). |
 | **Comics** | **Library**: only comics on the phone (downloaded, grabbed or imported), last read first, plus Import CBZ/CBR. **Find**: GetComics + Pirate Bay (tap **Get**), MangaDex and your Suwayomi sources (open one and download chapters). **Wanted**: where each grabbed comic is, and new issues of series you follow. Reader with scroll-down or page-turn modes, data saver, read marks and next chapter. |
-| **Settings** (⚙ top right) | Tracking (Trakt, Simkl, Hardcover), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
+| **Settings** (⚙ top right) | Tracking (Trakt, Simkl, 128bit Tracker), **Statistics** (listening/watching time, last 7 days, books finished, movies and episodes watched, chapters read), Layout (accent colour, AMOLED black), Content & Discovery (addons with on/off, reorder, refresh, configure; M3U playlists), Downloads, Playback, Integrations (TorBox, TMDB, MDBList, Audiobookshelf), About. |
 
 Streams appear addon by addon as each answers (a slow addon is skipped after 15 s; lists are kept 10 minutes). Filter by quality, and by provider (addons and the torrent sites they found, e.g. ThePirateBay, EZTV). In Continue watching, hold an item to remove it. Tap a stream to play it; **hold a stream to download** it to the phone (direct links download at once; torrents go to TorBox and download when ready). **Settings → Downloads** has Movies, TV (grouped by show) and Audiobooks, with progress, pause/resume, play and delete; a downloaded title shows **Play downloaded**. Live TV only streams.
 
@@ -99,14 +99,14 @@ When connected, 128bit reads and writes your whole Trakt account:
 ### Getting a book (Pageturner style)
 
 1. **Audiobooks tab → search bar**: search Audible's catalog by **Title / Author / Narrator / All** (recent searches are kept). Results show cover, narrators, rating, length and series.
-2. Tap a book → **Book Details** → **Download**: it goes on your **Wanted** list (and Hardcover **Want to Read**), the best release is found on AudiobookBay / your download sources (series number aware, so Book 1 doesn't grab Book 7) and sent to TorBox. **Choose a release myself** lists them all instead.
+2. Tap a book → **Book Details** → **Download**: it goes on your **Wanted** list (and your 128bit Tracker **Audiobooks** list), the best release is found on AudiobookBay / your download sources (series number aware, so Book 1 doesn't grab Book 7) and sent to TorBox. **Choose a release myself** lists them all instead.
 3. **Wanted** shows each book's TorBox progress. In the book: **Download when ready** saves it to the phone as soon as TorBox finishes (checked every minute while the app is open); once ready: **Play** or **Download to phone** (it also lands in your Library).
 
 ### AudiobookBay search and the Wanted list
 
 Searching in **Find audiobooks** also searches AudiobookBay's whole catalog (the same way [audiobookbay-automated](https://github.com/JamesRy96/audiobookbay-automated) does), with **Load more**. Tapping a book from iTunes/Audible shows AudiobookBay matches too, plus **Add to Wanted**.
 
-**Audiobooks → Wanted** keeps books you want but don't have yet. Each one is checked against AudiobookBay and your download sources; when a match turns up, tap **TorBox** on it. With Hardcover connected, Wanted syncs with your **Want to Read** shelf both ways (new Want to Read books come in; books you add here go there).
+**Audiobooks → Wanted** keeps books you want but don't have yet. Each one is checked against AudiobookBay and your download sources; when a match turns up, tap **TorBox** on it; the book then moves to your **Library** (shown with its TorBox progress until it's ready) and is "listening" in 128bit Tracker. Signed in, Wanted *is* your Tracker **Audiobooks** list, both ways: books added in Tracker show up here, books added or removed here are added or removed there (it works offline and catches up later).
 
 ### Comics from Mihon extensions (Keiyoushi) via Suwayomi
 
@@ -189,10 +189,6 @@ The video player decodes audio with **FFmpeg** first (Jellyfin's media3 FFmpeg d
 2. In the app: **Settings → Tracking → Simkl**, paste the **Client ID**, tap **Connect Simkl**; simkl.com opens with the code filled in, approve it. New-style sign-ins are refreshed automatically.
 
 Movies, episodes and anime (IMDb and Kitsu ids) are scrobbled to Simkl, next to Trakt if you use both.
-
-### Optional: Hardcover
-
-**Settings → Tracking → Hardcover**: paste your token from <https://hardcover.app/account/api>. Books you listen to are marked Currently Reading with your progress (every few minutes and whenever you pause), and Read when you finish. **Each time the app opens**, progress syncs both ways: if Hardcover is further along (you listened elsewhere) your place here moves up, and if this phone is further along Hardcover is updated. **Sync now** does it on demand. Tap **Hardcover** in the player to fix a wrong match or stop tracking a book. Progress is sent against the book's **audiobook edition** (the one closest to your audiobook's length), so Hardcover shows the % complete.
 
 ### Audiobook sources (Pageturner format)
 

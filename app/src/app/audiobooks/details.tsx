@@ -184,7 +184,7 @@ export default function BookDetailsScreen() {
               onPress={get}
             />
             <Text style={styles.hint}>
-              Adds it to Wanted{entry ? '' : ' (and Hardcover Want to Read)'}, finds the best release
+              Adds it to Wanted{entry ? '' : ' (and your Tracker Audiobooks list)'}, finds the best release
               and sends it to TorBox.
             </Text>
             <Button
