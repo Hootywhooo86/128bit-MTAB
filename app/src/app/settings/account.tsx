@@ -1,8 +1,8 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import makeQr from 'qrcode-generator';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Text, TextInput, View } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Body, Button, Input } from '@/components/ui';
@@ -262,6 +262,12 @@ function SignInForm({ busy, run }: { busy: boolean; run: (fn: () => Promise<stri
   const styles = useStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const passwordRef = useRef<TextInput>(null);
+  const signInNow = () =>
+    run(async () => {
+      if (!email || !password) return 'Enter your email and password first.';
+      return signIn(email, password);
+    });
   return (
     <View style={styles.box}>
       <Text style={styles.heading}>{IS_TV ? 'OR SIGN IN HERE' : '128BIT FAMILY ACCOUNT'}</Text>
@@ -277,19 +283,44 @@ function SignInForm({ busy, run }: { busy: boolean; run: (fn: () => Promise<stri
           <Body muted style={{ fontSize: 13 }}>Or with email:</Body>
         </>
       )}
-      <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
-      <Input placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
-      <Button label="Sign in" disabled={busy || !email || !password} onPress={() => run(() => signIn(email, password))} />
+      <Input
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoComplete="email"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+      />
+      <Input
+        ref={passwordRef}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        autoComplete="password"
+        returnKeyType="go"
+        // TV: "Done" on the on-screen keyboard signs in straight away.
+        onSubmitEditing={IS_TV ? signInNow : undefined}
+      />
+      {/* On TV a disabled button can't take the remote's focus (D-pad skips it), so there the
+          buttons stay enabled and say what's missing instead. */}
+      <Button
+        label="Sign in"
+        disabled={busy || (!IS_TV && (!email || !password))}
+        onPress={signInNow}
+      />
       <Button
         label="Create account"
         variant="secondary"
-        disabled={busy || !email || password.length < 6}
+        disabled={busy || (!IS_TV && (!email || password.length < 6))}
         onPress={() =>
-          run(async () =>
-            (await signUp(email, password))
+          run(async () => {
+            if (!email || password.length < 6) return 'Enter your email and a password of at least 6 characters.';
+            return (await signUp(email, password))
               ? undefined
-              : 'Account created. Tap the link in the email Supabase sent (if it opens a “localhost:3000” error page, that’s fine: you’re confirmed), then come back and tap Sign in.',
-          )
+              : 'Account created. Tap the link in the email Supabase sent (if it opens a “localhost:3000” error page, that’s fine: you’re confirmed), then come back and tap Sign in.';
+          })
         }
       />
     </View>
