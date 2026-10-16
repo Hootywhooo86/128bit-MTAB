@@ -288,6 +288,16 @@ export default function AudiobooksScreen() {
             }
             onToggleFavorite={async () => setFavorites(await toggleFavorite(item.key))}
             download={tab === 'downloads' ? downloadInfo(live.get(item.key)) : undefined}
+            // Streaming it? Download it to the phone from here; it shows under Downloads while it comes down.
+            onDownload={
+              tab === 'library' && offlineSupported && !downloads.some((d) => d.key === item.key)
+                ? () => {
+                    downloadBook(item).catch((e) => Alert.alert('Download failed', String(e?.message ?? e))).finally(load);
+                    setTimeout(load, 500);
+                  }
+                : undefined
+            }
+            onPhone={tab === 'library' && onPhone.some((d) => d.key === item.key)}
           />
         )}
       />

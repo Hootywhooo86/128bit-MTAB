@@ -26,6 +26,10 @@ type Props = {
   extra?: string;
   /** Downloading: a download bar (with "123 MB of 565 MB · 4.2 MB/s") instead of listening progress. */
   download?: { fraction: number; text: string };
+  /** Streamed and not on the phone yet: a download button. */
+  onDownload?: () => void;
+  /** Already on the phone: a small tick. */
+  onPhone?: boolean;
 };
 
 /** One book in the Audiobooks library: cover, title, author · narrator, length and progress. */
@@ -38,6 +42,8 @@ export function BookRow({
   onToggleFavorite,
   extra,
   download,
+  onDownload,
+  onPhone,
 }: Props) {
   const Colors = useColors();
   const styles = useStyles();
@@ -86,6 +92,13 @@ export function BookRow({
           <Text style={styles.sub}>Not started</Text>
         )}
       </View>
+      {onDownload ? (
+        <Pressable hitSlop={12} onPress={onDownload} accessibilityLabel={`Download ${book.title} to this phone`}>
+          <Ionicons name="cloud-download-outline" size={24} color={Colors.text} />
+        </Pressable>
+      ) : onPhone ? (
+        <Ionicons name="checkmark-circle" size={20} color={Colors.textSecondary} accessibilityLabel="On this phone" />
+      ) : null}
       <Pressable
         hitSlop={12}
         onPress={onToggleFavorite}
