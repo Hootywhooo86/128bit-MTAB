@@ -39,7 +39,6 @@ export function TrackerPlus({ item: given, size }: { item: TrackerRef; size: num
   const givenKey = JSON.stringify(given);
   useEffect(() => {
     let cancelled = false;
-    setItem(given);
     withAnimeType(given).then((i) => !cancelled && setItem(i), () => {});
     return () => {
       cancelled = true;
