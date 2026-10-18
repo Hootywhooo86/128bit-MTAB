@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Text, View } from 'react-native';
 
-import { TorboxButton } from '@/components/torbox-button';
+import { ReleaseButtons } from '@/components/torbox-button';
 import { Body, Cover, Heading } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { retryAbbNow, searchAbbSmart, type AbbResult, type AbbSearch } from '@/lib/abb';
 import { resolveTorrent } from '@/lib/feeds';
+import type { WantedInput } from '@/lib/wanted';
 import { Pressable } from '@/components/focusable';
 
 /** AudiobookBay search results for `query`, best matches first, with Load more. */
 export function AbbResults({
   query,
+  book,
   onSent,
 }: {
   query: string;
+  /** The book these are for (its Download button saves it to the phone under that name). */
+  book?: WantedInput;
   onSent?: (torboxId: number, name: string) => void;
 }) {
   const Colors = useColors();
@@ -95,9 +99,10 @@ export function AbbResults({
               {[r.format, r.bitrate, r.sizeText, r.posted, r.language].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          <TorboxButton
+          <ReleaseButtons
             name={r.title}
             getMagnet={async () => (await resolveTorrent(r)).magnet}
+            book={book}
             onSent={onSent}
           />
         </FadeIn>

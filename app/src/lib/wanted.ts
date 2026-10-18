@@ -11,10 +11,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { searchAbbSmart } from './abb';
+import { autoPickable, rankRelease, seriesName, stripFiller, titleScore } from './book-match';
 import { getSession, isSignedIn, rpc } from './account';
 import { resolveTorrent } from './feeds';
 import { addToTrackerList, getStarterLists, invalidateTracker, removeFromTrackerList, type TrackerItem, type TrackerRef } from './tracker';
-import { cleanTitle, getSources, isCatalog, matchScore, searchSource } from './sources';
+import { cleanTitle, getSources, isCatalog, searchSourceSmart } from './sources';
 import { downloadBook } from './downloads';
 import { bookFromTorboxItem } from './resolve';
 import { addToLibrary, getLibrary, getProgressMany } from './storage';
@@ -310,6 +311,37 @@ export async function grabBook(book: WantedInput): Promise<WantedBook> {
   return (await getWantedById(entry.id))!;
 }
 
+/**
+ * "⬇ Download" on a release: sends it to TorBox like the TorBox button, and marks the book
+ * (added to Wanted if it isn't there) to save to the phone as soon as TorBox has it. When
+ * TorBox already has it (cached: ready at once), `item` is set so the download can start
+ * now; otherwise runAutoDownloads picks it up when it's ready.
+ */
+export async function sendToPhone(
+  book: WantedInput,
+  magnet: string,
+  name: string,
+  /** TorBox says it has this one cached: wait a few seconds for it to be ready. */
+  cached = false,
+): Promise<{ wanted: WantedBook; torboxId: number; item?: TorboxItem }> {
+  const entry = await addWanted(book);
+  const { id } = await addMagnet(magnet, name);
+  await markSent(entry.id, name, id);
+  await updateWanted(entry.id, { autoDownload: true });
+  const wanted = (await getWantedById(entry.id))!;
+  for (let i = 0; i < (cached ? 5 : 1); i++) {
+    if (i) await new Promise((r) => setTimeout(r, 2000));
+    const s = await torboxState(wanted);
+    if (s.state === 'ready') {
+      // Known now, so the Wanted row can follow the download to the phone.
+      await updateWanted(entry.id, { libraryKey: playable(wanted, s.item).key });
+      return { wanted, torboxId: id, item: s.item };
+    }
+    if (s.state === 'gone') break;
+  }
+  return { wanted, torboxId: id };
+}
+
 export type TorboxState =
   | { state: 'none' }
   | { state: 'downloading'; progress: number; name: string }
@@ -389,7 +421,7 @@ function authorFits(name: string, author?: string) {
 }
 
 /** A slow or dead source shouldn't hold up the rest. */
-const SOURCE_TIMEOUT_MS = 12_000;
+const SOURCE_TIMEOUT_MS = 20_000;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -417,47 +449,16 @@ export function findMatches(book: Wanted, fresh = false) {
 
 type Wanted = { title: string; author?: string; series?: string };
 
-const FILLER = new Set(
-  'the a an and of book books vol volume audiobook audio unabridged abridged m4b mp3 aac flac kbps chapterized chapterised retail complete series edition narrated read by'.split(' '),
-);
-const numberWords: Record<string, string> = {
-  one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
-};
-
-/**
- * How well a release name fits the wanted book. The title match counts most;
- * extra title words (another book's subtitle) and the wrong series number count
- * against it, so "Ajax's Ascension" picks Book 1, not Book 7.
- */
-export function rankRelease(book: Wanted, name: string) {
-  const title = cleanTitle(book.title);
-  let score = matchScore(title, name);
-  const words = (x: string) =>
-    norm(x)
-      .split(' ')
-      .map((w) => numberWords[w] ?? w)
-      .filter((w) => w && !FILLER.has(w) && !/^\d+k$/.test(w));
-  const allowed = new Set([...words(title), ...words(book.author ?? ''), ...words(book.series ?? '')]);
-  const extra = words(name).filter((w) => !allowed.has(w) && !/^\d+$/.test(w) && !/^(19|20)\d\d$/.test(w));
-  score -= Math.min(0.4, extra.length * 0.08);
-
-  const want = book.series?.match(/book\s*(\d+(?:\.\d+)?)/i)?.[1];
-  if (want) {
-    const n = norm(name);
-    const numbers = [...n.matchAll(/(?:book|vol|volume|#|part)\s*(\d+(?:\.\d+)?)/g)].map((m) => m[1]);
-    if (numbers.includes(want)) score += 0.3;
-    else if (numbers.length) score -= 0.6;
-  }
-  return score;
-}
-
 async function search(book: Wanted): Promise<Match[]> {
   const title = cleanTitle(book.title);
-  const fits = (name: string, score: number) => score >= 0.75 && authorFits(name, book.author);
+  // The title's words (numbers aside: rankRelease weighs the book number), else the series'.
+  const series = seriesName(stripFiller(title));
+  const fits = (name: string) =>
+    Math.max(titleScore(title, name), series ? titleScore(series, name) : 0) >= 0.75 && authorFits(name, book.author);
 
   const abb = withTimeout(searchAbbSmart(book.author ? `${title} - ${book.author}` : title), SOURCE_TIMEOUT_MS).then(({ results }) =>
     results
-      .filter((r) => fits(r.title, r.score))
+      .filter((r) => fits(r.title))
       .map<Match>((r) => ({
         name: r.title,
         where: 'AudiobookBay',
@@ -472,10 +473,10 @@ async function search(book: Wanted): Promise<Match[]> {
       all
         .filter((s) => s.enabled !== false && !isCatalog(s.config))
         .map((s) =>
-          withTimeout(searchSource(s.config, { title, author: book.author }), SOURCE_TIMEOUT_MS)
+          withTimeout(searchSourceSmart(s.config, { title, author: book.author }), SOURCE_TIMEOUT_MS)
             .then((rs) =>
               rs
-                .filter((r) => fits(r.title, matchScore(title, r.title)))
+                .filter((r) => fits(r.title))
                 .map<Match>((r) => ({
                   name: r.title,
                   where: s.config.name,
@@ -490,8 +491,9 @@ async function search(book: Wanted): Promise<Match[]> {
     ),
   );
   const [fromAbb, fromSources] = await Promise.all([abb.catch(() => [] as Match[]), sources]);
-  // Weak matches (usually another book in the series) never get picked automatically.
-  return [...fromAbb, ...fromSources.flat()].filter((m) => m.score >= 0.6).sort(
+  // Weak matches (usually another book in the series) never get picked automatically, and
+  // a numbered book ("Book Seven") only takes a release with that number.
+  return [...fromAbb, ...fromSources.flat()].filter((m) => m.score >= 0.6 && autoPickable(book, m.name)).sort(
     (a, b) => b.score - a.score || (b.seeders ?? 0) - (a.seeders ?? 0),
   );
 }

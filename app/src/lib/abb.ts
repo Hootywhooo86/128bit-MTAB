@@ -3,13 +3,43 @@
  * audiobookbay-automated (github.com/JamesRy96/audiobookbay-automated, MIT) does.
  * The torrent for a result comes from its post page (see resolveTorrent in feeds.ts).
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { bookNumber, numberFit, seriesName, stripFiller, toDigits } from './book-match';
 import { decodeEntities, type FeedItem } from './feeds';
 import { matchScore } from './sources';
 
-export const ABB_HOST = 'audiobookbay.lu';
-/** Other addresses AudiobookBay uses, tried when the main one can't be reached. */
-const MIRRORS = [ABB_HOST, 'audiobookbay.is', 'audiobookbay.fi'];
-let workingHost = ABB_HOST;
+/**
+ * AudiobookBay's addresses, tried in this order until one answers (it moves often and
+ * some are blocked by some providers). The last one that worked is remembered and tried first.
+ */
+export const ABB_MIRRORS = [
+  'audiobookbay.lu',
+  'audiobookbay.is',
+  'audiobookbay.se',
+  'audiobookbay.nl',
+  'audiobookbay.fi',
+  'audiobookbay.li',
+  'theaudiobookbay.se',
+];
+export const ABB_HOST = ABB_MIRRORS[0];
+const MIRROR_KEY = '128bit.abb.mirror';
+let workingHost: string | null = null;
+
+/** The address to try first: the last one that worked (remembered on the phone). */
+async function firstHost() {
+  if (!workingHost) {
+    const saved = await AsyncStorage.getItem(MIRROR_KEY).catch(() => null);
+    workingHost = saved && ABB_MIRRORS.includes(saved) ? saved : ABB_HOST;
+  }
+  return workingHost;
+}
+
+function rememberHost(host: string) {
+  if (host === workingHost) return;
+  workingHost = host;
+  AsyncStorage.setItem(MIRROR_KEY, host).catch(() => {});
+}
 
 export type AbbResult = FeedItem & {
   link: string;
@@ -30,8 +60,6 @@ async function fetchWithTimeout(url: string, ms: number) {
   const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await fetch(url, { signal: controller.signal });
-  } catch (e) {
-    throw controller.signal.aborted ? new Error('AudiobookBay is slow to answer right now') : e;
   } finally {
     clearTimeout(timer);
   }
@@ -40,32 +68,46 @@ async function fetchWithTimeout(url: string, ms: number) {
 /** Set when AudiobookBay just failed us, so the rest of that search stops waiting on it. */
 let downUntil = 0;
 
+const UNREACHABLE =
+  'Couldn’t reach AudiobookBay at any of its addresses. Check your connection, or try again in a while.';
+
 /** "Try again": ask AudiobookBay straight away, even if it just failed. */
 export const retryAbbNow = () => {
   downUntil = 0;
 };
 
+/** An answer that really is AudiobookBay (not a parked domain or a block page). */
+const looksLikeAbb = (html: string) => /audiobook ?bay|class="post(Title)?"/i.test(html);
+
 /**
- * The main address, then the mirrors only if it can't be reached at all (a blocked or
- * unknown address fails fast). A slow answer just times out: the mirrors are the same site.
+ * Asks each address in turn (the last one that worked first) until one answers: an
+ * unknown address, a connection error, a timeout or an error page moves on to the next.
+ * Only when all of them fail does it give up. A 404 is a real answer (past the last page).
  */
-async function fetchMirror(path: string) {
-  if (Date.now() < downUntil) throw new Error('AudiobookBay is slow to answer right now.');
-  let last: unknown;
-  for (const host of [workingHost, ...MIRRORS.filter((h) => h !== workingHost)]) {
+async function fetchMirror(path: string): Promise<{ status: number; html: string; host: string }> {
+  if (Date.now() < downUntil) throw new Error(UNREACHABLE);
+  const first = await firstHost();
+  for (const host of [first, ...ABB_MIRRORS.filter((h) => h !== first)]) {
     try {
-      const res = await fetchWithTimeout(`https://${host}${path}`, 15000);
-      if (res.status >= 500 && res.status !== 503) throw new Error(`AudiobookBay answered ${res.status}`);
-      workingHost = host;
-      return res;
-    } catch (e) {
-      last = e;
-      if (e instanceof Error && /slow to answer/.test(e.message)) break;
+      const res = await fetchWithTimeout(`https://${host}${path}`, 10_000);
+      if (!res.ok && res.status !== 404) continue;
+      const html = await res.text();
+      if (!looksLikeAbb(html)) continue;
+      rememberHost(host);
+      return { status: res.status, html, host };
+    } catch {
+      // DNS, connection or timeout: the next address.
     }
   }
   downUntil = Date.now() + 20_000;
-  throw last instanceof Error ? last : new Error('Couldn’t reach AudiobookBay');
+  throw new Error(UNREACHABLE);
 }
+
+/** A post link on any AudiobookBay address → the same post on the one that works now. */
+const onWorkingHost = (link: string, host: string) => {
+  const m = /^https?:\/\/([^/]+)(\/.*)?$/.exec(link);
+  return m && ABB_MIRRORS.includes(m[1].replace(/^www\./, '')) ? `https://${host}${m[2] ?? '/'}` : link;
+};
 
 /** One page of results (about 9). `more` is true when there's probably another page. */
 export async function searchAbb(
@@ -73,16 +115,14 @@ export async function searchAbb(
   page = 1,
 ): Promise<{ results: AbbResult[]; more: boolean }> {
   const q = encodeURIComponent(query.trim().toLowerCase()).replace(/%20/g, '+');
-  const res = await fetchMirror(`/page/${page}/?s=${q}`);
+  const { status, html, host } = await fetchMirror(`/page/${page}/?s=${q}`);
   // Past the last page the site answers 404.
-  if (res.status === 404) return { results: [], more: false };
-  if (!res.ok) throw new Error(`AudiobookBay answered ${res.status}`);
-  const html = await res.text();
+  if (status === 404) return { results: [], more: false };
   const posts = html.split(/<div class="post">/).slice(1);
   const results = posts.flatMap<AbbResult>((post) => {
     const a = post.match(/class="postTitle"><h2><a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
     if (!a) return [];
-    const href = a[1].startsWith('http') ? a[1] : `https://${workingHost}${a[1]}`;
+    const href = a[1].startsWith('http') ? onWorkingHost(a[1], host) : `https://${host}${a[1]}`;
     const title = text(a[2]) ?? 'Untitled';
     const info = text(post.match(/class="postInfo">([\s\S]*?)<\/div>/)?.[1]) ?? '';
     const details = post.match(/text-align:center;'>([\s\S]*?)<\/p>/)?.[1] ?? '';
@@ -140,7 +180,9 @@ function wordsOf(s: string) {
 const keyWords = (s: string) => wordsOf(s).filter((w) => !NOISE.has(w) && !/^\d+$/.test(w) && w.length > 1);
 
 /** The questions to ask AudiobookBay for one search, most specific first (at most 5). */
-export function abbQueries(query: string): string[] {
+export function abbQueries(input: string): string[] {
+  // "Book Seven" → "Book 7", marketing filler ("A LitRPG Adventure") off.
+  const query = toDigits(stripFiller(input));
   const out: string[] = [];
   const add = (words: string[]) => {
     const q = words.join(' ').trim();
@@ -151,9 +193,12 @@ export function abbQueries(query: string): string[] {
   const author = dash.length > 1 ? keyWords(dash[dash.length - 1]) : [];
   const titlePart = dash.length > 1 ? dash.slice(0, -1).join(' ') : query;
   const key = keyWords(titlePart);
-  // "Book 5 of Ajax's Ascension" / "Ajax's Ascension, Book 5": the series on its own.
-  const series = titlePart.match(/\bbook\s+\d+\s+of\s+(.+)$/i)?.[1] ?? titlePart.match(/^(.+?),?\s+book\s+\d+/i)?.[1];
+  // "Book 5 of Ajax's Ascension" / "Azarinth Healer Book 7": the series on its own.
+  const series = seriesName(titlePart) ?? seriesName(titlePart.split(':')[0]);
   add(key.slice(0, 4));
+  // The main title (the subtitle after ":" is often not in a post's name).
+  const main = keyWords(titlePart.split(':')[0]);
+  if (main.length && main.length < key.length) add(main.slice(0, 4));
   if (author.length) add([...key.slice(0, 2), ...author.slice(0, 1)]);
   if (series) add(keyWords(series));
   // The most distinctive words on their own (longest first).
@@ -185,14 +230,19 @@ export async function searchAbbSmart(
   const seen = new Map<string, AbbResult>();
   // Compare words without possessives ("ajax" = "ajax's").
   const stem = (w: string) => w.replace(/'s$/, '').replace(/'/g, '');
-  const want = keyWords(query).map(stem);
-  // A book number in the search ("… Monsters 10", "book 5") lifts the release with that number.
-  const nums = wordsOf(query).filter((w) => /^\d+$/.test(w));
+  const asked = toDigits(stripFiller(query));
+  const want = keyWords(asked).map(stem);
+  // Without the subtitle / author, for names that leave those out.
+  const wantMain = keyWords(asked.split(/\s+[-–—]\s+/)[0].split(':')[0]).map(stem);
+  // A book number in the search ("… Monsters 10", "Book Seven") lifts the release with that
+  // number and puts other books of the series well below (still listed).
+  const wantNumber = bookNumber(toDigits(query));
+  const fitBonus = { same: 0.2, none: 0, other: -0.5 };
   const rank = (r: AbbResult) => {
-    const have = new Set(keyWords(r.title).map(stem));
-    const hit = want.length ? want.filter((w) => have.has(w)).length / want.length : 1;
-    const numbered = nums.length && nums.every((n) => wordsOf(r.title).includes(n)) ? 0.1 : 0;
-    return hit + numbered;
+    const have = new Set(keyWords(toDigits(r.title)).map(stem));
+    const share = (ws: string[]) => (ws.length ? ws.filter((w) => have.has(w)).length / ws.length : 1);
+    const hit = Math.max(share(want), share(wantMain) * 0.95);
+    return hit + (wantNumber == null ? 0 : fitBonus[numberFit(wantNumber, r.title)]);
   };
   const pages = new Map(queries.map((q) => [q, 0]));
   const open = new Set(queries);
