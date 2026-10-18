@@ -11,6 +11,7 @@ import {
   createTrackerList,
   findInTracker,
   getAllTrackerLists,
+  getTrackerItemLists,
   getTrackerListItems,
   rateInTracker,
   removeFromTrackerList,
@@ -84,6 +85,12 @@ export function TrackerPlus({ item, size }: { item: TrackerRef; size: number }) 
       setLists([...all].sort((a, b) => rank(a) - rank(b)));
       // Which of them it's on: only worth asking once it's in your Tracker at all.
       if (!found) return setOnLists(new Set());
+      const direct = await getTrackerItemLists(found.id);
+      if (direct) {
+        if (!cancelled) setOnLists(new Set(direct));
+        return;
+      }
+      // Older account server: look through each list.
       const hits = await Promise.all(
         all.map((l) =>
           getTrackerListItems(l.id).then(
