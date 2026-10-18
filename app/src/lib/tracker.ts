@@ -220,6 +220,11 @@ export async function addToTrackerList(listId: string, ref: TrackerRef) {
   return rpc<{ item_id: string }>('add_to_list', { list_id: listId, item: refBody(ref) });
 }
 
+/** The ids of every list this Tracker item is on (older account servers: null). */
+export function getTrackerItemLists(itemId: string) {
+  return rpc<string[]>('get_item_lists', { item_id: itemId }).catch(() => null);
+}
+
 export async function removeFromTrackerList(listId: string, itemId: string) {
   invalidateTracker();
   return rpc<void>('remove_from_list', { list_id: listId, item_id: itemId });

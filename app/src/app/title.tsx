@@ -9,11 +9,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DownloadedPlay } from '@/components/downloaded-play';
 import { LinkToTrakt, TraktActions, useTraktConnected } from '@/components/trakt-actions';
 import { getShowProgress, onEpisodeFinished, rememberEpisode, setEpisodeWatched, traktLink } from '@/lib/trakt-library';
-import { TrackerActions, idsFor } from '@/components/tracker-actions';
-import { StreamList } from '@/components/stream-list';
+import { idsFor } from '@/components/tracker-actions';
+import { TrackerPlus } from '@/components/tracker-sheet';
+import { PixelBlock, PixelPlay } from '@/components/pixel-art';
 import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
-import { Body, EmptyState, Heading, Title } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Body, EmptyState, Title } from '@/components/ui';
+import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMeta } from '@/lib/addons';
 import { kitsuMeta } from '@/lib/kitsu';
 import { getActiveAddons } from '@/lib/storage';
@@ -29,13 +30,25 @@ const episodeNumber = (e: Episode) => e.episode ?? e.number ?? 0;
 /** The episode in Trakt's numbering (Kitsu gives IMDb season/episode when they differ). */
 const traktEp = (e: Episode) => `${e.imdbSeason ?? e.season}:${e.imdbEpisode ?? episodeNumber(e)}`;
 
+/** "S1 E3" (or just "E3" for anime without seasons). */
+const episodeCode = (e: Episode) => (e.season !== undefined ? `S${e.season} E${episodeNumber(e)}` : `E${episodeNumber(e)}`);
+
 function episodeLabel(e: Episode) {
   const name = e.title ?? e.name;
-  const code = e.season !== undefined ? `S${e.season} E${episodeNumber(e)}` : '';
+  const code = e.season !== undefined ? episodeCode(e) : '';
   return [code, name].filter(Boolean).join(' · ');
 }
 
-/** Details for a movie or show. Movies list streams here; shows list seasons and episodes. */
+/** Still to air: its release date is in the future. */
+const notAired = (e: Episode) => !!e.released && new Date(e.released).getTime() > Date.now();
+
+const PLAY_HEIGHT = 56;
+
+/**
+ * Details for a movie or show: a big PLAY (the movie, or a show's next episode) and a "+"
+ * for Tracker lists and rating. Shows list seasons and episodes below; a movie's streams open
+ * from PLAY (so the page stays quick when you only want to add it to a list).
+ */
 export default function TitleScreen() {
   const Colors = useColors();
   const styles = useStyles();
@@ -95,9 +108,15 @@ export default function TitleScreen() {
   const [trackerEps, setTrackerEps] = useState<Set<string>>(new Set());
   useFocusEffect(
     useCallback(() => {
-      if (type === 'movie') return;
       let cancelled = false;
       (async () => {
+        // A movie only needs how far into it you are (RESUME).
+        if (type === 'movie') {
+          const part = new Map<string, number>();
+          for (const p of await getWatchProgress().catch(() => [])) if (p.duration > 0) part.set(p.key, Math.min(1, p.position / p.duration));
+          if (!cancelled) setPartial(part);
+          return;
+        }
         const stats = await getStats().catch(() => null);
         const done = new Set(Object.entries(stats?.watched ?? {}).filter(([, w]) => w.finished).map(([k]) => k));
         const part = new Map<string, number>();
@@ -154,6 +173,63 @@ export default function TitleScreen() {
   }
 
   const isSeries = (type === 'series' || type === 'anime') && (meta.videos?.length ?? 0) > 0;
+  // Watch order for "Next episode": regular seasons in order, specials skipped.
+  const watchOrder = (meta.videos ?? [])
+    // Anime often has no seasons at all: then every episode counts.
+    .filter((v) => (v.season ?? 0) > 0 || !meta.videos?.some((x) => x.season))
+    .sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || episodeNumber(a) - episodeNumber(b));
+
+  /** Start an episode: pick its stream (the same for its row and for PLAY). */
+  function playEpisode(e: Episode) {
+    if (!meta) return;
+    // Anime: remember its Trakt episode so finishing it ticks it on Trakt.
+    if (imdb && imdb !== id) rememberEpisode(e.id, `${imdb}:${traktEp(e)}`);
+    setSeriesContext({ metaId: id, episodes: watchOrder.map((v) => ({ id: v.id, label: episodeLabel(v) })) });
+    router.push({
+      pathname: '/streams',
+      params: {
+        type,
+        id: e.id,
+        title: meta.name,
+        subtitle: episodeLabel(e),
+        poster: e.thumbnail ?? meta.background ?? meta.poster ?? '',
+        linkId: id,
+      },
+    });
+  }
+
+  // The episode PLAY starts: the one you're part-way through (most recent first), else the
+  // one after the furthest you've watched (Trakt, Tracker or here), else the first.
+  const watchIds = new Set(watchOrder.map((v) => v.id));
+  const resumeId = [...partial.entries()].find(([k, f]) => f > 0.01 && watchIds.has(k))?.[0];
+  const resumeEp = watchOrder.find((v) => v.id === resumeId && !isWatched(v));
+  let lastWatched = -1;
+  watchOrder.forEach((v, i) => {
+    if (isWatched(v)) lastWatched = i;
+  });
+  const nextEp = isSeries ? (resumeEp ?? watchOrder[lastWatched + 1] ?? watchOrder[0]) : undefined;
+  const movieResume = !isSeries && (partial.get(id) ?? 0) > 0.01;
+  const waiting = nextEp && !resumeEp && notAired(nextEp);
+  const playLabel = nextEp
+    ? waiting
+      ? `${episodeCode(nextEp)} · ${new Date(nextEp.released!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+      : `${resumeEp ? 'RESUME' : 'PLAY'} ${episodeCode(nextEp)}`
+    : movieResume
+      ? 'RESUME'
+      : 'PLAY';
+  const play = () => {
+    if (nextEp) {
+      // Not out yet: show its season instead.
+      if (waiting) setSeason(nextEp.season ?? 0);
+      else playEpisode(nextEp);
+      return;
+    }
+    router.push({
+      pathname: '/streams',
+      params: { type, id, title: meta.name, subtitle: '', poster: meta.background ?? meta.poster ?? '', linkId: id },
+    });
+  };
+
   const facts = [meta.releaseInfo, meta.runtime, meta.imdbRating ? `★ ${meta.imdbRating}` : null]
     .filter(Boolean)
     .join('  ·  ');
@@ -196,6 +272,33 @@ export default function TitleScreen() {
             ) : null}
           </View>
         </View>
+        <View style={styles.playRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={playLabel}
+            hasTVPreferredFocus
+            onPress={play}
+            style={({ pressed }) => [{ flex: 1 }, pressed && { opacity: 0.7 }]}>
+            <PixelBlock color={waiting ? Colors.surfaceRaised : Colors.accent} style={{ height: PLAY_HEIGHT, paddingHorizontal: Spacing.three }}>
+              {waiting ? null : <PixelPlay size={18} color={Colors.accentText} />}
+              <Text style={[styles.playText, waiting && { color: Colors.textSecondary }]} numberOfLines={1}>
+                {playLabel}
+              </Text>
+            </PixelBlock>
+          </Pressable>
+          <TrackerPlus
+            size={PLAY_HEIGHT}
+            item={{
+              type: type === 'movie' ? 'movie' : type === 'anime' || id.startsWith('kitsu:') ? 'anime' : 'show',
+              title: meta.name,
+              year: Number(String(meta.releaseInfo ?? '').slice(0, 4)) || undefined,
+              poster: meta.poster,
+              ids: { ...idsFor(id), ...idsFor(imdb) },
+            }}
+          />
+        </View>
+        {/* Play from a downloaded copy (movies). */}
+        {isSeries ? null : <DownloadedPlay itemKey={id} />}
         <RatingsRow id={id} type={type} />
         {meta.description || extra?.overview ? (
           <Body muted numberOfLines={6}>
@@ -203,15 +306,6 @@ export default function TitleScreen() {
           </Body>
         ) : null}
         {extra ? <TmdbDetails data={extra} /> : null}
-        <TrackerActions
-          item={{
-            type: type === 'movie' ? 'movie' : type === 'anime' || id.startsWith('kitsu:') ? 'anime' : 'show',
-            title: meta.name,
-            year: Number(String(meta.releaseInfo ?? '').slice(0, 4)) || undefined,
-            poster: meta.poster,
-            ids: { ...idsFor(id), ...idsFor(imdb) },
-          }}
-        />
         {imdb ? (
           <TraktActions type={type} imdb={imdb} />
         ) : imdb === null ? (
@@ -245,33 +339,7 @@ export default function TitleScreen() {
                 key={e.id}
                 style={styles.episode}
                 onLongPress={() => toggleEpisode(e)}
-                onPress={() => {
-                  // Anime: remember its Trakt episode so finishing it ticks it on Trakt.
-                  if (imdb && imdb !== id) rememberEpisode(e.id, `${imdb}:${traktEp(e)}`);
-                  // Watch order for "Next episode": regular seasons in order, specials skipped.
-                  setSeriesContext({
-                    metaId: id,
-                    episodes: (meta.videos ?? [])
-                      // Anime often has no seasons at all: then every episode counts.
-                      .filter((v) => (v.season ?? 0) > 0 || !meta.videos?.some((x) => x.season))
-                      .sort(
-                        (a, b) =>
-                          (a.season ?? 0) - (b.season ?? 0) || episodeNumber(a) - episodeNumber(b),
-                      )
-                      .map((v) => ({ id: v.id, label: episodeLabel(v) })),
-                  });
-                  router.push({
-                    pathname: '/streams',
-                    params: {
-                      type,
-                      id: e.id,
-                      title: meta.name,
-                      subtitle: episodeLabel(e),
-                      poster: e.thumbnail ?? meta.background ?? meta.poster ?? '',
-                      linkId: id,
-                    },
-                  });
-                }}>
+                onPress={() => playEpisode(e)}>
                 <View style={styles.thumb}>
                   {e.thumbnail ? (
                     <Image
@@ -304,19 +372,7 @@ export default function TitleScreen() {
               </Pressable>
             ))}
           </>
-        ) : (
-          <>
-            <DownloadedPlay itemKey={id} />
-            <Heading>Streams</Heading>
-            <StreamList
-              type={type}
-              id={id}
-              title={meta.name}
-              poster={meta.background ?? meta.poster}
-              link={{ type, id }}
-            />
-          </>
-        )}
+        ) : null}
       </View>
       {extra?.similar.length ? <MoreLikeThis items={extra.similar} /> : null}
     </ScrollView>
@@ -349,6 +405,8 @@ const useStyles = makeStyles((Colors) => ({
     borderRadius: Radius.md,
     backgroundColor: Colors.surfaceRaised,
   },
+  playRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
+  playText: { color: Colors.accentText, fontFamily: PixelFont, fontSize: 13, flexShrink: 1 },
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
