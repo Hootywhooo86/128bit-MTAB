@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Platform, Text, View } from 'react-native';
 
-import { TorboxButton } from '@/components/torbox-button';
+import { PhoneButton, TorboxButton, useBookDownload } from '@/components/torbox-button';
 import { Body, Button, Cover, EmptyState, Input } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
@@ -157,6 +157,18 @@ function WantedRow({
     };
   }, [book, fresh]);
 
+  // Downloading to the phone right now (Download button, or "download when ready").
+  const toPhone = useBookDownload(book.libraryKey);
+  const wasDownloading = useRef(false);
+  useEffect(() => {
+    if (toPhone) wasDownloading.current = true;
+    else if (wasDownloading.current) {
+      // Finished (or stopped): it's in the Library now if it made it.
+      wasDownloading.current = false;
+      onChanged();
+    }
+  }, [toPhone, onChanged]);
+
   const best = matches?.[0];
   const { openBook } = usePlayer();
   // Ready in TorBox: tap plays it (starting it is what moves it to the Library).
@@ -191,6 +203,10 @@ function WantedRow({
         {book.author ? <Text style={styles.meta}>{book.author}</Text> : null}
         {book.downloaded ? (
           <Text style={[styles.meta, { color: Colors.success }]}>✓ On your phone · in Library</Text>
+        ) : toPhone ? (
+          <Text style={[styles.meta, { color: Colors.accent }]}>
+            Downloading to phone… {Math.round(toPhone.fraction * 100)}%
+          </Text>
         ) : book.torbox && tb?.state === 'downloading' ? (
           <Text style={[styles.meta, { color: Colors.accent }]}>
             TorBox {Math.round(tb.progress * 100)}%
@@ -198,13 +214,14 @@ function WantedRow({
           </Text>
         ) : book.torbox && tb?.state === 'ready' ? (
           <Text style={[styles.meta, { color: Colors.success }]}>
-            Ready in TorBox · tap to play
+            Ready in TorBox · {book.autoDownload ? 'downloading to phone…' : 'tap to play'}
           </Text>
         ) : book.torbox && tb?.state === 'gone' ? (
           <Text style={[styles.meta, { color: Colors.danger }]}>TorBox item gone · tap to send again</Text>
         ) : book.sentAt ? (
           <Text style={[styles.meta, { color: Colors.success }]} numberOfLines={2}>
-            ✓ Sent to TorBox{book.sentName ? `: ${book.sentName}` : ''}
+            {book.autoDownload ? 'Sent · downloads to phone when ready' : '✓ Sent to TorBox'}
+            {book.sentName ? `: ${book.sentName}` : ''}
           </Text>
         ) : error ? (
           <Text style={[styles.meta, { color: Colors.danger }]}>{error}</Text>
@@ -221,14 +238,18 @@ function WantedRow({
         )}
       </View>
       {best && !book.sentAt ? (
-        <TorboxButton
-          name={best.name}
-          getMagnet={best.magnet}
-          onSent={async (torboxId) => {
-            await markSent(book.id, best.name, torboxId);
-            onChanged();
-          }}
-        />
+        <View style={{ gap: 6, alignItems: 'flex-end' }}>
+          <TorboxButton
+            name={best.name}
+            getMagnet={best.magnet}
+            onSent={async (torboxId) => {
+              await markSent(book.id, best.name, torboxId);
+              onChanged();
+            }}
+          />
+          {/* Sends it to TorBox and saves it to the phone when ready (it marks the book itself). */}
+          <PhoneButton name={best.name} getMagnet={best.magnet} book={book} onSent={onChanged} />
+        </View>
       ) : null}
     </Pressable>
   );

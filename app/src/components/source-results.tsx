@@ -1,34 +1,39 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
+import { ReleaseButtons } from '@/components/torbox-button';
 import { Body, Heading, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   getSources,
   isCatalog,
   resultHash,
-  searchSource,
+  searchSourceSmart,
   type InstalledSource,
   type SourceResult,
 } from '@/lib/sources';
 import { getTorboxKey } from '@/lib/storage';
-import { addMagnet, checkCached, magnetFromHash } from '@/lib/torbox';
-import { Pressable } from '@/components/focusable';
-import { canGetTorrents } from '@/lib/torrent-device';
+import { checkCached, magnetFromHash } from '@/lib/torbox';
+import type { WantedInput } from '@/lib/wanted';
 
-type Sent = 'sending' | 'sent' | { error: string };
-
-/** Torrent results for `query` from every enabled download source, each with a Send to TorBox button. */
+/**
+ * Torrent results for `query` from every enabled download source, each with TorBox and
+ * Download (TorBox, then the phone) buttons. Each source is asked simpler forms of the
+ * query until one finds something (see searchSourceSmart).
+ */
 export function SourceResults({
   query,
   author,
   title = 'Download sources',
+  book,
+  onSent,
 }: {
   query: string;
   author?: string;
   title?: string;
+  /** The book these are for (its Download button saves it to the phone under that name). */
+  book?: WantedInput;
+  onSent?: (torboxId: number, name: string) => void;
 }) {
   const Colors = useColors();
   const styles = useStyles();
@@ -37,7 +42,6 @@ export function SourceResults({
   const [pending, setPending] = useState(0);
   const [errors, setErrors] = useState<string[]>([]);
   const [cached, setCached] = useState<Set<string>>(new Set());
-  const [sent, setSent] = useState<Record<string, Sent>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +53,7 @@ export function SourceResults({
       setErrors([]);
       setPending(active.length);
       active.forEach((s) => {
-        searchSource(s.config, { title: query, author })
+        searchSourceSmart(s.config, { title: query, author })
           .then((found) => {
             if (cancelled) return;
             setResults((prev) => [...prev, ...found]);
@@ -84,22 +88,6 @@ export function SourceResults({
       return true;
     });
 
-  async function send(r: SourceResult) {
-    const key = resultHash(r) ?? r.title;
-    // TorBox, or this device when there's no TorBox key.
-    if (!(await canGetTorrents())) {
-      router.push('/settings/integrations');
-      return;
-    }
-    setSent((s) => ({ ...s, [key]: 'sending' }));
-    try {
-      await addMagnet(r.magnet ?? magnetFromHash(r.infoHash!, r.title), r.title);
-      setSent((s) => ({ ...s, [key]: 'sent' }));
-    } catch (e) {
-      setSent((s) => ({ ...s, [key]: { error: e instanceof Error ? e.message : String(e) } }));
-    }
-  }
-
   return (
     <View style={{ gap: Spacing.two, paddingHorizontal: Spacing.three }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
@@ -115,7 +103,6 @@ export function SourceResults({
       {sorted.slice(0, 40).map((r) => {
         const hash = resultHash(r);
         const key = hash ?? r.title;
-        const state = sent[key];
         const meta = [
           r.size ? formatBytes(r.size) : null,
           r.seeders != null ? `${r.seeders} seeders` : null,
@@ -130,31 +117,14 @@ export function SourceResults({
                 {r.title}
               </Text>
               <Text style={styles.meta}>{meta.join(' · ')}</Text>
-              {typeof state === 'object' ? (
-                <Text style={[styles.meta, { color: Colors.danger }]}>{state.error}</Text>
-              ) : null}
             </View>
-            {state === 'sent' ? (
-              <Pressable style={styles.sent} onPress={() => router.push('/audiobooks/cloud')}>
-                <Ionicons name="checkmark" size={16} color={Colors.success} />
-                <Text style={[styles.buttonText, { color: Colors.success }]}>In TorBox</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                style={styles.button}
-                disabled={state === 'sending'}
-                onPress={() => send(r)}
-                accessibilityLabel="Send to TorBox">
-                {state === 'sending' ? (
-                  <ActivityIndicator size="small" color={Colors.accentText} />
-                ) : (
-                  <>
-                    <Ionicons name="cloud-download" size={16} color={Colors.accentText} />
-                    <Text style={styles.buttonText}>TorBox</Text>
-                  </>
-                )}
-              </Pressable>
-            )}
+            <ReleaseButtons
+              name={r.title}
+              getMagnet={async () => r.magnet ?? magnetFromHash(r.infoHash!, r.title)}
+              book={book}
+              cached={!!hash && cached.has(hash)}
+              onSent={onSent}
+            />
           </View>
         );
       })}
@@ -173,23 +143,4 @@ const useStyles = makeStyles((Colors) => ({
   },
   title: { color: Colors.text, fontSize: 14, fontWeight: '600' },
   meta: { color: Colors.textSecondary, fontSize: 12 },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minWidth: 84,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.accent,
-  },
-  sent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-  },
-  buttonText: { color: Colors.accentText, fontWeight: '700', fontSize: 13 },
 }));

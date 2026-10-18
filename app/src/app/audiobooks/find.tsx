@@ -8,7 +8,7 @@ import { TorboxMatches } from '@/components/torbox-matches';
 import { Body, Button, Cover, Input, Title } from '@/components/ui';
 import { Spacing, makeStyles } from '@/constants/theme';
 import { cleanTitle, getSources, isCatalog } from '@/lib/sources';
-import { addWanted, isWanted, markSent, wantedId } from '@/lib/wanted';
+import { addWanted, isWanted, markSent, wantedId, type WantedInput } from '@/lib/wanted';
 
 /** A book from a catalog (iTunes, Audible…): details, then torrents for it from your download sources. */
 export default function FindBookScreen() {
@@ -35,8 +35,20 @@ export default function FindBookScreen() {
   }, [p.title, p.author]);
 
   // Sending something for a wanted book records it, so the Wanted tab can follow TorBox.
+  // (Download adds the book to Wanted itself, so check again.)
   const onSent = (torboxId: number, name: string) => {
     if (wanted) markSent(wantedId(p.title ?? '', p.author || undefined), name, torboxId);
+    else isWanted(p.title ?? '', p.author || undefined).then(setWanted);
+  };
+  // What the Download buttons save to the phone (and put on Wanted).
+  const book: WantedInput = {
+    title: p.title ?? '',
+    author: p.author || undefined,
+    narrator: p.narrator || undefined,
+    cover: p.cover || undefined,
+    series: p.series || undefined,
+    description: p.description || undefined,
+    minutes: Number(p.minutes) || undefined,
   };
 
   useEffect(() => {
@@ -100,13 +112,15 @@ export default function FindBookScreen() {
         />
       </View>
       {submitted ? <TorboxMatches key={`tb:${submitted}`} query={submitted} onPick={onSent} /> : null}
-      {submitted ? <AbbResults key={`abb:${submitted}`} query={submitted} onSent={onSent} /> : null}
+      {submitted ? <AbbResults key={`abb:${submitted}`} query={submitted} book={book} onSent={onSent} /> : null}
       {submitted && downloadSources ? (
         <SourceResults
           key={submitted}
           query={submitted}
           author={p.author || undefined}
           title="Other download sources"
+          book={book}
+          onSent={onSent}
         />
       ) : null}
     </ScrollView>

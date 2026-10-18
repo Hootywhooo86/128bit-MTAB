@@ -5,27 +5,15 @@ import { Text, View } from 'react-native';
 import { Pressable } from '@/components/focusable';
 import { Body, Cover, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles } from '@/constants/theme';
+import { bookNumber, numberFit, titleScore } from '@/lib/book-match';
 import { listAudioItems, type TorboxItem } from '@/lib/torbox';
 import { canGetTorrents } from '@/lib/torrent-device';
 
-const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-const SKIP = new Set(['the', 'and', 'book', 'audiobook', 'unabridged', 'm4b', 'mp3', 'of', 'a', 'an']);
-
-/** Lower-case words, numbers as plain digits ("Seven", "07" → "7"), filler dropped. */
-const words = (s: string) =>
-  s
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .map((w) => (NUMBERS.includes(w) ? String(NUMBERS.indexOf(w)) : /^\d+$/.test(w) ? String(Number(w)) : w))
-    .filter((w) => w && !SKIP.has(w));
-
-/** Share of the search's words found in `name` (0..1). Only the main title counts: the
- * subtitle after ":" ("An Apocalyptic LitRPG…") is rarely in a torrent's name. */
+/** Share of the search's words found in `name`, the right book number first (see book-match). */
 function overlap(query: string, name: string) {
-  const want = words(query.split(':')[0]);
-  if (!want.length) return 0;
-  const have = new Set(words(name));
-  return want.filter((w) => have.has(w)).length / want.length;
+  const want = bookNumber(query);
+  const fit = numberFit(want, name);
+  return titleScore(query, name) + (fit === 'same' ? 0.2 : fit === 'other' ? -0.3 : 0);
 }
 
 /**

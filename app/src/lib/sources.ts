@@ -11,6 +11,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { searchQueries, searchScore } from './book-match';
+
 const KEY = '128bit.sources';
 const SEEDED_KEY = '128bit.defaultSourcesInstalled';
 
@@ -310,6 +312,21 @@ export async function searchSource(source: SourceConfig, q: Query): Promise<Sour
       };
     })
     .filter((r) => (r.magnet || r.infoHash) && r.score >= threshold);
+}
+
+/**
+ * Searches a source the smart way: the title as given, then simpler forms of it (number
+ * words as digits, the series without "Book 7", then with the author; see searchQueries)
+ * until one finds something. Results are ranked against what you searched for, the right
+ * book number first and other books in the series well below.
+ */
+export async function searchSourceSmart(source: SourceConfig, q: Query): Promise<SourceResult[]> {
+  for (const title of searchQueries(q.title, q.author)) {
+    // A source that can't be reached won't answer the next question either: let it throw.
+    const found = await searchSource(source, { ...q, title });
+    if (found.length) return found.map((r) => ({ ...r, score: searchScore(q.title, r.title) }));
+  }
+  return [];
 }
 
 // --- Catalogs ---------------------------------------------------------------
