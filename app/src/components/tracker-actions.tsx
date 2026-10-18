@@ -18,19 +18,43 @@ import {
   type TrackerList,
   type TrackerRef,
 } from '@/lib/tracker';
+import { isAnime } from '@/lib/video';
 import { Pressable } from '@/components/focusable';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 const STATUS: Record<string, string> = { planned: 'In your Tracker', active: 'In progress', done: 'Finished', on_hold: 'On hold', dropped: 'Dropped' };
 
-/** A Play title id → the ids Tracker matches on. */
+/** Prefixes addons put on title ids (AIOMetadata, Kitsu, MAL…) → Tracker's id keys. */
+const ID_KEYS: Record<string, string> = {
+  kitsu: 'kitsu', tmdb: 'tmdb', tvdb: 'tvdb', mal: 'mal', myanimelist: 'mal', anilist: 'anilist', al: 'anilist',
+  anidb: 'anidb', trakt: 'trakt', tvmaze: 'tvmaze', simkl: 'simkl',
+};
+
+/**
+ * A Play title id → the ids Tracker matches on: "tt123" → {imdb}, "kitsu:1" → {kitsu: 1},
+ * "tmdb:2" (or "tmdb:tv:2") → {tmdb: 2}, "mal:3" → {mal: 3}, "anilist:4" → {anilist: 4}…
+ * Numbers stay numbers (Tracker compares them exactly). Anything else: {} (Tracker then
+ * goes by title + year).
+ */
 export function idsFor(id?: string | null): Record<string, string | number> {
   if (!id) return {};
-  if (/^tt\d+$/.test(id)) return { imdb: id };
-  const kitsu = id.match(/^kitsu:(\d+)$/);
-  if (kitsu) return { kitsu: Number(kitsu[1]) };
-  return {};
+  const imdb = id.match(/^(?:imdb[:_])?(tt\d+)(?::|$)/i);
+  if (imdb) return { imdb: imdb[1].toLowerCase() };
+  const m = id.match(/^([a-z]+)[:_](?:(?:tv|movie|series|show|anime)[:_])?(\d+)(?::|$)/i);
+  const key = m && ID_KEYS[m[1].toLowerCase()];
+  return key ? { [key]: Number(m[2]) } : {};
+}
+
+/**
+ * A show you opened from the Anime tab (or with an anime id: Kitsu, MAL, AniList…) goes
+ * to Tracker as an anime, even when its page came from a general addon (Cinemeta etc.).
+ */
+export async function withAnimeType(item: TrackerRef): Promise<TrackerRef> {
+  if (item.type !== 'show') return item;
+  const playIds = Object.entries(item.ids ?? {}).map(([k, v]) => (k === 'imdb' ? String(v) : `${k}:${v}`));
+  const anime = await Promise.all(playIds.map((id) => isAnime({ type: 'series', id }).catch(() => false)));
+  return anime.some(Boolean) ? { ...item, type: 'anime' } : item;
 }
 
 /**
@@ -38,7 +62,7 @@ export function idsFor(id?: string | null): Record<string, string | number> {
  * comics. Add (or take off), put it on your lists, rate it. Saved to the
  * signed-in account's own Tracker.
  */
-export function TrackerActions({ item }: { item: TrackerRef }) {
+export function TrackerActions({ item: given }: { item: TrackerRef }) {
   const Colors = useColors();
   const styles = useStyles();
   const [state, setState] = useState<'loading' | 'signed-out' | 'ready' | 'unavailable'>('loading');
@@ -48,18 +72,23 @@ export function TrackerActions({ item }: { item: TrackerRef }) {
   const [lists, setLists] = useState<TrackerList[] | null>(null);
   const [newName, setNewName] = useState('');
   const [added, setAdded] = useState<string | null>(null);
-  const key = `${item.type}|${item.title}|${JSON.stringify(item.ids ?? {})}`;
+  const [failed, setFailed] = useState<string | null>(null);
+  // What Tracker is sent: the title as given, as an anime when it is one.
+  const [item, setItem] = useState<TrackerRef>(given);
+  const key = `${given.type}|${given.title}|${given.year ?? ''}|${JSON.stringify(given.ids ?? {})}`;
 
   const load = useCallback(async () => {
     const signedIn = await trackerSignedIn();
     if (!signedIn) return setState('signed-out');
     try {
-      setFound(await findInTracker(item));
+      const ref = await withAnimeType(given);
+      setItem(ref);
+      setFound(await findInTracker(ref));
       setState('ready');
     } catch {
       setState('unavailable'); // Tracker not set up on this account server yet
     }
-    // item is described by key
+    // given is described by key
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   useEffect(() => {
@@ -80,10 +109,14 @@ export function TrackerActions({ item }: { item: TrackerRef }) {
   const kind: TrackerKind = item.type;
   const run = async (fn: () => Promise<unknown>, note?: string) => {
     setBusy(true);
+    setFailed(null);
     try {
       await fn();
       await load();
       if (note) setAdded(note);
+    } catch (e) {
+      setAdded(null);
+      setFailed(`Couldn’t save to Tracker: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -105,6 +138,7 @@ export function TrackerActions({ item }: { item: TrackerRef }) {
         </Text>
       ) : null}
       {added ? <Text style={[styles.muted, { color: Colors.accent }]}>{added}</Text> : null}
+      {failed ? <Text style={[styles.muted, { color: Colors.danger }]}>{failed}</Text> : null}
       <View style={{ flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' }}>
         {inTracker && found?.status !== 'planned'
           ? button('checkmark-circle', 'In Tracker', () => {}, true)
