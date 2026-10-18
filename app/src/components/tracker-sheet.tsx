@@ -22,6 +22,7 @@ import {
   type TrackerRef,
 } from '@/lib/tracker';
 import { Pressable } from '@/components/focusable';
+import { withAnimeType } from '@/components/tracker-actions';
 
 const STATUS: Record<string, string> = { planned: 'In your Tracker', active: 'In progress', done: 'Finished', on_hold: 'On hold', dropped: 'Dropped' };
 
@@ -30,9 +31,22 @@ const STATUS: Record<string, string> = { planned: 'In your Tracker', active: 'In
  * any of your 128bit Tracker lists, and rate it 1–10. Being on a list is what puts it in
  * your Tracker. Filled with the accent colour once it's in your Tracker.
  */
-export function TrackerPlus({ item, size }: { item: TrackerRef; size: number }) {
+export function TrackerPlus({ item: given, size }: { item: TrackerRef; size: number }) {
   const Colors = useColors();
   const styles = useStyles();
+  // A show from the Anime tab (or with an anime id) goes to Tracker as an anime.
+  const [item, setItem] = useState(given);
+  const givenKey = JSON.stringify(given);
+  useEffect(() => {
+    let cancelled = false;
+    setItem(given);
+    withAnimeType(given).then((i) => !cancelled && setItem(i), () => {});
+    return () => {
+      cancelled = true;
+    };
+    // given is described by givenKey
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [givenKey]);
   const [state, setState] = useState<'loading' | 'signed-out' | 'ready' | 'unavailable'>('loading');
   const [found, setFound] = useState<TrackerItem | null>(null);
   const [open, setOpen] = useState(false);

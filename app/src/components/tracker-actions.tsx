@@ -50,7 +50,7 @@ export function idsFor(id?: string | null): Record<string, string | number> {
  * A show you opened from the Anime tab (or with an anime id: Kitsu, MAL, AniList…) goes
  * to Tracker as an anime, even when its page came from a general addon (Cinemeta etc.).
  */
-async function withAnimeType(item: TrackerRef): Promise<TrackerRef> {
+export async function withAnimeType(item: TrackerRef): Promise<TrackerRef> {
   if (item.type !== 'show') return item;
   const playIds = Object.entries(item.ids ?? {}).map(([k, v]) => (k === 'imdb' ? String(v) : `${k}:${v}`));
   const anime = await Promise.all(playIds.map((id) => isAnime({ type: 'series', id }).catch(() => false)));
