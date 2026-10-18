@@ -18,6 +18,7 @@ import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/compone
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMetas, isBrowsable, supportsSearch, catalogTab } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
+import { searchAnilist } from '@/lib/anilist';
 import { searchKitsu } from '@/lib/kitsu';
 import type { CatalogDef, InstalledAddon, MetaPreview } from '@/lib/types';
 import { usePrefs } from '@/lib/prefs';
@@ -47,16 +48,21 @@ export function VideoBrowse({ type, noun }: Props) {
   const { addons, loaded } = useAddons();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
-  // Searching Shows also searches the anime catalogs (anime are shows too).
+  // Searching Shows also searches the anime catalogs (anime are shows too), and searching
+  // Anime searches the show catalogs (Cinemeta, AIOMetadata… often know an anime Kitsu doesn't).
   const inTab = (tab: string) =>
-    tab === type || tab === 'all' || (!!submitted && type === 'series' && tab === 'anime');
+    tab === type ||
+    tab === 'all' ||
+    (!!submitted && ((type === 'series' && tab === 'anime') || (type === 'anime' && tab === 'series')));
   const rows = addons.flatMap((addon) =>
     addon.manifest.catalogs
       .filter((c) => inTab(catalogTab(addon, c)) && (submitted ? supportsSearch(c) : isBrowsable(c)))
       .map((catalog) => ({ addon, catalog })),
   );
-  // Anime search: the Kitsu addon's results and Kitsu's own search, as one row.
-  const kitsuSearch = !!submitted && (type === 'anime' || type === 'series');
+  // Anime search: every search above plus Kitsu's and AniList's own, as one row (AnimeSearchRow).
+  // Shows search: the Kitsu addon's results and Kitsu's own search, as one row.
+  const animeSearch = !!submitted && type === 'anime';
+  const kitsuSearch = !!submitted && type === 'series';
   const isKitsuRow = (r: { addon: InstalledAddon; catalog: CatalogDef }) =>
     kitsuSearch && /kitsu/i.test(`${r.addon.manifest.id} ${r.addon.manifest.name}`) && catalogTab(r.addon, r.catalog) === 'anime';
   const clear = () => {
@@ -117,14 +123,15 @@ export function VideoBrowse({ type, noun }: Props) {
       {!submitted ? <TrackerRows type={type} /> : null}
       {!submitted ? <TraktRows type={type} /> : null}
 
-      {submitted && rows.length === 0 && !kitsuSearch ? (
+      {submitted && rows.length === 0 && !kitsuSearch && !animeSearch ? (
         <EmptyState title="Nothing to search" body={`None of your addons can search ${noun}.`} />
       ) : null}
       {submitted && type !== 'anime' ? <TraktSearchRow type={type} query={submitted} /> : null}
       {kitsuSearch ? (
         <KitsuSearchRow key={`kitsu/${submitted}`} query={submitted} addons={addons} rows={rows.filter(isKitsuRow)} />
       ) : null}
-      {rows.filter((r) => !isKitsuRow(r)).map(({ addon, catalog }) => (
+      {animeSearch ? <AnimeSearchRow key={`anime/${submitted}`} query={submitted} addons={addons} rows={rows} /> : null}
+      {(animeSearch ? [] : rows.filter((r) => !isKitsuRow(r))).map(({ addon, catalog }) => (
         <CatalogRow
           key={`${addon.manifest.id}/${catalog.id}/${submitted}`}
           addon={addon}
@@ -411,6 +418,136 @@ function KitsuSearchRow({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
           renderItem={({ item }) => <PosterTile meta={item} addonId={addonId} anime />}
+        />
+      )}
+    </View>
+  );
+}
+
+const ANIME_ID = /^(kitsu|mal|anilist|anidb)[:_]/i;
+const yearOf = (m: MetaPreview) => String(m.releaseInfo ?? '').slice(0, 4);
+const nameKey = (m: MetaPreview) => `${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}|${yearOf(m)}`;
+
+type SearchPart = { metas: MetaPreview[]; anime: boolean; addonId?: string };
+type SearchHit = { meta: MetaPreview; addonId?: string; anime: boolean };
+
+/**
+ * Results from several searches as one list: the same title once (same id, IMDb id, or
+ * name + year; the first source's version wins), anime-looking ones first (from an anime
+ * catalog, Kitsu / AniList / MAL ids, or an "Anime" genre).
+ */
+function mergeSearch(parts: SearchPart[]): SearchHit[] {
+  const out: SearchHit[] = [];
+  const at = new Map<string, number>();
+  for (const part of parts) {
+    for (const meta of part.metas) {
+      if (!meta?.id || !meta.name) continue;
+      const keys = [meta.id, meta.imdb_id, nameKey(meta)].filter((k): k is string => !!k);
+      const anime = part.anime || ANIME_ID.test(meta.id) || !!meta.genres?.some((g) => /anime/i.test(g));
+      const same = keys.map((k) => at.get(k)).find((n) => n !== undefined);
+      if (same !== undefined) {
+        out[same].anime ||= anime;
+        keys.forEach((k) => at.set(k, same));
+        continue;
+      }
+      keys.forEach((k) => at.set(k, out.length));
+      out.push({ meta, addonId: part.addonId, anime });
+    }
+  }
+  return [...out.filter((h) => h.anime), ...out.filter((h) => !h.anime)];
+}
+
+/**
+ * The Anime tab's search: every addon search for shows and anime (the same ones the Shows
+ * tab asks), plus Kitsu's own search and AniList's, as one row. Fills in as each answers.
+ */
+function AnimeSearchRow({
+  query,
+  addons,
+  rows,
+}: {
+  query: string;
+  addons: InstalledAddon[];
+  rows: { addon: InstalledAddon; catalog: CatalogDef }[];
+}) {
+  const Colors = useColors();
+  const [hits, setHits] = useState<SearchHit[] | null>(null);
+  // Keyed by the query, so a new search starts fresh.
+  const [pending, setPending] = useState(rows.length + 2);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const isKitsu = (a: InstalledAddon) => /kitsu/i.test(`${a.manifest.id} ${a.manifest.name}`);
+    // Order decides which copy of a title is kept: Kitsu first (its streams know anime
+    // episode numbering), then anime catalogs and AniList, then everything else.
+    const sources = [
+      ...rows.map(({ addon, catalog }) => ({
+        rank: isKitsu(addon) ? 0 : catalogTab(addon, catalog) === 'anime' ? 1 : 3,
+        anime: catalogTab(addon, catalog) === 'anime',
+        addonId: addon.manifest.id,
+        load: () => fetchMetas(addon, catalog, { search: query }),
+      })),
+      { rank: 0, anime: true, addonId: rows.find((r) => isKitsu(r.addon))?.addon.manifest.id, load: () => searchKitsu(query, addons) },
+      { rank: 2, anime: true, addonId: undefined, load: () => searchAnilist(query, addons) },
+    ]
+      .map((src, i) => ({ ...src, i }))
+      .sort((a, b) => a.rank - b.rank || a.i - b.i);
+    const got: (SearchPart | undefined)[] = sources.map(() => undefined);
+    let left = sources.length;
+    let firstError: string | null = null;
+    sources.forEach((src, n) => {
+      src
+        .load()
+        .then((metas) => {
+          got[n] = { metas, anime: src.anime, addonId: src.addonId };
+        })
+        .catch((e) => {
+          firstError ??= String(e?.message ?? e);
+        })
+        .finally(() => {
+          left -= 1;
+          if (cancelled) return;
+          const merged = mergeSearch(got.filter((p): p is SearchPart => !!p));
+          setPending(left);
+          if (merged.length || !left) setHits(merged);
+          if (!left && !merged.length && firstError && !got.some(Boolean)) setError(firstError);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // rows is rebuilt every render; the query (and the addons) are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, addons]);
+
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <View style={{ paddingHorizontal: Spacing.three }}>
+        <Heading>{`“${query}” · Anime`}</Heading>
+        <Body muted style={{ fontSize: 12 }}>
+          {pending ? 'Searching your addons, Kitsu and AniList…' : 'Your addons, Kitsu and AniList'}
+        </Body>
+      </View>
+      {error ? (
+        <Body style={{ paddingHorizontal: Spacing.three, color: Colors.danger }}>{error}</Body>
+      ) : hits && !hits.length ? (
+        <Body muted style={{ paddingHorizontal: Spacing.three }}>
+          No matches.
+        </Body>
+      ) : !hits ? (
+        <ActivityIndicator color={Colors.accent} style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
+      ) : (
+        <FlatList
+          horizontal
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          data={hits}
+          keyExtractor={(h) => h.meta.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+          renderItem={({ item }) => <PosterTile meta={item.meta} addonId={item.addonId} anime />}
         />
       )}
     </View>

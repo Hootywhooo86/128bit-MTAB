@@ -8,8 +8,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getSession, isSignedIn, onAccount, rpc } from './account';
+import { fetchMetas, supports, supportsSearch } from './addons';
+import { searchKitsu } from './kitsu';
+import { getActiveAddons } from './storage';
 import { imdbIdFor } from './tmdb';
-import type { TraktItem } from './trakt-library';
+import { poster, type TraktItem } from './trakt-library';
+import type { InstalledAddon, MetaPreview } from './types';
 
 export type TrackerKind = 'movie' | 'show' | 'anime' | 'book' | 'comic' | 'game' | 'mixed';
 
@@ -38,7 +42,9 @@ export type TrackerList = { id: string; name: string; kind: TrackerKind; item_co
 
 const TTL = 5 * 60_000;
 const cache = new Map<string, { at: number; value: unknown }>();
-onAccount(() => cache.clear()); // another account: another library
+/** How each Tracker item opens here, once looked up (by Tracker item id). */
+const opened = new Map<string, { id: string; openType: 'movie' | 'series' } | null>();
+onAccount(() => invalidateTracker()); // another account: another library
 
 async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
@@ -47,7 +53,10 @@ async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   cache.set(key, { at: Date.now(), value });
   return value;
 }
-export const invalidateTracker = () => cache.clear();
+export function invalidateTracker() {
+  cache.clear();
+  opened.clear();
+}
 
 /** Signed in to a 128bit account (Tracker lists are per account). */
 export async function trackerSignedIn() {
@@ -232,28 +241,100 @@ export async function rateInTracker(itemId: string, rating: number | null) {
   return rpc<void>('rate', { item_id: itemId, rating });
 }
 
+/** A Tracker item as a poster: how Play opens it (`id` / `openType`) plus its Tracker poster. */
+export type TrackerRowItem = TraktItem & { id: string; openType: 'movie' | 'series'; poster?: string };
+
+const normTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/** The first search result that is this title (same name, else same year, else the top one). */
+function bestMatch(found: MetaPreview[], title: string, year?: number | null) {
+  const yearOf = (m: MetaPreview) => Number(String(m.releaseInfo ?? '').slice(0, 4)) || null;
+  const named = found.filter((m) => normTitle(m.name) === normTitle(title));
+  return (
+    named.find((m) => !year || yearOf(m) === year) ??
+    named[0] ??
+    (year ? found.find((m) => yearOf(m) === year) : undefined) ??
+    found[0]
+  );
+}
+
 /**
- * Tracker items as rows of posters. Play opens titles by IMDb id; items that
- * only have a TMDB id are looked up (shows without either can't open here).
+ * How Play opens a Tracker item: by IMDb id; else `kitsu:<id>` (the title page knows Kitsu);
+ * else TMDB → IMDb (needs a TMDB key), or the TMDB / MAL / AniList id itself when an addon
+ * can show it; else, last, a search by title. Null when nothing finds it.
  */
-export async function asRowItems(items: TrackerItem[]): Promise<TraktItem[]> {
-  const out: TraktItem[] = [];
-  for (const i of items) {
-    if (!['movie', 'show', 'anime'].includes(i.type)) continue;
-    let imdb = i.ids?.imdb;
-    if (!imdb && i.ids?.tmdb) imdb = (await imdbIdFor(Number(i.ids.tmdb), i.type === 'movie' ? 'movie' : 'tv').catch(() => null)) ?? undefined;
-    if (!imdb) continue;
-    const ep = i.next;
-    out.push({
-      kind: ep ? 'episode' : i.type === 'movie' ? 'movie' : 'show',
-      title: i.title,
-      year: i.year ?? undefined,
-      imdb,
-      season: ep?.season,
-      episode: ep?.number,
-      // A new season coming: when it starts ("S2 E1 · Oct 30").
-      subtitle: ep ? `S${ep.season} E${ep.number}${ep.air_date && ep.air_date > new Date().toISOString().slice(0, 10) ? ` · ${airDay(ep.air_date)}` : ''}` : undefined,
-    });
+async function openFor(i: TrackerItem, addons: InstalledAddon[]) {
+  const movie = i.type === 'movie';
+  const type = movie ? 'movie' : 'series';
+  const as = (id: string) => ({ id, openType: type as 'movie' | 'series' });
+  const ids = i.ids ?? {};
+  if (ids.imdb) return as(ids.imdb);
+  if (ids.kitsu && /^\d+$/.test(String(ids.kitsu))) return as(`kitsu:${ids.kitsu}`);
+  const known = opened.get(i.id);
+  if (known !== undefined) return known;
+  let out: { id: string; openType: 'movie' | 'series' } | null = null;
+  if (ids.tmdb) {
+    const imdb = await imdbIdFor(Number(ids.tmdb), movie ? 'movie' : 'tv').catch(() => null);
+    if (imdb) out = as(imdb);
   }
+  const canShow = (id: string) => addons.some((a) => supports(a, 'meta', type, id));
+  for (const key of ['tmdb', 'mal', 'anilist', 'tvdb'] as const) {
+    if (!out && ids[key] && canShow(`${key}:${ids[key]}`)) out = as(`${key}:${ids[key]}`);
+  }
+  if (!out && i.title) {
+    // Last resort: find it by name (Kitsu for anime, then your addons' searches).
+    const anime = i.type === 'anime';
+    const found: MetaPreview[] = anime ? await searchKitsu(i.title, addons).catch(() => []) : [];
+    if (!found.length) {
+      const catalogs = addons.flatMap((a) =>
+        a.manifest.catalogs.filter((c) => c.type === type && supportsSearch(c)).map((c) => ({ a, c })),
+      );
+      const results = await Promise.all(
+        catalogs.slice(0, 6).map(({ a, c }) => fetchMetas(a, c, { search: i.title }).catch(() => [] as MetaPreview[])),
+      );
+      found.push(...results.flat());
+    }
+    const hit = bestMatch(found, i.title, i.year);
+    if (hit) out = { id: hit.id, openType: hit.type === 'movie' ? 'movie' : 'series' };
+  }
+  opened.set(i.id, out);
   return out;
+}
+
+/** Tracker types a Shows / Movies / Anime tab can open ("other": whatever it is, try). */
+const VIDEO_TYPES = ['movie', 'show', 'anime', 'other'];
+
+/**
+ * Tracker items as rows of posters. Every movie, show and anime gets a poster, whatever
+ * ids it has (see openFor); only titles nothing can find are left out (and logged).
+ */
+export async function asRowItems(items: TrackerItem[]): Promise<TrackerRowItem[]> {
+  const addons = await getActiveAddons().catch(() => [] as InstalledAddon[]);
+  const rows = await Promise.all(
+    items.map(async (i): Promise<TrackerRowItem | null> => {
+      if (!VIDEO_TYPES.includes(i.type)) return null;
+      const open = await openFor(i, addons).catch(() => null);
+      if (!open) {
+        console.warn(`Tracker: can't open "${i.title}" here (ids ${JSON.stringify(i.ids ?? {})})`);
+        return null;
+      }
+      const imdb = /^tt\d+$/.test(open.id) ? open.id : undefined;
+      const ep = i.next;
+      return {
+        ...open,
+        kind: ep ? 'episode' : i.type === 'movie' ? 'movie' : 'show',
+        title: i.title,
+        year: i.year ?? undefined,
+        imdb,
+        poster: i.poster || poster(imdb),
+        season: ep?.season,
+        episode: ep?.number,
+        // A new season coming: when it starts ("S2 E1 · Oct 30").
+        subtitle: ep ? `S${ep.season} E${ep.number}${ep.air_date && ep.air_date > new Date().toISOString().slice(0, 10) ? ` · ${airDay(ep.air_date)}` : ''}` : undefined,
+      };
+    }),
+  );
+  // One poster per title (older libraries had an item per season).
+  const seen = new Set<string>();
+  return rows.filter((r): r is TrackerRowItem => !!r && !seen.has(`${r.id}:${r.subtitle ?? ''}`) && !!seen.add(`${r.id}:${r.subtitle ?? ''}`));
 }

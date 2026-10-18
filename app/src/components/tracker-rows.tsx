@@ -16,14 +16,14 @@ import {
   kindFor,
   trackerSignedIn,
   type TrackerItem,
+  type TrackerRowItem,
 } from '@/lib/tracker';
-import { poster, type TraktItem } from '@/lib/trakt-library';
 import type { MetaPreview } from '@/lib/types';
 
 import { PosterTile } from './video-browse';
 import { Pressable } from '@/components/focusable';
 
-type Row = { key: string; title: string; items: TraktItem[] };
+type Row = { key: string; title: string; items: TrackerRowItem[] };
 
 /**
  * Your 128bit Tracker on the Shows / Movies / Anime tabs: Up next, Watchlist,
@@ -68,8 +68,12 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
           const listRows: Row[] = [];
           const inLists = new Set<string>();
           for (const list of (await getAllTrackerLists()).filter((l) => listPlaces(l, places).includes(type))) {
+            // A list you placed on this tab, or one of this tab's kind (your "Anime" list, whatever
+            // each item was saved as): all of it. An "anything" list: just this tab's kind.
             const placed = !!places[list.id];
-            const items = (await getTrackerListItems(list.id)).filter((i) => placed || list.kind !== 'mixed' || i.type === kind);
+            const items = (await getTrackerListItems(list.id)).filter(
+              (i) => placed || list.kind !== 'mixed' || i.type === kind,
+            );
             items.forEach((i) => inLists.add(i.id));
             if (items.length) listRows.push({ key: `list:${list.id}`, title: list.name, items: await asRowItems(items) });
           }
@@ -115,18 +119,18 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
             maxToRenderPerBatch={6}
             windowSize={5}
             data={r.items.slice(0, 40)}
-            keyExtractor={(i) => `${i.imdb}:${i.subtitle ?? ''}`}
+            keyExtractor={(i) => `${i.id}:${i.subtitle ?? ''}`}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
             renderItem={({ item }) => {
               const meta: MetaPreview = {
-                id: item.imdb!,
-                type: type === 'anime' ? (item.kind === 'movie' ? 'movie' : 'series') : type,
+                id: item.id,
+                type: item.openType,
                 name: item.kind === 'episode' && item.subtitle ? `${item.title} · ${item.subtitle}` : item.title,
-                poster: poster(item.imdb),
+                poster: item.poster,
                 releaseInfo: item.year ? String(item.year) : undefined,
               };
-              return <PosterTile meta={meta} />;
+              return <PosterTile meta={meta} anime={type === 'anime'} />;
             }}
           />
         </View>

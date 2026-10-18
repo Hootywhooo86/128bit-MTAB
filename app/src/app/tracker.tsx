@@ -33,7 +33,7 @@ export default function TrackerScreen() {
 
   const open = async (item: TrackerItem) => {
     const [row] = await asRowItems([item]);
-    if (row?.imdb) router.push({ pathname: '/title', params: { type: item.type === 'movie' ? 'movie' : 'series', id: row.imdb } });
+    if (row) router.push({ pathname: '/title', params: { type: row.openType, id: row.id } });
   };
 
   if (!state) return <ActivityIndicator style={{ marginTop: 40 }} color={Colors.accent} />;
