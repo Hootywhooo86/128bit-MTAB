@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type GestureResponderEvent,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -43,6 +44,9 @@ export default function PlayerScreen() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
+  // Sideways (e.g. in a car mount): controls on the left, big; the chapter list on the right.
+  const { width, height } = useWindowDimensions();
+  const wide = width > height;
 
   const bookKey = p.book?.key;
   const loadBookmarks = useCallback(() => {
@@ -105,92 +109,125 @@ export default function PlayerScreen() {
     ? `${p.mark.title} (${p.mark.index + 1}/${marks.length})`
     : `${chapter?.title} (${p.chapterIndex + 1}/${book.chapters.length})`;
 
-  return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <PixelFrame playing={p.playing}>
-        <View style={styles.coverFrame}>
-          <View style={styles.coverShadow} />
-          <View style={styles.coverInner}>
-            <Cover uri={book.cover} size={212} title={book.title} author={book.author} />
-          </View>
-        </View>
-        <View style={{ alignItems: 'center', gap: Spacing.two }}>
-          <Text style={styles.bookTitle}>{book.title}</Text>
-          {book.author ? <Body muted>{book.author}</Body> : null}
-        </View>
-      </PixelFrame>
-      <View style={{ alignItems: 'center', gap: Spacing.two, alignSelf: 'stretch' }}>
-        <View style={styles.chapterTag}>
-          <Text style={styles.chapterText} numberOfLines={2}>
-            ▶ {heading}
-          </Text>
+  const cover = (
+    <PixelFrame playing={p.playing}>
+      <View style={styles.coverFrame}>
+        <View style={styles.coverShadow} />
+        <View style={styles.coverInner}>
+          <Cover uri={book.cover} size={212} title={book.title} author={book.author} />
         </View>
       </View>
-
-      <View style={{ alignSelf: 'stretch', gap: Spacing.one }}>
-        <Pressable
-          onPress={onSeek}
-          onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width || 1)}
-          style={{ paddingVertical: Spacing.two }}>
-          <PixelBar value={segLen ? segPos / segLen : 0} />
-        </Pressable>
-        <View style={styles.times}>
-          <Text style={styles.time}>{formatTime(segPos)}</Text>
-          <Text style={styles.time}>-{formatTime(segLen - segPos)}</Text>
-        </View>
+      <View style={{ alignItems: 'center', gap: Spacing.two }}>
+        <Text style={styles.bookTitle}>{book.title}</Text>
+        {book.author ? <Body muted>{book.author}</Body> : null}
       </View>
+    </PixelFrame>
+  );
 
-      {p.error ? <Body style={{ color: Colors.danger }}>{p.error}</Body> : null}
+  const chapterTag = (
+    <View style={styles.chapterTag}>
+      <Text style={styles.chapterText} numberOfLines={2}>
+        ▶ {heading}
+      </Text>
+    </View>
+  );
 
-      <View style={styles.controls}>
-        <IconButton name="play-skip-back" label="Previous chapter" onPress={p.previous} />
-        <IconButton
-          name="play-back"
-          caption={String(prefs.skipBack)}
-          label={`Back ${prefs.skipBack} seconds`}
-          onPress={() => p.seekBy(-prefs.skipBack)}
-        />
-        <Pressable
-          style={styles.playButton}
-          onPress={p.toggle}
-          accessibilityLabel={p.playing ? 'Pause' : 'Play'}>
-          {p.loading ? (
-            <ActivityIndicator color={Colors.accentText} />
-          ) : (
-            <Ionicons name={p.playing ? 'pause' : 'play'} size={36} color={Colors.accentText} />
-          )}
-        </Pressable>
-        <IconButton
-          name="play-forward"
-          caption={String(prefs.skipForward)}
-          label={`Forward ${prefs.skipForward} seconds`}
-          onPress={() => p.seekBy(prefs.skipForward)}
-        />
-        <IconButton
-          name="play-skip-forward"
-          label="Next chapter"
-          disabled={!p.hasNext}
-          onPress={p.next}
-        />
+  // A smaller cover with the title beside it, so the controls fit when sideways.
+  const wideHeader = (
+    <View style={styles.wideHeader}>
+      <View style={styles.wideCover}>
+        <Cover uri={book.cover} size={96} title={book.title} author={book.author} />
       </View>
-
-      <View style={styles.pills}>
-        <Pressable style={styles.pill} onPress={() => p.setRate(nextRate)}>
-          <Text style={styles.pillText}>{p.rate}×</Text>
-        </Pressable>
-        <Pressable style={styles.pill} onPress={cycleSleep} accessibilityLabel="Sleep timer">
-          <Ionicons name="moon" size={14} color={p.sleep ? Colors.accent : Colors.text} />
-          <Text style={styles.pillText}>{p.sleep ? SLEEP_CHOICES[sleepIndex].label : 'Sleep'}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.pill}
-          onPress={() => setNoteOpen(true)}
-          accessibilityLabel="Add bookmark">
-          <Ionicons name="bookmark" size={14} color={Colors.text} />
-          <Text style={styles.pillText}>Bookmark</Text>
-        </Pressable>
+      <View style={{ flex: 1, gap: Spacing.two }}>
+        <Text style={styles.bookTitle} numberOfLines={2}>
+          {book.title}
+        </Text>
+        {book.author ? (
+          <Body muted numberOfLines={1}>
+            {book.author}
+          </Body>
+        ) : null}
+        {chapterTag}
       </View>
+    </View>
+  );
 
+  const progress = (
+    <View style={{ alignSelf: 'stretch', gap: Spacing.one }}>
+      <Pressable
+        onPress={onSeek}
+        onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width || 1)}
+        style={{ paddingVertical: Spacing.two }}>
+        <PixelBar value={segLen ? segPos / segLen : 0} />
+      </Pressable>
+      <View style={styles.times}>
+        <Text style={styles.time}>{formatTime(segPos)}</Text>
+        <Text style={styles.time}>-{formatTime(segLen - segPos)}</Text>
+      </View>
+    </View>
+  );
+
+  const big = wide ? 44 : 28;
+  const controls = (
+    <View style={styles.controls}>
+      <IconButton name="play-skip-back" size={big} label="Previous chapter" onPress={p.previous} />
+      <IconButton
+        name="play-back"
+        size={big}
+        caption={String(prefs.skipBack)}
+        label={`Back ${prefs.skipBack} seconds`}
+        onPress={() => p.seekBy(-prefs.skipBack)}
+      />
+      <Pressable
+        style={[styles.playButton, wide && styles.playButtonWide]}
+        onPress={p.toggle}
+        accessibilityLabel={p.playing ? 'Pause' : 'Play'}>
+        {p.loading ? (
+          <ActivityIndicator color={Colors.accentText} size={wide ? 'large' : 'small'} />
+        ) : (
+          <Ionicons name={p.playing ? 'pause' : 'play'} size={wide ? 56 : 36} color={Colors.accentText} />
+        )}
+      </Pressable>
+      <IconButton
+        name="play-forward"
+        size={big}
+        caption={String(prefs.skipForward)}
+        label={`Forward ${prefs.skipForward} seconds`}
+        onPress={() => p.seekBy(prefs.skipForward)}
+      />
+      <IconButton
+        name="play-skip-forward"
+        size={big}
+        label="Next chapter"
+        disabled={!p.hasNext}
+        onPress={p.next}
+      />
+    </View>
+  );
+
+  const pills = (
+    <View style={styles.pills}>
+      <Pressable style={styles.pill} onPress={() => p.setRate(nextRate)}>
+        <Text style={styles.pillText}>{p.rate}×</Text>
+      </Pressable>
+      <Pressable style={styles.pill} onPress={cycleSleep} accessibilityLabel="Sleep timer">
+        <Ionicons name="moon" size={14} color={p.sleep ? Colors.accent : Colors.text} />
+        <Text style={styles.pillText}>{p.sleep ? SLEEP_CHOICES[sleepIndex].label : 'Sleep'}</Text>
+      </Pressable>
+      <Pressable
+        style={styles.pill}
+        onPress={() => setNoteOpen(true)}
+        accessibilityLabel="Add bookmark">
+        <Ionicons name="bookmark" size={14} color={Colors.text} />
+        <Text style={styles.pillText}>Bookmark</Text>
+      </Pressable>
+    </View>
+  );
+
+  const error = p.error ? <Body style={{ color: Colors.danger }}>{p.error}</Body> : null;
+
+  const list = (
+    <>
       <View style={styles.tabs}>
         {(['chapters', 'bookmarks'] as const).map((t) => (
           <Pressable key={t} onPress={() => setTab(t)} style={styles.tab}>
@@ -268,6 +305,35 @@ export default function PlayerScreen() {
           )
         ) : null}
       </View>
+    </>
+  );
+
+  return (
+    <>
+      {wide ? (
+        <View style={[styles.screen, styles.wide]}>
+          <ScrollView style={{ flex: 1.15 }} contentContainerStyle={styles.wideLeft}>
+            {wideHeader}
+            {progress}
+            {error}
+            {controls}
+          </ScrollView>
+          <ScrollView style={styles.wideRight} contentContainerStyle={{ gap: Spacing.three }}>
+            {pills}
+            {list}
+          </ScrollView>
+        </View>
+      ) : (
+        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+          {cover}
+          <View style={{ alignItems: 'center', gap: Spacing.two, alignSelf: 'stretch' }}>{chapterTag}</View>
+          {progress}
+          {error}
+          {controls}
+          {pills}
+          {list}
+        </ScrollView>
+      )}
 
       <Modal
         visible={noteOpen}
@@ -294,7 +360,7 @@ export default function PlayerScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </>
   );
 }
 
@@ -318,8 +384,10 @@ function IconButton({
   label,
   onPress,
   disabled,
+  size = 28,
 }: {
   name: ComponentProps<typeof Ionicons>['name'];
+  size?: number;
   caption?: string;
   label: string;
   onPress: () => void;
@@ -331,10 +399,10 @@ function IconButton({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      hitSlop={8}
+      hitSlop={size > 28 ? 16 : 8}
       accessibilityLabel={label}
       style={{ alignItems: 'center', opacity: disabled ? 0.3 : 1 }}>
-      <Ionicons name={name} size={28} color={Colors.text} />
+      <Ionicons name={name} size={size} color={Colors.text} />
       {caption ? <Text style={styles.iconLabel}>{caption}</Text> : null}
     </Pressable>
   );
@@ -377,6 +445,12 @@ const useStyles = makeStyles((Colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  wide: { flexDirection: 'row' },
+  wideLeft: { padding: Spacing.three, gap: Spacing.three, justifyContent: 'center', flexGrow: 1 },
+  wideRight: { flex: 1, borderLeftWidth: 2, borderColor: Colors.border, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
+  wideHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, alignSelf: 'stretch' },
+  wideCover: { borderWidth: 2, borderColor: Colors.accent },
+  playButtonWide: { width: 104, height: 104, borderWidth: 4 },
   iconLabel: { color: Colors.textSecondary, fontSize: 8, fontFamily: PixelFont, marginTop: 4 },
   pills: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap', justifyContent: 'center' },
   pill: {
