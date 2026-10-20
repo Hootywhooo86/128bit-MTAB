@@ -15,6 +15,14 @@ export default function SettingsScreen() {
           subtitle={IS_TV ? 'Sign in with your phone to bring your add-ons and settings here.' : 'Your add-ons and settings on every phone and TV.'}
           onPress={() => router.push('/settings/account')}
         />
+        {IS_TV ? null : (
+          <Row
+            icon="key"
+            title="Clerk account"
+            subtitle="Sign in with email or Google."
+            onPress={() => router.push('/settings/clerk')}
+          />
+        )}
         <Row
           icon="sync"
           title="Tracking"

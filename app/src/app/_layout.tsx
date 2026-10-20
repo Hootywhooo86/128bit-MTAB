@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
+import { ClerkGate } from '@/components/clerk-gate';
 import { useColors } from '@/constants/theme';
 import { IS_TV } from '@/constants/tv';
 import { syncHistoryToTracker } from '@/lib/tracker-sync';
@@ -63,9 +64,11 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Pro
 
 export default function RootLayout() {
   return (
-    <PrefsProvider>
-      <AppNavigator />
-    </PrefsProvider>
+    <ClerkGate>
+      <PrefsProvider>
+        <AppNavigator />
+      </PrefsProvider>
+    </ClerkGate>
   );
 }
 
@@ -233,6 +236,7 @@ function AppNavigator() {
           <Stack.Screen name="settings/comics" options={{ title: 'Comics' }} />
           <Stack.Screen name="settings/stats" options={{ title: 'Statistics' }} />
           <Stack.Screen name="settings/account" options={{ title: 'Account & sync' }} />
+          <Stack.Screen name="settings/clerk" options={{ title: 'Clerk account' }} />
           <Stack.Screen name="settings/index" options={{ title: '' }} />
           <Stack.Screen name="addons" options={{ title: 'Addons' }} />
           <Stack.Screen name="settings/content" options={{ title: 'Content & Discovery' }} />

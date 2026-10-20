@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@clerk/expo": "^4.13.1",
     "@expo-google-fonts/press-start-2p": "^0.4.1",
     "@expo/ui": "~57.0.21",
     "@expo/vector-icons": "^15.0.2",
@@ -10,6 +11,7 @@
     "expo": "~57.0.26",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
+    "expo-auth-session": "~57.0.16",
     "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.20",
@@ -28,6 +30,7 @@
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
     "expo-video": "~57.0.5",
+    "expo-web-browser": "~57.0.3",
     "fflate": "^0.8.3",
     "qrcode-generator": "^2.0.4",
     "react": "19.2.3",
