@@ -292,13 +292,17 @@ export function CatalogRow({
   useEffect(() => {
     let cancelled = false;
     fetchMetas(addon, catalog, { search })
-      .then((m) => !cancelled && setMetas(m))
+      // Entries with no title and no poster (just a year) are an addon's broken placeholders.
+      .then((m) => !cancelled && setMetas(m.filter((x) => x.name?.trim() || x.poster)))
       .catch((e) => !cancelled && setError(String(e.message ?? e)));
     return () => {
       cancelled = true;
     };
   }, [addon, catalog, search]);
 
+  // Browsing: a catalog that failed or came back empty is dead, so it doesn't take up a row.
+  // (Searching keeps the row, saying "No matches", so the page doesn't jump around.)
+  if (!search && (error || metas?.length === 0)) return null;
 
   return (
     <View style={{ gap: Spacing.two }}>
