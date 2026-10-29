@@ -3,6 +3,7 @@ import { AppState, Linking, PermissionsAndroid, Platform } from 'react-native';
 
 import { ChoiceRow, Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
 import { usePrefs } from '@/lib/prefs';
+import { videoDownloadsSupported } from '@/lib/video-downloads';
 import { askBatteryUnrestricted, batteryUnrestricted } from '@/lib/torrent-device';
 import { SUBTITLE_LANGUAGES, languageName } from '@/lib/subtitles';
 import { IS_TV } from '@/constants/tv';
@@ -75,6 +76,22 @@ export default function PlaybackSettings() {
           value={prefs.resumeVideos}
           onChange={(v) => setPref('resumeVideos', v)}
         />
+        <ChoiceRow
+          title="Biggest stream to show"
+          subtitle="Streams over this size are hidden (you can still show them). Saves data and time to start."
+          value={prefs.maxStreamGB}
+          options={[0, 2, 4, 8, 15, 30].map((v) => ({ value: v, label: v ? `${v} GB` : 'No limit' }))}
+          onChange={(v) => setPref('maxStreamGB', v)}
+        />
+        {videoDownloadsSupported ? (
+          <ChoiceRow
+            title="Keep next episodes downloaded"
+            subtitle="While you watch a show, the next episodes download to this device for offline, and ones you've watched past are deleted."
+            value={prefs.keepNextEpisodes}
+            options={[0, 1, 2, 3, 5].map((v) => ({ value: v, label: v ? `Next ${v}` : 'Off' }))}
+            onChange={(v) => setPref('keepNextEpisodes', v)}
+          />
+        ) : null}
         <ToggleRow
           title="TorBox cached streams first"
           subtitle="Show ⚡ streams that start instantly at the top of each addon."

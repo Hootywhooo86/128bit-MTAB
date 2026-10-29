@@ -31,6 +31,8 @@ export type VideoDownload = {
   torboxId?: number;
   stream: Stream;
   addedAt: number;
+  /** Downloaded by "Keep next episodes" (deleted again once you've watched past it). */
+  auto?: boolean;
 };
 
 export const videoDownloadsSupported = Platform.OS !== 'web';

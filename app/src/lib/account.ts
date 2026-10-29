@@ -303,7 +303,7 @@ const SECTIONS: Record<string, Section> = {
   addons: { keys: ['128bit.addons'] },
   prefs: { keys: ['128bit.prefs'] },
   live: { keys: ['128bit.playlists'] },
-  watching: { keys: ['128bit.watch', '128bit.continueHidden', '128bit.animeIds'] },
+  watching: { keys: ['128bit.watch', '128bit.continueHidden', '128bit.animeIds', '128bit.streamLiked', '128bit.streamFailed'] },
   integrations: {
     keys: ['128bit.mdblist.sources'],
     secure: ['128bit.torboxKey', '128bit.tmdb', '128bit.mdblist', '128bit.githubToken'],

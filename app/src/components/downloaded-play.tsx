@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui';
-import { setNowWatching } from '@/lib/video';
+import { getSeriesContext, setNowWatching } from '@/lib/video';
 import { getVideoDownloads, onVideoDownloads, type VideoDownload } from '@/lib/video-downloads';
 
 /** "Play downloaded" when this movie/episode is saved on the phone. */
@@ -26,6 +26,9 @@ export function DownloadedPlay({ itemKey }: { itemKey: string }) {
           poster: d.poster,
           uri: d.file!,
           link: d.link,
+          // The episode list, so Next episode (and Keep next episodes) work from here too.
+          series: d.link ? getSeriesContext(d.link.id) : undefined,
+          stream: d.stream,
         });
         router.push('/watch');
       }}

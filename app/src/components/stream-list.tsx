@@ -16,6 +16,7 @@ import { LIVE_TYPES, fetchStreamsEach, streamAddons, type AddonStreams } from '@
 import { usePrefs } from '@/lib/prefs';
 import { getActiveAddons, getTorboxKey } from '@/lib/storage';
 import { parseStream, qualityRank, type Quality } from '@/lib/stream-info';
+import { getFailed, getLiked, likedScore, rememberFailed, streamId, tooBig, type Liked } from '@/lib/stream-memory';
 import { checkCached } from '@/lib/torbox';
 import { isDeviceId, torrentsOnDevice } from '@/lib/torrent-device';
 import type { Stream } from '@/lib/types';
@@ -76,6 +77,14 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     };
   }, [link.type, link.id]);
   const [filter, setFilter] = useState<Filter>('all');
+  // What you watched before for this show (floats up), and streams that failed (hidden).
+  const [liked, setLiked] = useState<Liked | null>(null);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+  useEffect(() => {
+    getLiked(id).then(setLiked, () => {});
+    getFailed().then(setFailedIds, () => {});
+  }, [id]);
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState<{
     stream: Stream;
@@ -209,6 +218,8 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
       await handle(await resolveStream(stream, name), stream, addonId);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      // Nothing playable in it: don't offer it again.
+      if (/no video file|nothing playable/i.test(String(e))) rememberFailed(stream).catch(() => {});
     } finally {
       setBusy(null);
     }
@@ -225,16 +236,23 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     if (filter === 'cached') return isCached(s) || !!s.url;
     return parseStream(s).quality === filter;
   };
-  // Keep each stream's original index for its key; optionally float TorBox-cached ones up.
-  const ordered = (streams: Stream[], addonName: string) => {
-    const list = streams.map((s, i) => ({ s, i })).filter(({ s }) => matches(s, addonName));
-    if (prefs.cachedFirst) list.sort((a, b) => Number(isCached(b.s)) - Number(isCached(a.s)));
-    // Anime: English dubs first.
-    if (anime) list.sort((a, b) => Number(parseStream(b.s).dub) - Number(parseStream(a.s).dub));
-    return list;
+  // Failed before, or over your size limit (Settings → Playback): hidden unless you ask.
+  const hidden = (s: Stream) => failedIds.has(streamId(s)) || tooBig(s, prefs.maxStreamGB);
+  // Keep each stream's original index for its key. Order: like what you watched last time,
+  // then TorBox-cached (if on), then (anime) English dubs; ties keep the addon's own order.
+  const ordered = (streams: Stream[], addonName: string, addonId: string) => {
+    const list = streams
+      .map((s, i) => ({ s, i, like: likedScore(s, addonId, liked) }))
+      .filter(({ s }) => matches(s, addonName) && (showHidden || !hidden(s)));
+    const rank = (x: (typeof list)[number]) =>
+      x.like * 100 + (prefs.cachedFirst && isCached(x.s) ? 10 : 0) + (anime && parseStream(x.s).dub ? 1 : 0);
+    return list.sort((a, b) => rank(b) - rank(a));
   };
+  const hiddenCount = showHidden
+    ? 0
+    : groups.reduce((n, g) => n + g.streams.filter((s) => matches(s, g.addon.manifest.name) && hidden(s)).length, 0);
   const total = groups.reduce((n, g) => n + g.streams.length, 0);
-  const shown = groups.reduce((n, g) => n + ordered(g.streams, g.addon.manifest.name).length, 0);
+  const shown = groups.reduce((n, g) => n + ordered(g.streams, g.addon.manifest.name, g.addon.manifest.id).length, 0);
   // Providers: the addons, then the torrent sites they found things on.
   const addonNames = groups.filter((g) => g.streams.length).map((g) => g.addon.manifest.name);
   const sites = [
@@ -317,12 +335,20 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
         </Body>
       ) : total === 0 ? (
         <Body muted>No streams found.</Body>
-      ) : shown === 0 ? (
+      ) : shown === 0 && !hiddenCount ? (
         <Body muted>No streams match this filter.</Body>
+      ) : null}
+      {hiddenCount ? (
+        <Pressable onPress={() => setShowHidden(true)}>
+          <Body muted style={{ fontSize: 12 }}>
+            {hiddenCount} hidden (failed before
+            {prefs.maxStreamGB ? ` or over ${prefs.maxStreamGB} GB` : ''}) · <Text style={{ color: Colors.accent }}>Show them</Text>
+          </Body>
+        </Pressable>
       ) : null}
 
       {groups.map(({ addon, streams, error: groupError }) => {
-        const list = ordered(streams, addon.manifest.name);
+        const list = ordered(streams, addon.manifest.name, addon.manifest.id);
         if (!list.length && !groupError) return null;
         return (
           <View key={addon.manifest.id} style={{ gap: Spacing.two }}>
@@ -332,7 +358,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                 {groupError}
               </Body>
             ) : null}
-            {list.map(({ s, i }) => {
+            {list.map(({ s, i, like }) => {
               const key = `${addon.manifest.id}:${i}`;
               const info = parseStream(s);
               const cachedHere = isCached(s);
@@ -354,6 +380,8 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
                       </Text>
                     ) : null}
                     <View style={styles.badges}>
+                      {like >= 4 ? <Badge label="★ Like last time" strong /> : null}
+                      {failedIds.has(streamId(s)) ? <Badge label="✕ Failed before" /> : null}
                       {info.quality ? (
                         <Badge label={info.quality} strong={qualityRank(info.quality) >= 3} />
                       ) : null}

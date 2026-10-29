@@ -5,7 +5,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { fetchStreams } from './addons';
+import { readPrefs } from './prefs';
 import { getActiveAddons, getTorboxKey } from './storage';
+import { getFailed, getLiked, likedScore, streamId, tooBig } from './stream-memory';
 import * as torbox from './torbox';
 import { deviceSetFiles, isDeviceId } from './torrent-device';
 import type { Stream } from './types';
@@ -128,17 +130,22 @@ export type NextPick = { stream: Stream; addonId: string; match: boolean };
 
 /**
  * Picks a stream for the next episode, preferring (in order): the same addon and
- * release group as now, then the same addon, then anything that starts instantly
- * (direct link or cached on TorBox), then any torrent.
+ * release group as now, then the same addon, then what you watched before for this show
+ * (release group, quality), then anything that starts instantly (direct link or cached on
+ * TorBox), then any torrent. Streams that failed before or are over your size limit only
+ * count when there's nothing else.
  */
 export async function pickNextStream(
   episodeId: string,
   source: WatchItem['source'],
 ): Promise<NextPick | null> {
   const groups = await fetchStreams(await getActiveAddons(), 'series', episodeId);
-  const all = groups.flatMap((g) =>
+  const [failed, liked, { maxStreamGB }] = await Promise.all([getFailed(), getLiked(episodeId), readPrefs()]);
+  const every = groups.flatMap((g) =>
     g.streams.map((stream) => ({ stream, addonId: g.addon.manifest.id })),
   );
+  const good = every.filter(({ stream }) => !failed.has(streamId(stream)) && !tooBig(stream, maxStreamGB));
+  const all = good.length ? good : every;
   if (!all.length) return null;
 
   let cached = new Set<string>();
@@ -152,15 +159,16 @@ export async function pickNextStream(
     addonId === source.addonId &&
     source.bingeGroup &&
     stream.behaviorHints?.bingeGroup === source.bingeGroup
-      ? 8
+      ? 80
       : 0) +
-    (source && addonId === source.addonId ? 4 : 0) +
+    (source && addonId === source.addonId ? 40 : 0) +
+    likedScore(stream, addonId, liked) * 3 +
     (instant(stream) ? 2 : 0) +
     (stream.url || stream.infoHash ? 1 : 0);
 
   // Stable: ties keep the addon's own order (usually best first).
   const best = [...all].sort((a, b) => score(b) - score(a))[0];
-  return { ...best, match: score(best) >= (source?.bingeGroup ? 8 : 4) };
+  return { ...best, match: score(best) >= (source?.bingeGroup ? 80 : 40) };
 }
 
 // --- Continue watching ------------------------------------------------------

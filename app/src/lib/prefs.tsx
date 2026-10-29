@@ -39,6 +39,10 @@ export type Prefs = {
   resumeVideos: boolean;
   /** Put streams TorBox already has cached at the top. */
   cachedFirst: boolean;
+  /** Hide streams bigger than this (GB); 0 = no limit. */
+  maxStreamGB: number;
+  /** Keep this many upcoming episodes of what you're watching downloaded; 0 = off. */
+  keepNextEpisodes: number;
   traktScrobble: boolean;
   traktContinueWatching: boolean;
   /** Trakt rows on the Shows / Movies tabs, in order ("trending", "list:123", …). */
@@ -90,6 +94,8 @@ export const DEFAULT_PREFS: Prefs = {
   watchSeries: true,
   resumeVideos: true,
   cachedFirst: true,
+  maxStreamGB: 0,
+  keepNextEpisodes: 0,
   traktScrobble: true,
   traktContinueWatching: true,
   traktRows: ['upnext', 'watchlist'],

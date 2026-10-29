@@ -37,6 +37,9 @@ import { reportWatchProgress } from '@/lib/tracker-live';
 import { sessionEnd, sessionTick } from '@/lib/sessions';
 import { scrobble } from '@/lib/trakt';
 import { episodeFinished } from '@/lib/trakt-library';
+import { keepNextEpisodes } from '@/lib/keep-next';
+import { rememberFailed, rememberLiked } from '@/lib/stream-memory';
+import { getVideoDownload } from '@/lib/video-downloads';
 import {
   checkTorboxStream,
   getNowWatching,
@@ -238,6 +241,28 @@ export default function WatchScreen() {
     const t = setTimeout(go, 30_000);
     return () => clearTimeout(t);
   }, [fallbackFor, started, failed, player]);
+
+  // Stream memory: a stream that errors is hidden next time; one that plays for a minute
+  // is what this show prefers from now on (release group, quality, addon).
+  const memStream = item?.live ? undefined : item?.stream;
+  const memAddon = item?.source?.addonId;
+  const memKey = item?.key;
+  useEffect(() => {
+    if (failed && memStream) rememberFailed(memStream).catch(() => {});
+  }, [failed, memStream]);
+  useEffect(() => {
+    if (!started || !memStream || !memAddon || !memKey) return;
+    const t = setTimeout(() => rememberLiked(memKey, memStream, memAddon).catch(() => {}), 60_000);
+    return () => clearTimeout(t);
+  }, [started, memStream, memAddon, memKey]);
+
+  // Keep the next few episodes downloaded (Settings → Playback), once this one is playing.
+  const keepNext = prefs.keepNextEpisodes;
+  useEffect(() => {
+    if (started && item && keepNext) keepNextEpisodes(item, keepNext).catch(() => {});
+    // Once per episode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, item?.key, keepNext]);
 
   // --- Skip intro ---
   const [segments, setSegments] = useState<{ key: string; list: Segment[] } | null>(null);
@@ -555,6 +580,19 @@ export default function WatchScreen() {
     const fail = (e: unknown) =>
       setNext({ status: 'error', message: e instanceof Error ? e.message : String(e) });
     try {
+      // Already on the phone ("Keep next episodes", or saved by hand): play that.
+      const saved = await getVideoDownload(upNext.id);
+      if (saved?.state === 'done' && saved.file) {
+        const nextItem: WatchItem = { ...item, key: upNext.id, subtitle: upNext.label, uri: saved.file, headers: undefined, stream: saved.stream, fallback: false };
+        await player.replaceAsync(toSource(nextItem));
+        player.play();
+        setItem(nextItem);
+        setAddonSubs([]);
+        setSubtitle({ kind: 'off' });
+        setCues([]);
+        setNext({ status: 'idle' });
+        return;
+      }
       const pick = await pickNextStream(upNext.id, item.source);
       // Nothing from the same source for the next episode: let them pick from the list.
       if (!pick?.match) {
