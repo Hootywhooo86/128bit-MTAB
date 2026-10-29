@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
@@ -220,6 +221,10 @@ export default function PlayerScreen() {
         accessibilityLabel="Add bookmark">
         <Ionicons name="bookmark" size={14} color={Colors.text} />
         <Text style={styles.pillText}>Bookmark</Text>
+      </Pressable>
+      <Pressable style={styles.pill} onPress={() => router.push('/car')} accessibilityLabel="Car mode">
+        <Ionicons name="car-sport" size={14} color={Colors.text} />
+        <Text style={styles.pillText}>Car</Text>
       </Pressable>
     </View>
   );

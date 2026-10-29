@@ -223,6 +223,7 @@ function AppNavigator() {
               orientation: 'all',
             }}
           />
+          <Stack.Screen name="car" options={{ headerShown: false, orientation: 'all' }} />
           <Stack.Screen name="comics/[id]" options={{ title: '' }} />
           <Stack.Screen
             name="comics/read"
