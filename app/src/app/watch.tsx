@@ -133,6 +133,7 @@ export default function WatchScreen() {
   const Colors = useColors();
   const styles = useStyles();
   const [item, setItem] = useState<WatchItem | null>(getNowWatching);
+  const [inPip, setInPip] = useState(false);
   const audio = usePlayer();
   const { prefs } = usePrefs();
 
@@ -644,8 +645,15 @@ export default function WatchScreen() {
         nativeControls
         contentFit="contain"
         allowsPictureInPicture
+        // Leave the app mid-video (home, swipe up, another app): it keeps playing in a small window.
+        startsPictureInPictureAutomatically
+        onPictureInPictureStart={() => setInPip(true)}
+        onPictureInPictureStop={() => setInPip(false)}
         fullscreenOptions={{ enable: true }}
       />
+      {/* In picture-in-picture only the video shows; our buttons would crowd the small window. */}
+      {inPip ? null : (
+        <>
       {startedFor !== item.key && status !== 'error' ? (
         <View style={styles.loadingArt} pointerEvents="none">
           {item.poster ? (
@@ -777,6 +785,8 @@ export default function WatchScreen() {
         onDelay={setDelay}
         error={subError}
       />
+        </>
+      )}
     </View>
   );
 }
