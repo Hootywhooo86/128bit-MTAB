@@ -5,6 +5,9 @@
   },
   "build": {
     "development": {
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_aHVtYmxlLWRyYWtlLTMyOC5jbGVyay5hY2NvdW50cy5kZXYk"
+      },
       "developmentClient": true,
       "distribution": "internal",
       "android": {
@@ -12,6 +15,9 @@
       }
     },
     "preview": {
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_aHVtYmxlLWRyYWtlLTMyOC5jbGVyay5hY2NvdW50cy5kZXYk"
+      },
       "distribution": "internal",
       "android": {
         "buildType": "apk"
