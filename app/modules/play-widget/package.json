@@ -1,0 +1,6 @@
+{
+  "name": "play-widget",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Home screen widgets: resume your audiobook (1x1 cover + play, 2x1 with title and skip buttons)."
+}

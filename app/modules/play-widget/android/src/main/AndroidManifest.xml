@@ -1,0 +1,31 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Home screen widgets: "128bit · Resume" (1x1) and "128bit · Resume wide" (2x1). -->
+    <receiver
+      android:name="expo.modules.playwidget.PlayWidgetSmall"
+      android:label="@string/play_widget_small"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/play_widget_small_info" />
+    </receiver>
+    <receiver
+      android:name="expo.modules.playwidget.PlayWidgetWide"
+      android:label="@string/play_widget_wide"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/play_widget_wide_info" />
+    </receiver>
+    <!-- Invisible: turns a widget tap into play/pause/skip (or opens the app to resume). -->
+    <activity
+      android:name="expo.modules.playwidget.WidgetActionActivity"
+      android:exported="false"
+      android:excludeFromRecents="true"
+      android:noHistory="true"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+  </application>
+</manifest>

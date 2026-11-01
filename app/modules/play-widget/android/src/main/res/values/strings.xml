@@ -1,0 +1,5 @@
+<resources>
+  <string name="play_widget_small">Resume audiobook</string>
+  <string name="play_widget_wide">Resume audiobook (wide)</string>
+  <string name="play_widget_desc">Play or pause the book you were listening to.</string>
+</resources>

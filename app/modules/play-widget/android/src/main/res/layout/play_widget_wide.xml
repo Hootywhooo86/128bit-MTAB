@@ -1,0 +1,83 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="horizontal"
+  android:gravity="center_vertical"
+  android:background="@drawable/widget_bg"
+  android:clipToOutline="true"
+  android:paddingEnd="8dp">
+  <ImageView
+    android:id="@+id/widget_cover"
+    android:layout_width="72dp"
+    android:layout_height="match_parent"
+    android:scaleType="centerCrop"
+    android:contentDescription="@null" />
+  <LinearLayout
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_weight="1"
+    android:orientation="vertical"
+    android:paddingStart="10dp">
+    <TextView
+      android:id="@+id/widget_title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:textColor="#FFFFFFFF"
+      android:textSize="14sp"
+      android:textStyle="bold"
+      android:maxLines="1"
+      android:ellipsize="end"
+      android:text="128bit" />
+    <TextView
+      android:id="@+id/widget_subtitle"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:textColor="#FFAAAAAA"
+      android:textSize="12sp"
+      android:maxLines="1"
+      android:ellipsize="end"
+      android:text="Tap play to listen" />
+    <LinearLayout
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="4dp"
+      android:orientation="horizontal"
+      android:gravity="center_vertical">
+      <ImageView
+        android:id="@+id/widget_back"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:padding="6dp"
+        android:src="@drawable/widget_back"
+        android:contentDescription="Back 30 seconds" />
+      <FrameLayout
+        android:id="@+id/widget_toggle"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp">
+        <ImageView
+          android:id="@+id/widget_button_bg"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:src="@drawable/widget_button"
+          android:contentDescription="@null" />
+        <ImageView
+          android:id="@+id/widget_toggle_icon"
+          android:layout_width="24dp"
+          android:layout_height="24dp"
+          android:layout_gravity="center"
+          android:src="@drawable/widget_play"
+          android:contentDescription="Play" />
+      </FrameLayout>
+      <ImageView
+        android:id="@+id/widget_fwd"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:padding="6dp"
+        android:src="@drawable/widget_fwd"
+        android:contentDescription="Forward 30 seconds" />
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>

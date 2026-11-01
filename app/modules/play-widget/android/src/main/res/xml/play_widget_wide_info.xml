@@ -1,0 +1,11 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:minWidth="110dp"
+  android:minHeight="40dp"
+  android:targetCellWidth="2"
+  android:targetCellHeight="1"
+  android:resizeMode="horizontal|vertical"
+  android:widgetCategory="home_screen"
+  android:updatePeriodMillis="0"
+  android:initialLayout="@layout/play_widget_wide"
+  android:previewLayout="@layout/play_widget_wide"
+  android:description="@string/play_widget_desc" />

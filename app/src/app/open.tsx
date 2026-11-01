@@ -5,6 +5,7 @@
  *   kind=episode id=tt… | kitsu:… season episode → pick a stream for that episode
  *   kind=show    id=…                           → the show's page
  *   kind=book    key=<Play book key>             → plays it (else the Audiobooks tab)
+ *                play=1                         → and starts playing (the home screen widget)
  *   kind=comic   key=<Play comic id>             → the comic (else the Comics tab)
  * Without an id, movies and shows are looked up by title (Cinemeta, no key).
  */
@@ -14,11 +15,11 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { EmptyState } from '@/components/ui';
 import { useColors } from '@/constants/theme';
-import { usePlayer } from '@/lib/player';
+import { resumeLastBook, usePlayer } from '@/lib/player';
 import { getLibrary } from '@/lib/storage';
 import { getDownloadedBooks } from '@/lib/downloads';
 
-type Params = { kind?: string; id?: string; title?: string; poster?: string; season?: string; episode?: string; key?: string };
+type Params = { kind?: string; id?: string; title?: string; poster?: string; season?: string; episode?: string; key?: string; play?: string };
 
 async function findImdb(title: string, type: 'movie' | 'series') {
   const res = await fetch(`https://v3-cinemeta.strem.io/catalog/${type}/top/search=${encodeURIComponent(title)}.json`);
@@ -37,6 +38,11 @@ export default function OpenFromTracker() {
   useEffect(() => {
     (async () => {
       const title = p.title ?? '';
+      if (p.kind === 'book' && p.play === '1') {
+        // The widget, with the app closed: straight back into your book.
+        router.replace((await resumeLastBook(p.key)) ? '/player' : '/audiobooks');
+        return;
+      }
       if (p.kind === 'book') {
         const books = [...(await getLibrary()), ...(await getDownloadedBooks().catch(() => []))];
         const book = books.find((b) => b.key === p.key) ?? books.find((b) => b.title.toLowerCase() === title.toLowerCase());
@@ -73,7 +79,7 @@ export default function OpenFromTracker() {
       }
       router.replace({ pathname: '/title', params: { type: 'series', id } });
     })().catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [p.kind, p.id, p.title, p.poster, p.season, p.episode, p.key, openBook]);
+  }, [p.kind, p.id, p.title, p.poster, p.season, p.episode, p.key, p.play, openBook]);
 
   if (error) return <EmptyState title="Open from Tracker" body={error} />;
   return (

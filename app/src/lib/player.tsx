@@ -35,10 +35,11 @@ import { reportBookProgress } from './tracker-live';
 import { onSessionTime, registerSessionProbe, sessionEnd, sessionTick } from './sessions';
 import { addListening, markBookFinished } from './stats';
 import { addBookmark as storeBookmark } from './bookmarks';
-import { chapterUrl, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
+import { chapterUrl, getDownloadedBooks, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
 import { httpRangeReader, readMp4Chapters } from './mp4-chapters';
-import { usePrefs } from './prefs';
-import { addToLibrary, bookFraction, getProgress, saveProgress } from './storage';
+import { onWidgetAction, updateWidget } from './play-widget';
+import { readPrefs, usePrefs } from './prefs';
+import { addToLibrary, bookFraction, getLibrary, getProgress, getProgressMany, saveProgress } from './storage';
 import { askBackgroundPlaybackOnce } from './torrent-device';
 import type { Chapter, PlayableBook } from './types';
 
@@ -179,6 +180,22 @@ function getAudio(): AudioPlayer {
   (audio as unknown as Remote).addListener('remoteChapter', (dir) =>
     dir === 'next' ? next() : previous(),
   );
+  // Home screen widget buttons.
+  onWidgetAction(async (action) => {
+    const a = getAudio();
+    if (!state.book) {
+      await resumeLastBook();
+      return;
+    }
+    if (action === 'toggle') {
+      if (a.playing) a.pause();
+      else a.play();
+      return;
+    }
+    const prefs = await readPrefs();
+    const by = action === 'back' ? -prefs.skipBack : prefs.skipForward;
+    a.seekTo(Math.min(Math.max(0, a.currentTime + by), a.duration || Infinity));
+  });
   return audio;
 }
 
@@ -209,6 +226,15 @@ function onStatus(s: AudioStatus) {
     lastLockKey = lockKey;
     p.updateLockScreenMetadata(lockScreenInfo(book, chapterIndex, mark));
   }
+
+  // The home screen widget: cover, title, chapter, play/pause.
+  updateWidget({
+    key: book.key,
+    title: book.title,
+    subtitle: mark?.title ?? chapter?.title,
+    cover: book.cover,
+    playing: s.playing,
+  }).catch(() => {});
 
   // Sleep at the end of an in-file chapter: pause as soon as the next marker starts.
   if (state.sleep?.kind === 'chapter' && mark) {
@@ -440,6 +466,20 @@ async function playBook(nextBook: PlayableBook, chapter?: number, autoPlay = tru
     }
   }
   return loadChapter(nextBook, index, position, autoPlay);
+}
+
+/** The widget's play with nothing loaded: the book you listened to most recently, from your spot. */
+export async function resumeLastBook(key?: string) {
+  const books = [...(await getLibrary()), ...(await getDownloadedBooks().catch(() => []))];
+  let book = key ? books.find((b) => b.key === key) : undefined;
+  if (!book) {
+    const progress = await getProgressMany(books.map((b) => b.key));
+    book = books
+      .filter((b) => progress[b.key] && !progress[b.key].finished)
+      .sort((a, b) => progress[b.key].updatedAt - progress[a.key].updatedAt)[0];
+  }
+  if (book) await playBook(book);
+  return !!book;
 }
 
 /** Opens a book at your saved spot without playing (already open? leaves it as it is). */
