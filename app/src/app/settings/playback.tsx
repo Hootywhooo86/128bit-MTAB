@@ -6,7 +6,7 @@ import { usePrefs } from '@/lib/prefs';
 import { videoDownloadsSupported } from '@/lib/video-downloads';
 import { askBatteryUnrestricted, batteryUnrestricted } from '@/lib/torrent-device';
 import { SUBTITLE_LANGUAGES, languageName } from '@/lib/subtitles';
-import { IS_TV } from '@/constants/tv';
+import { HAS_BOOKS, IS_TV } from '@/constants/tv';
 
 const seconds = (values: number[]) => values.map((v) => ({ value: v, label: `${v}s` }));
 const RATES = [0.8, 1, 1.1, 1.25, 1.5, 1.75, 2].map((v) => ({
@@ -19,7 +19,7 @@ export default function PlaybackSettings() {
 
   return (
     <SettingsPage>
-      {IS_TV ? null : (
+      {!HAS_BOOKS ? null : (
         <>
           <SectionTitle>Audiobooks</SectionTitle>
           <Group>

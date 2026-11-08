@@ -6,3 +6,9 @@ import { Platform } from 'react-native';
  * into this when it runs on a TV.
  */
 export const IS_TV = process.env.EXPO_PUBLIC_TV === '1' || Platform.isTV === true;
+
+/** Audiobooks are a phone thing: not on the TV app or the Windows app (the web build). */
+export const HAS_BOOKS = !IS_TV && Platform.OS !== 'web';
+
+/** Comics: phones and Windows, not the TV app. */
+export const HAS_COMICS = !IS_TV;

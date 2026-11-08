@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import { useColors } from '@/constants/theme';
-import { IS_TV } from '@/constants/tv';
+import { HAS_BOOKS, IS_TV } from '@/constants/tv';
 import { syncHistoryToTracker } from '@/lib/tracker-sync';
 import { onAccount, startAccountSync, syncNow } from '@/lib/account';
 import { flushFamilyEvents } from '@/lib/family';
@@ -38,7 +38,7 @@ function syncOnOpen() {
   flushFamilyEvents().catch(() => {});
   invalidateTracker();
   getStarterLists().catch(() => {});
-  if (!IS_TV) syncWantedWithTracker().catch(() => {}); // Wanted ⇄ Tracker Audiobooks list
+  if (HAS_BOOKS) syncWantedWithTracker().catch(() => {}); // Wanted ⇄ Tracker Audiobooks list
   if (Date.now() - lastOpenSync >= OPEN_SYNC_MS) {
     lastOpenSync = Date.now();
     syncHistoryToTracker(true).catch(() => {});
@@ -167,9 +167,11 @@ function AppNavigator() {
     const tick = () => {
       runVideoQueue().catch(() => {});
       syncHistoryToTracker(); // what you watched, read and listened to → 128bit Tracker (every 30 min)
-      if (IS_TV) return; // audiobooks and comics are phone-only
-      runAutoDownloads().catch(() => {});
-      watchSeries().catch(() => {}); // once a day
+      if (HAS_BOOKS) {
+        runAutoDownloads().catch(() => {});
+        watchSeries().catch(() => {}); // once a day
+      }
+      if (IS_TV) return; // comics: phone and Windows
       // Comics: TorBox → phone, and new issues of followed series (every 6 h).
       runComicQueue().catch(() => {});
       checkFollows().catch(() => {});

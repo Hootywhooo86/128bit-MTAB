@@ -1,8 +1,8 @@
 import { Redirect } from 'expo-router';
 
-import { IS_TV } from '@/constants/tv';
+import { HAS_BOOKS } from '@/constants/tv';
 
-/** The app opens on Audiobooks (the TV app on Shows). */
+/** The app opens on Audiobooks (the TV and Windows apps, which have none, on Shows). */
 export default function Index() {
-  return <Redirect href={IS_TV ? '/shows' : '/audiobooks'} />;
+  return <Redirect href={HAS_BOOKS ? '/audiobooks' : '/shows'} />;
 }

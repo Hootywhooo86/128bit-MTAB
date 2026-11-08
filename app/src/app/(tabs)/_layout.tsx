@@ -8,7 +8,7 @@ import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
 import { UpdateBanner } from '@/components/update-banner';
 import { useColors } from '@/constants/theme';
-import { IS_TV } from '@/constants/tv';
+import { HAS_BOOKS, HAS_COMICS, IS_TV } from '@/constants/tv';
 import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-grab';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -37,7 +37,7 @@ function AnimeIcon({ focused, size, accent }: { focused: boolean; size: number; 
 function useComicsComing() {
   const [n, setN] = useState(0);
   useEffect(() => {
-    if (IS_TV) return;
+    if (!HAS_COMICS) return;
     getComicWanted().then((l) => setN(activeComicCount(l)), () => {});
     return onComicWanted((l) => setN(activeComicCount(l)));
   }, []);
@@ -50,8 +50,8 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={(props) =>
-        // The TV app is video only: no audiobook mini player.
-        IS_TV ? (
+        // No audiobooks on the TV or Windows app: no audiobook mini player.
+        !HAS_BOOKS ? (
           <>
             <UpdateBanner />
             <BottomTabBar {...props} />
@@ -92,8 +92,8 @@ export default function TabLayout() {
         options={{
           title: 'Audiobooks',
           tabBarLabel: 'Books',
-          // Books and Comics are phone-only; the TV app has Shows, Movies, Anime and Sports.
-          href: IS_TV ? null : undefined,
+          // Books: phone only. Comics: phone and Windows. The TV app has Shows, Movies, Anime and Sports.
+          href: HAS_BOOKS ? undefined : null,
           tabBarIcon: icon('headset-outline'),
         }}
       />
@@ -115,7 +115,7 @@ export default function TabLayout() {
         name="comics"
         options={{
           title: 'Comics',
-          href: IS_TV ? null : undefined,
+          href: HAS_COMICS ? undefined : null,
           tabBarIcon: icon('book-outline'),
           // Downloads carry on in the background; the badge shows how many are coming.
           tabBarBadge: comicsComing || undefined,
