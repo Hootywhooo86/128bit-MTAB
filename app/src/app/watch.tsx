@@ -38,6 +38,7 @@ import { sessionEnd, sessionTick } from '@/lib/sessions';
 import { scrobble } from '@/lib/trakt';
 import { episodeFinished } from '@/lib/trakt-library';
 import { keepNextEpisodes } from '@/lib/keep-next';
+import { PixelBurst } from '@/components/fx';
 import { rememberFailed, rememberLiked } from '@/lib/stream-memory';
 import { getVideoDownload } from '@/lib/video-downloads';
 import {
@@ -137,6 +138,13 @@ export default function WatchScreen() {
   const styles = useStyles();
   const [item, setItem] = useState<WatchItem | null>(getNowWatching);
   const [inPip, setInPip] = useState(false);
+  // "EPISODE CLEAR!": a pixel burst when you pass 90% of an episode or movie.
+  const [cleared, setCleared] = useState(0);
+  useEffect(() => {
+    if (!cleared) return;
+    const t = setTimeout(() => setCleared(0), 2600);
+    return () => clearTimeout(t);
+  }, [cleared]);
   const audio = usePlayer();
   const { prefs } = usePrefs();
 
@@ -419,6 +427,7 @@ export default function WatchScreen() {
         known.current.time / known.current.duration > 0.9
       ) {
         counted = true;
+        setCleared(Date.now());
         if (session) sessionTick(item.key, 'watch.session', session, { finished: true, pos: known.current.time });
         isAnime(item.link)
           .catch(() => false)
@@ -692,6 +701,12 @@ export default function WatchScreen() {
       {/* In picture-in-picture only the video shows; our buttons would crowd the small window. */}
       {inPip ? null : (
         <>
+      {cleared ? (
+        <View pointerEvents="none" style={styles.clear}>
+          <PixelBurst key={cleared} size={120} />
+          <Text style={styles.clearText}>{kindLabel(item)} CLEAR!</Text>
+        </View>
+      ) : null}
       {startedFor !== item.key && status !== 'error' ? (
         <View style={styles.loadingArt} pointerEvents="none">
           {item.poster ? (
@@ -829,7 +844,18 @@ export default function WatchScreen() {
   );
 }
 
+/** "EPISODE" or "MOVIE" for the clear burst. */
+const kindLabel = (item: WatchItem | null) => (item?.link?.type === 'movie' ? 'MOVIE' : 'EPISODE');
+
 const useStyles = makeStyles((Colors) => ({
+  clear: { position: 'absolute', top: 70, alignSelf: 'center', width: 260, height: 120, alignItems: 'center', justifyContent: 'center' },
+  clearText: {
+    color: Colors.accent,
+    fontFamily: PixelFont,
+    fontSize: 14,
+    textShadowColor: '#000',
+    textShadowRadius: 6,
+  },
   screen: { flex: 1, backgroundColor: '#000' },
   skipButton: {
     position: 'absolute',

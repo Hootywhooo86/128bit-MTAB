@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   Platform,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 
+import { Starfield, ZoomIn, useBounce } from '@/components/fx';
 import { PixelFrame } from '@/components/pixel-frame';
 import { Body, Button, Cover, EmptyState, Title, formatTime } from '@/components/ui';
 import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
@@ -48,6 +50,7 @@ export default function PlayerScreen() {
   // Sideways (e.g. in a car mount): controls on the left, big; the chapter list on the right.
   const { width, height } = useWindowDimensions();
   const wide = width > height;
+  const playBounce = useBounce();
 
   const bookKey = p.book?.key;
   const loadBookmarks = useCallback(() => {
@@ -111,6 +114,7 @@ export default function PlayerScreen() {
     : `${chapter?.title} (${p.chapterIndex + 1}/${book.chapters.length})`;
 
   const cover = (
+    <ZoomIn>
     <PixelFrame playing={p.playing}>
       <View style={styles.coverFrame}>
         <View style={styles.coverShadow} />
@@ -123,6 +127,7 @@ export default function PlayerScreen() {
         {book.author ? <Body muted>{book.author}</Body> : null}
       </View>
     </PixelFrame>
+    </ZoomIn>
   );
 
   const chapterTag = (
@@ -136,9 +141,9 @@ export default function PlayerScreen() {
   // A smaller cover with the title beside it, so the controls fit when sideways.
   const wideHeader = (
     <View style={styles.wideHeader}>
-      <View style={styles.wideCover}>
+      <ZoomIn style={styles.wideCover}>
         <Cover uri={book.cover} size={96} title={book.title} author={book.author} />
-      </View>
+      </ZoomIn>
       <View style={{ flex: 1, gap: Spacing.two }}>
         <Text style={styles.bookTitle} numberOfLines={2}>
           {book.title}
@@ -179,9 +184,13 @@ export default function PlayerScreen() {
         label={`Back ${prefs.skipBack} seconds`}
         onPress={() => p.seekBy(-prefs.skipBack)}
       />
+      <Animated.View style={{ transform: [{ scale: playBounce.scale }] }}>
       <Pressable
         style={[styles.playButton, wide && styles.playButtonWide]}
-        onPress={p.toggle}
+        onPress={() => {
+          playBounce.bounce();
+          p.toggle();
+        }}
         accessibilityLabel={p.playing ? 'Pause' : 'Play'}>
         {p.loading ? (
           <ActivityIndicator color={Colors.accentText} size={wide ? 'large' : 'small'} />
@@ -189,6 +198,7 @@ export default function PlayerScreen() {
           <Ionicons name={p.playing ? 'pause' : 'play'} size={wide ? 56 : 36} color={Colors.accentText} />
         )}
       </Pressable>
+      </Animated.View>
       <IconButton
         name="play-forward"
         size={big}
@@ -317,6 +327,7 @@ export default function PlayerScreen() {
     <>
       {wide ? (
         <View style={[styles.screen, styles.wide]}>
+          <Starfield playing={p.playing} />
           <ScrollView style={{ flex: 1.15 }} contentContainerStyle={styles.wideLeft}>
             {wideHeader}
             {progress}
@@ -329,7 +340,9 @@ export default function PlayerScreen() {
           </ScrollView>
         </View>
       ) : (
-        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <View style={styles.screen}>
+        <Starfield playing={p.playing} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
           {cover}
           <View style={{ alignItems: 'center', gap: Spacing.two, alignSelf: 'stretch' }}>{chapterTag}</View>
           {progress}
@@ -338,6 +351,7 @@ export default function PlayerScreen() {
           {pills}
           {list}
         </ScrollView>
+        </View>
       )}
 
       <Modal

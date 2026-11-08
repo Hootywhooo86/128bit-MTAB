@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import { useColors } from '@/constants/theme';
+import { BootSplash, FxOverlay } from '@/components/fx';
 import { HAS_BOOKS, IS_TV } from '@/constants/tv';
 import { syncHistoryToTracker } from '@/lib/tracker-sync';
 import { onAccount, startAccountSync, syncNow } from '@/lib/account';
@@ -259,6 +260,9 @@ function AppNavigator() {
           <Stack.Screen name="cloud/[kind]/[id]" options={{ title: '' }} />
           <Stack.Screen name="player" options={{ presentation: 'modal', title: 'Now playing' }} />
         </Stack>
+        {/* Over everything: "BOOK COMPLETE!", the sleep timer's CRT switch-off, and the boot splash. */}
+        <FxOverlay />
+        <BootSplash />
       </ThemeProvider>
     </PlayerProvider>
   );

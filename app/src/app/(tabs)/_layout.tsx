@@ -4,6 +4,7 @@ import { useEffect, useState, type ComponentProps } from 'react';
 import { Image, View, type ColorValue } from 'react-native';
 
 import { Pressable } from '@/components/focusable';
+import { Wiggle } from '@/components/fx';
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
 import { UpdateBanner } from '@/components/update-banner';
@@ -13,9 +14,14 @@ import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-gra
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
+// Each tab icon does a quick 8-bit wiggle when its tab is picked.
 const icon = (name: IconName) =>
-  function TabBarIcon({ color, size }: { color: ColorValue; size: number }) {
-    return <Ionicons name={name} color={color} size={size} />;
+  function TabBarIcon({ color, size, focused }: { color: ColorValue; size: number; focused: boolean }) {
+    return (
+      <Wiggle focused={focused}>
+        <Ionicons name={name} color={color} size={size} />
+      </Wiggle>
+    );
   };
 
 /**
@@ -106,7 +112,9 @@ export default function TabLayout() {
         options={{
           title: 'Anime',
           tabBarIcon: ({ focused, size }) => (
-            <AnimeIcon focused={focused} size={size} accent={Colors.accent} />
+            <Wiggle focused={focused}>
+              <AnimeIcon focused={focused} size={size} accent={Colors.accent} />
+            </Wiggle>
           ),
         }}
       />

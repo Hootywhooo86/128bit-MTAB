@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { PixelSpinner } from '@/components/fx';
 import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { LIVE_TYPES, fetchStreamsEach, streamAddons, type AddonStreams } from '@/lib/addons';
@@ -225,8 +226,7 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
     }
   }
 
-  if (!groups)
-    return <ActivityIndicator color={Colors.accent} style={{ marginTop: Spacing.four }} />;
+  if (!groups) return <PixelSpinner style={{ marginTop: Spacing.four, alignSelf: 'center' }} />;
 
   const isCached = (s: Stream) => !!s.infoHash && cached.has(s.infoHash.toLowerCase());
   const siteOf = (s: Stream) => parseStream(s).site;

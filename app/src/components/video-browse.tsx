@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   BackHandler,
   ActivityIndicator,
+  Animated,
   Alert,
   FlatList,
   Platform,
@@ -14,6 +15,7 @@ import {
   View,
 } from 'react-native';
 
+import { FadeIn, PixelSpinner, usePressScale } from '@/components/fx';
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMetas, isBrowsable, supportsSearch, catalogTab } from '@/lib/addons';
@@ -311,10 +313,7 @@ export function CatalogRow({
           No matches.
         </Body>
       ) : !metas ? (
-        <ActivityIndicator
-          color={Colors.accent}
-          style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }}
-        />
+        <PixelSpinner style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
       ) : (
         <FlatList
           horizontal
@@ -454,7 +453,7 @@ function AnimeSearchRow({
           No matches.
         </Body>
       ) : !hits ? (
-        <ActivityIndicator color={Colors.accent} style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
+        <PixelSpinner style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
       ) : (
         <FlatList
           horizontal
@@ -483,9 +482,13 @@ export function PosterTile({
   anime?: boolean;
 }) {
   const styles = useStyles();
+  const press = usePressScale();
   return (
+    <FadeIn>
     <Pressable
       style={{ width: 112, gap: 4 }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       onPress={() => {
         if (anime) markAnime(meta.id).catch(() => {});
         router.push({
@@ -493,7 +496,7 @@ export function PosterTile({
           params: { type: meta.type, id: meta.id, addon: addonId ?? '' },
         });
       }}>
-      <View style={styles.poster}>
+      <Animated.View style={[styles.poster, { transform: [{ scale: press.scale }] }]}>
         {meta.poster ? (
           <Image
             source={{ uri: meta.poster }}
@@ -506,12 +509,13 @@ export function PosterTile({
             {meta.name}
           </Text>
         )}
-      </View>
+      </Animated.View>
       <Text numberOfLines={1} style={styles.tileTitle}>
         {meta.name}
       </Text>
       {meta.releaseInfo ? <Text style={styles.tileSub}>{meta.releaseInfo}</Text> : null}
     </Pressable>
+    </FadeIn>
   );
 }
 

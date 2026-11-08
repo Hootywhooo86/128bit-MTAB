@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { type ComponentProps } from 'react';
-import { ActivityIndicator, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Animated, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Pressable } from '@/components/focusable';
+import { useBounce } from '@/components/fx';
 import { EmptyState, formatTime } from '@/components/ui';
 import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { usePlayer } from '@/lib/player';
@@ -23,19 +24,28 @@ export default function CarMode() {
   const { prefs } = usePrefs();
   const { width, height } = useWindowDimensions();
   const wide = width > height;
+  const playBounce = useBounce();
 
   if (!p.book) return <EmptyState title="Nothing playing" body="Pick a book from Audiobooks." />;
   const chapter = p.mark?.title ?? p.book.chapters[p.chapterIndex]?.title;
   const left = Math.max(0, (p.mark ? (p.book.chapters[p.chapterIndex]?.marks?.[p.mark.index + 1]?.start ?? p.duration) : p.duration) - p.position);
 
   const play = (
-    <Tile style={[styles.play, wide ? { flex: 2 } : { flex: 3 }]} onPress={p.toggle} label={p.playing ? 'Pause' : 'Play'}>
+    <Animated.View style={[wide ? { flex: 2 } : { flex: 3 }, { transform: [{ scale: playBounce.scale }] }]}>
+    <Tile
+      style={styles.play}
+      onPress={() => {
+        playBounce.bounce();
+        p.toggle();
+      }}
+      label={p.playing ? 'Pause' : 'Play'}>
       {p.loading ? (
         <ActivityIndicator size="large" color={Colors.accentText} />
       ) : (
         <Ionicons name={p.playing ? 'pause' : 'play'} size={wide ? 120 : 140} color={Colors.accentText} />
       )}
     </Tile>
+    </Animated.View>
   );
   const back = <Tile icon="play-back" caption={`${prefs.skipBack}s`} label={`Back ${prefs.skipBack} seconds`} onPress={() => p.seekBy(-prefs.skipBack)} />;
   const fwd = <Tile icon="play-forward" caption={`${prefs.skipForward}s`} label={`Forward ${prefs.skipForward} seconds`} onPress={() => p.seekBy(prefs.skipForward)} />;

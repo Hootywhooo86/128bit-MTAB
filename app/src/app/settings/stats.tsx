@@ -4,6 +4,7 @@ import { Alert, Platform, Text, View } from 'react-native';
 
 import { Group, Row, SectionTitle, SettingsPage } from '@/components/settings-ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { PixelFlame } from '@/components/fx';
 import { dayKey, formatDuration, getStats, resetStats, streaks, summarize, type Stats } from '@/lib/stats';
 import { Pressable } from '@/components/focusable';
 
@@ -111,7 +112,12 @@ export default function StatsScreen() {
 
       <SectionTitle>Streaks & records</SectionTitle>
       <Group>
-        <Row title="Current streak" value={`${streak.current} ${streak.current === 1 ? 'day' : 'days'}`} />
+        <Row
+          title="Current streak"
+          value={`${streak.current} ${streak.current === 1 ? 'day' : 'days'}`}
+          // A pixel flame that grows with the streak.
+          right={<PixelFlame days={streak.current} />}
+        />
         <Row title="Longest streak" value={`${streak.longest} ${streak.longest === 1 ? 'day' : 'days'}`} />
         {streak.best ? (
           <Row

@@ -33,7 +33,8 @@ import { absReportProgress, absResumePoint, isAbsBook } from './audiobookshelf';
 import { findCover } from './covers';
 import { reportBookProgress } from './tracker-live';
 import { onSessionTime, registerSessionProbe, sessionEnd, sessionTick } from './sessions';
-import { addListening, markBookFinished } from './stats';
+import { emitFx } from './fx-events';
+import { addListening, getStats, markBookFinished } from './stats';
 import { addBookmark as storeBookmark } from './bookmarks';
 import { chapterUrl, getDownloadedBooks, localChapterUri, localRangeReader, updateDownloadedBook } from './downloads';
 import { httpRangeReader, readMp4Chapters } from './mp4-chapters';
@@ -242,6 +243,7 @@ function onStatus(s: AudioStatus) {
     else if (mark.index !== sleepMark) {
       p.pause();
       setSleep(null);
+      emitFx({ kind: 'sleep' });
     }
   }
 
@@ -359,6 +361,7 @@ function onFinish() {
   if (!book) return;
   if (state.sleep?.kind === 'chapter') {
     setSleep(null);
+    emitFx({ kind: 'sleep' });
     return;
   }
   if (chapterIndex + 1 < book.chapters.length) {
@@ -372,7 +375,18 @@ function onFinish() {
   const end = getAudio().duration;
   listenSample({ pos: end, dur: end, playing: false, finished: true });
   sessionEnd(book.key);
-  markBookFinished(book);
+  // "BOOK COMPLETE!" with how many you've finished in all.
+  markBookFinished(book)
+    .then(getStats)
+    .then((s) =>
+      emitFx({
+        kind: 'bookComplete',
+        title: book.title,
+        cover: book.cover,
+        count: Object.values(s.books).filter((b) => b.finished).length,
+      }),
+    )
+    .catch(() => {});
 }
 
 /** Looks for chapter markers inside an .m4b-style file once, and remembers them. */
@@ -538,6 +552,7 @@ function setSleep(sleep: Sleep) {
       () => {
         getAudio().pause();
         setSleep(null);
+        emitFx({ kind: 'sleep' });
       },
       Math.max(0, sleep.at - Date.now()),
     );
