@@ -90,6 +90,14 @@ jobs:
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install
 
+      # services.gradle.org is sometimes slow: give the Gradle download 2 minutes (not 10 s)
+      # and three tries, before the real build.
+      - name: Fetch Gradle
+        working-directory: app/android
+        run: |
+          sed -i 's/^networkTimeout=.*/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
+          for i in 1 2 3; do ./gradlew --version --no-daemon && break; echo "retry $i"; sleep 15; done
+
       - name: Build APK (${{ matrix.variant }})
         working-directory: app/android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=${{ matrix.abis }}
