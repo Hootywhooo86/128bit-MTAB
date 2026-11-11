@@ -118,6 +118,11 @@ export async function searchAbb(
   const { status, html, host } = await fetchMirror(`/page/${page}/?s=${q}`);
   // Past the last page the site answers 404.
   if (status === 404) return { results: [], more: false };
+  return parsePosts(html, host, query);
+}
+
+/** The posts on one AudiobookBay listing page (search results, the front page, a category). */
+function parsePosts(html: string, host: string, query: string): { results: AbbResult[]; more: boolean } {
   const posts = html.split(/<div class="post">/).slice(1);
   const results = posts.flatMap<AbbResult>((post) => {
     const a = post.match(/class="postTitle"><h2><a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
@@ -150,6 +155,23 @@ export async function searchAbb(
     ];
   });
   return { results, more: posts.length >= 9 };
+}
+
+/**
+ * The newest posts: the front page (everything) and the LitRPG section. AudiobookBay's
+ * search can take a day or more to list a new upload, but it's on these pages right away.
+ */
+const LATEST_PAGES = ['/', '/page/2/', '/page/3/', '/audio-books/type/litrpg/', '/audio-books/type/litrpg/page/2/'];
+
+async function latestAbb(query: string): Promise<AbbResult[]> {
+  const pages = await Promise.all(
+    LATEST_PAGES.map((path) =>
+      fetchMirror(path)
+        .then(({ status, html, host }) => (status === 200 ? parsePosts(html, host, query).results : []))
+        .catch(() => [] as AbbResult[]),
+    ),
+  );
+  return pages.flat();
 }
 
 // --- Smart search ---------------------------------------------------------------------
@@ -283,6 +305,21 @@ export async function searchAbbSmart(
     await Promise.all([worker(), worker(), worker()]);
   }
 
+  // Brand-new uploads the search doesn't list yet: the newest posts that fit what you asked.
+  const latest = latestAbb(query)
+    .then((items) => {
+      let added = false;
+      for (const item of items) {
+        if (seen.has(item.link)) continue;
+        const score = rank(item);
+        if (score < 0.6) continue;
+        seen.set(item.link, { ...item, score });
+        added = true;
+      }
+      if (added) onUpdate?.(snapshot());
+    })
+    .catch(() => {});
+
   // First page of each question (the best ones first), then a second page of the main one.
   await fetchRound(queries, 1);
   if (seen.size < 15 && open.has(queries[0])) await fetchRound([queries[0]], 1);
@@ -298,5 +335,6 @@ export async function searchAbbSmart(
     open.add(authorQ);
     await fetchRound([authorQ], 1);
   }
+  await latest;
   return finish();
 }
