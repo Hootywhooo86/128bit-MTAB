@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, Text, View } from 'react-native';
 
 import { Pressable } from '@/components/focusable';
 import { Body, Cover, Heading, ProgressBar, formatBytes } from '@/components/ui';
@@ -24,6 +24,18 @@ export function TorboxMatches({ query, onPick }: { query: string; onPick?: (id: 
   const styles = useStyles();
   const [items, setItems] = useState<TorboxItem[] | null>(null);
   const [off, setOff] = useState(false);
+  // Asked again when you come back (e.g. from adding it to TorBox in the browser), when the
+  // page shows again, and every 30 s while it's open.
+  const [tick, setTick] = useState(0);
+  useFocusEffect(useCallback(() => setTick((t) => t + 1), []));
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && setTick((t) => t + 1));
+    const timer = setInterval(() => AppState.currentState === 'active' && setTick((t) => t + 1), 30_000);
+    return () => {
+      sub.remove();
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +54,7 @@ export function TorboxMatches({ query, onPick }: { query: string; onPick?: (id: 
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, tick]);
 
   // Always shown (fewer moving parts): checking, nothing, or the matches.
   return (
