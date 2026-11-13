@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -208,11 +207,9 @@ export default function AudiobooksScreen() {
       </View>
 
       {tab === 'library' && shelf.length + coming.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={styles.filters}>
+        // A plain wrapping row, not a sideways ScrollView: on Android that could measure too
+        // short when it appears after the list loads, cutting the chips off under the books.
+        <View style={styles.filters}>
           {FILTERS.map((f) => (
             <Pressable
               key={f.id}
@@ -223,7 +220,7 @@ export default function AudiobooksScreen() {
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
       ) : null}
 
       {tab === 'wanted' ? <WantedList onCount={setWantedCount} /> : null}
@@ -381,6 +378,8 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: 'transparent',
   },
   filters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
