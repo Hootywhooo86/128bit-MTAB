@@ -41,6 +41,8 @@ export type Prefs = {
   cachedFirst: boolean;
   /** Hide streams bigger than this (GB); 0 = no limit. */
   maxStreamGB: number;
+  /** Now playing's look (components/player-looks.tsx). */
+  playerLook: string;
   /** Keep this many upcoming episodes of what you're watching downloaded; 0 = off. */
   keepNextEpisodes: number;
   traktScrobble: boolean;
@@ -95,6 +97,7 @@ export const DEFAULT_PREFS: Prefs = {
   resumeVideos: true,
   cachedFirst: true,
   maxStreamGB: 0,
+  playerLook: 'arcade',
   keepNextEpisodes: 0,
   traktScrobble: true,
   traktContinueWatching: true,

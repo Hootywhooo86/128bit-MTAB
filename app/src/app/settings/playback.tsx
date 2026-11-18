@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState, Linking, PermissionsAndroid, Platform } from 'react-native';
 
 import { ChoiceRow, Group, Row, SectionTitle, SettingsPage, ToggleRow } from '@/components/settings-ui';
+import { LOOKS } from '@/components/player-looks';
 import { usePrefs } from '@/lib/prefs';
 import { videoDownloadsSupported } from '@/lib/video-downloads';
 import { askBatteryUnrestricted, batteryUnrestricted } from '@/lib/torrent-device';
@@ -43,6 +44,13 @@ export default function PlaybackSettings() {
               value={prefs.defaultRate}
               options={RATES}
               onChange={(v) => setPref('defaultRate', v)}
+            />
+            <ChoiceRow
+              title="Player look"
+              subtitle="How Now playing looks upright (also the Look button on the player)."
+              value={prefs.playerLook}
+              options={LOOKS.map((l) => ({ value: l.id as string, label: l.name }))}
+              onChange={(v) => setPref('playerLook', v)}
             />
             <BatteryRow />
             <NotificationRow />

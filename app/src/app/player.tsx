@@ -18,6 +18,14 @@ import {
 
 import { Starfield, ZoomIn, useBounce } from '@/components/fx';
 import { PixelFrame } from '@/components/pixel-frame';
+import {
+  BigCoverLook,
+  CassetteLook,
+  HandheldLook,
+  LookPicker,
+  type CassetteSkin,
+  type LookProps,
+} from '@/components/player-looks';
 import { Body, Button, Cover, EmptyState, Title, formatTime } from '@/components/ui';
 import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { getBookmarks, removeBookmark, type Bookmark } from '@/lib/bookmarks';
@@ -41,7 +49,8 @@ export default function PlayerScreen() {
   const Colors = useColors();
   const styles = useStyles();
   const p = usePlayer();
-  const { prefs } = usePrefs();
+  const { prefs, setPref } = usePrefs();
+  const [lookOpen, setLookOpen] = useState(false);
   const [barWidth, setBarWidth] = useState(1);
   const [tab, setTab] = useState<Tab>('chapters');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -236,10 +245,74 @@ export default function PlayerScreen() {
         <Ionicons name="car-sport" size={14} color={Colors.text} />
         <Text style={styles.pillText}>Car</Text>
       </Pressable>
+      <Pressable style={styles.pill} onPress={() => setLookOpen(true)} accessibilityLabel="Player look">
+        <Ionicons name="color-palette" size={14} color={Colors.text} />
+        <Text style={styles.pillText}>Look</Text>
+      </Pressable>
     </View>
   );
 
   const error = p.error ? <Body style={{ color: Colors.danger }}>{p.error}</Body> : null;
+
+  // The chosen look (components/player-looks.tsx) for the upright screen.
+  const look = prefs.playerLook;
+  const lookProps: LookProps = {
+    book,
+    chapterTitle: p.mark?.title ?? chapter?.title ?? '',
+    chapterNo: p.mark ? p.mark.index + 1 : p.chapterIndex + 1,
+    chapterCount: p.mark ? marks.length : book.chapters.length,
+    flipKey: `${p.chapterIndex}|${p.mark?.index ?? -1}`,
+    playing: p.playing,
+    loading: p.loading,
+    fraction: segLen ? Math.min(1, segPos / segLen) : 0,
+    posText: formatTime(segPos),
+    leftText: formatTime(Math.max(0, segLen - segPos)),
+    skipBack: prefs.skipBack,
+    skipForward: prefs.skipForward,
+    hasNext: p.hasNext,
+    onToggle: p.toggle,
+    onBack: () => p.seekBy(-prefs.skipBack),
+    onForward: () => p.seekBy(prefs.skipForward),
+    onPrevious: p.previous,
+    onNext: p.next,
+    onSleep: cycleSleep,
+    sleepLabel: p.sleep ? SLEEP_CHOICES[sleepIndex].label.toUpperCase() : 'SLEEP',
+    onRate: () => p.setRate(nextRate),
+    rateLabel: `${p.rate}×`,
+    onBookmark: () => setNoteOpen(true),
+  };
+  const upright =
+    look === 'cover' ? (
+      <>
+        <BigCoverLook {...lookProps} />
+        <View style={{ alignItems: 'center', alignSelf: 'stretch' }}>{chapterTag}</View>
+        {progress}
+        {error}
+        {controls}
+        {pills}
+      </>
+    ) : look === 'handheld' ? (
+      <>
+        <HandheldLook {...lookProps} />
+        {error}
+        {pills}
+      </>
+    ) : look.startsWith('cassette-') ? (
+      <>
+        <CassetteLook {...lookProps} skin={look.slice('cassette-'.length) as CassetteSkin} />
+        {error}
+        {pills}
+      </>
+    ) : (
+      <>
+        {cover}
+        <View style={{ alignItems: 'center', gap: Spacing.two, alignSelf: 'stretch' }}>{chapterTag}</View>
+        {progress}
+        {error}
+        {controls}
+        {pills}
+      </>
+    );
 
   const list = (
     <>
@@ -343,17 +416,13 @@ export default function PlayerScreen() {
         <View style={styles.screen}>
         <Starfield playing={p.playing} />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-          {cover}
-          <View style={{ alignItems: 'center', gap: Spacing.two, alignSelf: 'stretch' }}>{chapterTag}</View>
-          {progress}
-          {error}
-          {controls}
-          {pills}
+          {upright}
           {list}
         </ScrollView>
         </View>
       )}
 
+      <LookPicker visible={lookOpen} value={look} onPick={(id) => setPref('playerLook', id)} onClose={() => setLookOpen(false)} />
       <Modal
         visible={noteOpen}
         transparent
