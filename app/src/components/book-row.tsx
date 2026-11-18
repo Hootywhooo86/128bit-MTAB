@@ -6,6 +6,7 @@ import { Spacing, makeStyles, useColors } from '@/constants/theme';
 import type { Progress } from '@/lib/storage';
 import type { PlayableBook } from '@/lib/types';
 import { Pressable } from '@/components/focusable';
+import { Pop } from '@/components/fx';
 
 /** "10:17:59" → "10h 17m" */
 export function formatBookLength(duration?: string) {
@@ -103,11 +104,13 @@ export function BookRow({
         hitSlop={12}
         onPress={onToggleFavorite}
         accessibilityLabel={favorite ? 'Remove from favorites' : 'Add to favorites'}>
-        <Ionicons
-          name={favorite ? 'heart' : 'heart-outline'}
-          size={24}
-          color={favorite ? Colors.accent : Colors.text}
-        />
+        <Pop on={!!favorite}>
+          <Ionicons
+            name={favorite ? 'heart' : 'heart-outline'}
+            size={24}
+            color={favorite ? Colors.accent : Colors.text}
+          />
+        </Pop>
       </Pressable>
     </Pressable>
   );

@@ -14,7 +14,7 @@ import { BookRow } from '@/components/book-row';
 import { HeaderButtons } from '@/components/header-buttons';
 import { WantedList } from '@/components/wanted-list';
 import { Button, Cover, EmptyState, formatBytes } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import {
   bookDownloads,
   cancelBookDownload,
@@ -365,16 +365,15 @@ const useStyles = makeStyles((Colors) => ({
   segment: { flex: 1, alignItems: 'center', paddingTop: Spacing.two, gap: 2 },
   segmentLabel: {
     color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: PixelFont,
+    fontSize: 18,
   },
   segmentLabelActive: { color: Colors.text },
   segmentCount: { color: Colors.textSecondary, fontSize: 13 },
   underline: {
-    height: 3,
+    height: 4,
     alignSelf: 'stretch',
     marginTop: Spacing.two,
-    borderRadius: 2,
     backgroundColor: 'transparent',
   },
   filters: {
@@ -385,11 +384,11 @@ const useStyles = makeStyles((Colors) => ({
     paddingVertical: Spacing.three,
   },
   chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: Radius.lg,
     backgroundColor: Colors.surfaceRaised,
   },
   chipActive: { backgroundColor: Colors.accent },
-  chipText: { color: Colors.text, fontWeight: '600', fontSize: 13 },
+  chipText: { color: Colors.text, fontFamily: PixelFont, fontSize: 14 },
 }));

@@ -56,7 +56,7 @@ export default function AboutSettings() {
           style={{ width: 112, height: 112 }}
           contentFit="contain"
         />
-        <Text style={{ color: Colors.accent, fontFamily: PixelFont, fontSize: 16 }}>128BITPLAY</Text>
+        <Text style={{ color: Colors.accent, fontFamily: PixelFont, fontSize: 25 }}>128BITPLAY</Text>
       </View>
       <SectionTitle>App</SectionTitle>
       <Group>

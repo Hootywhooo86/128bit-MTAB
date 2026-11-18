@@ -227,7 +227,7 @@ function PixelProgress({ value, busy }: { value: number; busy?: boolean }) {
 }
 
 const useStyles = makeStyles((Colors) => ({
-  heading: { color: Colors.accent, fontFamily: PixelFont, fontSize: 11 },
+  heading: { color: Colors.accent, fontFamily: PixelFont, fontSize: 17 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,7 +246,7 @@ const useStyles = makeStyles((Colors) => ({
     paddingVertical: Spacing.two,
   },
   btnMain: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  btnText: { color: Colors.text, fontFamily: PixelFont, fontSize: 9 },
+  btnText: { color: Colors.text, fontFamily: PixelFont, fontSize: 14 },
   block: { flex: 1, backgroundColor: Colors.surfaceRaised },
   blockOn: { backgroundColor: Colors.accent },
 }));

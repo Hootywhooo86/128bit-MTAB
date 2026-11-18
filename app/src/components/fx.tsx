@@ -5,7 +5,7 @@
  * a still frame when the phone's "Remove animations" / reduce-motion setting is on.
  */
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -15,6 +15,7 @@ import {
   View,
   useWindowDimensions,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
@@ -392,8 +393,99 @@ function CrtOff({ onDone }: { onDone: () => void }) {
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
-  boot: { fontFamily: PixelFont, fontSize: 16, marginTop: 18, letterSpacing: 4 },
-  levelTitle: { fontFamily: PixelFont, fontSize: 18, textAlign: 'center' },
+  boot: { fontFamily: PixelFont, fontSize: 25, marginTop: 18, letterSpacing: 4 },
+  levelTitle: { fontFamily: PixelFont, fontSize: 28, textAlign: 'center' },
   levelBook: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center', maxWidth: 280 },
-  levelCount: { color: '#bbb', fontFamily: PixelFont, fontSize: 10 },
+  levelCount: { color: '#bbb', fontFamily: PixelFont, fontSize: 16 },
 });
+
+// --- Typewriter --------------------------------------------------------------------------------
+
+/** Text that types itself out, a letter at a time (empty states, big titles). */
+export function TypeOn(props: { text: string; style?: StyleProp<TextStyle>; speed?: number }) {
+  // A new text starts typing again from the first letter.
+  return <Typing key={props.text} {...props} />;
+}
+
+function Typing({ text, style, speed = 28 }: { text: string; style?: StyleProp<TextStyle>; speed?: number }) {
+  const [shown, setShown] = useState(() => (motionOff() ? text.length : 0));
+  useEffect(() => {
+    if (motionOff()) return;
+    const timer = setInterval(() => {
+      setShown((n) => {
+        if (n >= text.length) {
+          clearInterval(timer);
+          return n;
+        }
+        return n + 1;
+      });
+    }, speed);
+    return () => clearInterval(timer);
+  }, [text, speed]);
+  return (
+    <Text style={style} accessibilityLabel={text}>
+      {text.slice(0, shown)}
+      {/* The rest stays laid out (invisible) so nothing jumps while it types. */}
+      <Text style={{ opacity: 0 }}>{text.slice(shown)}</Text>
+    </Text>
+  );
+}
+
+// --- Loading placeholders -----------------------------------------------------------------------
+
+/** Poster-shaped placeholders with a pixel shimmer sweeping across, while a row loads. */
+export function PosterSkeletons({ count = 4, width = 112, height = 168 }: { count?: number; width?: number; height?: number }) {
+  const Colors = useColors();
+  const t = useValue(0);
+  useEffect(() => {
+    if (motionOff()) return;
+    const loop = Animated.loop(Animated.timing(t, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
+  return (
+    <View style={{ flexDirection: 'row', gap: 16, paddingHorizontal: 16, overflow: 'hidden' }} accessibilityLabel="Loading">
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ width, gap: 6 }}>
+          <View style={{ width, height, backgroundColor: Colors.surfaceRaised, overflow: 'hidden' }}>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                width: 24,
+                backgroundColor: Colors.border,
+                opacity: 0.8,
+                // Stepped, so the shine moves in pixel jumps.
+                transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [-24 - i * 20, width + 40 - i * 20] }) }],
+              }}
+            />
+          </View>
+          <View style={{ width: width * 0.8, height: 10, backgroundColor: Colors.surfaceRaised }} />
+          <View style={{ width: width * 0.4, height: 8, backgroundColor: Colors.surface }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// --- Heart pop ------------------------------------------------------------------------------------
+
+/** A little pop when something is turned on (favourite heart): wrap the icon, flip `on`. */
+export function Pop({ on, children }: { on: boolean; children: ReactNode }) {
+  const t = useValue(1);
+  // No pop for hearts that are already on when the list first shows.
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    if (!on || motionOff()) return;
+    t.setValue(0.6);
+    Animated.spring(t, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 18 }).start();
+    // Only when `on` changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on]);
+  return <Animated.View style={{ transform: [{ scale: t }] }}>{children}</Animated.View>;
+}

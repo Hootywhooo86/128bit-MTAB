@@ -135,7 +135,7 @@ function Tile({
 const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background, padding: Spacing.three, gap: Spacing.three },
   top: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  title: { color: Colors.text, fontFamily: PixelFont, fontSize: 16, lineHeight: 24 },
+  title: { color: Colors.text, fontFamily: PixelFont, fontSize: 25, lineHeight: 35 },
   chapter: { color: Colors.textSecondary, fontSize: 18, marginTop: 4 },
   close: { padding: Spacing.two },
   row: { flex: 1, flexDirection: 'row', gap: Spacing.three },
@@ -150,5 +150,5 @@ const useStyles = makeStyles((Colors) => ({
     gap: Spacing.one,
   },
   play: { backgroundColor: Colors.accent, borderColor: Colors.text, borderWidth: 4 },
-  caption: { color: Colors.textSecondary, fontFamily: PixelFont, fontSize: 12 },
+  caption: { color: Colors.textSecondary, fontFamily: PixelFont, fontSize: 19 },
 }));

@@ -852,7 +852,7 @@ const useStyles = makeStyles((Colors) => ({
   clearText: {
     color: Colors.accent,
     fontFamily: PixelFont,
-    fontSize: 14,
+    fontSize: 22,
     textShadowColor: '#000',
     textShadowRadius: 6,
   },
@@ -868,7 +868,7 @@ const useStyles = makeStyles((Colors) => ({
     paddingVertical: Spacing.two,
   },
   skipManual: { backgroundColor: 'rgba(0,0,0,0.7)', borderColor: Colors.accent },
-  skipText: { color: '#fff', fontFamily: PixelFont, fontSize: 10 },
+  skipText: { color: '#fff', fontFamily: PixelFont, fontSize: 16 },
   video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   top: {
     position: 'absolute',
@@ -909,8 +909,8 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: '#000',
   },
   loadingShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
-  loadingTitle: { color: '#fff', fontFamily: PixelFont, fontSize: 14, lineHeight: 22, textAlign: 'center', paddingHorizontal: Spacing.four },
-  loadingSub: { color: '#ddd', fontFamily: PixelFont, fontSize: 9, lineHeight: 15 },
+  loadingTitle: { color: '#fff', fontFamily: PixelFont, fontSize: 22, lineHeight: 32, textAlign: 'center', paddingHorizontal: Spacing.four },
+  loadingSub: { color: '#ddd', fontFamily: PixelFont, fontSize: 14, lineHeight: 22 },
   errorDetail: { color: '#aaa', fontSize: 12, marginTop: 6, textAlign: 'center' },
   errorBack: { marginTop: Spacing.three, borderWidth: 2, borderColor: '#fff', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   errorBackText: { color: '#fff', fontWeight: '700' },

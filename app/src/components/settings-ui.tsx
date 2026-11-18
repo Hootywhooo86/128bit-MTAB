@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Children, Fragment, type ComponentProps, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Pixel, PixelFont, PixelFontBold, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { Pressable } from '@/components/focusable';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -161,15 +161,14 @@ const useStyles = makeStyles((Colors) => ({
   },
   bigTitle: {
     color: Colors.text,
+    fontFamily: PixelFontBold,
     fontSize: 40,
-    fontWeight: '900',
-    letterSpacing: -1,
     marginTop: Spacing.four,
   },
   section: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '800',
+    fontFamily: PixelFont,
+    fontSize: 15,
     letterSpacing: 1,
     marginTop: Spacing.three,
     marginBottom: Spacing.one,
@@ -177,7 +176,7 @@ const useStyles = makeStyles((Colors) => ({
   group: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: Pixel.border,
     borderColor: Colors.border,
     overflow: 'hidden',
   },

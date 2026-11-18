@@ -135,7 +135,7 @@ const useStyles = makeStyles((Colors) => ({
   },
   cover: { width: 64, height: 96, backgroundColor: Colors.surfaceRaised },
   coverBlank: { alignItems: 'center', justifyContent: 'center' },
-  coverText: { color: Colors.accent, fontFamily: PixelFont, fontSize: 10 },
+  coverText: { color: Colors.accent, fontFamily: PixelFont, fontSize: 16 },
   title: { color: Colors.text, fontWeight: '700', fontSize: 14 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   badge: {
@@ -155,5 +155,5 @@ const useStyles = makeStyles((Colors) => ({
     paddingVertical: Spacing.two,
   },
   btnMain: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  btnText: { color: Colors.text, fontFamily: PixelFont, fontSize: 9 },
+  btnText: { color: Colors.text, fontFamily: PixelFont, fontSize: 14 },
 }));

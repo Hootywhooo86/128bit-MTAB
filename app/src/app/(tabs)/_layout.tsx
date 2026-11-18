@@ -8,7 +8,7 @@ import { Wiggle } from '@/components/fx';
 import { HeaderButtons } from '@/components/header-buttons';
 import { MiniPlayer } from '@/components/mini-player';
 import { UpdateBanner } from '@/components/update-banner';
-import { useColors } from '@/constants/theme';
+import { Pixel, PixelFont, PixelFontBold, useColors } from '@/constants/theme';
 import { HAS_BOOKS, HAS_COMICS, IS_TV } from '@/constants/tv';
 import { activeComicCount, getComicWanted, onComicWanted } from '@/lib/comic-grab';
 
@@ -74,13 +74,16 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
         headerShadowVisible: false,
-        headerTitleStyle: { fontWeight: '800', fontSize: 22 },
+        headerTitleStyle: { fontFamily: PixelFontBold, fontSize: 28 },
         tabBarStyle: {
           backgroundColor: Colors.background,
           borderTopColor: Colors.border,
+          borderTopWidth: Pixel.border,
         },
         // Six tabs: keep the labels small enough to fit on a phone.
-        tabBarLabelStyle: { fontSize: IS_TV ? 14 : 10 },
+        // The pixel font sits taller than the system one: a little more room under the labels.
+        tabBarLabelStyle: { fontFamily: PixelFont, fontSize: IS_TV ? 16 : 11, lineHeight: IS_TV ? 20 : 13 },
+        tabBarIconStyle: { marginTop: -3 },
         // TV remote: tab buttons show the focus ring.
         ...(IS_TV
           ? {

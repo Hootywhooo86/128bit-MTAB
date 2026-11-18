@@ -406,7 +406,7 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: Colors.surfaceRaised,
   },
   playRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
-  playText: { color: Colors.accentText, fontFamily: PixelFont, fontSize: 13, flexShrink: 1 },
+  playText: { color: Colors.accentText, fontFamily: PixelFont, fontSize: 20, flexShrink: 1 },
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,

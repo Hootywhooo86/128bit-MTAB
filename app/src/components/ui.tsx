@@ -13,9 +13,10 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Pixel, PixelFont, PixelFontBold, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { useCover } from '@/lib/covers';
 import { Pressable } from '@/components/focusable';
+import { TypeOn } from '@/components/fx';
 
 export function Title({ style, ...rest }: TextProps) {
   const styles = useStyles();
@@ -58,7 +59,9 @@ export function Button({
         variant === 'primary' && styles.buttonPrimary,
         variant === 'secondary' && styles.buttonSecondary,
         variant === 'danger' && styles.buttonDanger,
-        (pressed || disabled) && { opacity: 0.6 },
+        // Arcade button: pressing pushes it down into its shadow.
+        pressed && styles.buttonPressed,
+        disabled && { opacity: 0.5 },
         style,
       ]}
       {...rest}>
@@ -94,7 +97,31 @@ export function Input(props: TextInputProps & { ref?: Ref<TextInput> }) {
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const styles = useStyles();
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <View style={[styles.card, style]}>
+      {children}
+      <Notches />
+    </View>
+  );
+}
+
+/**
+ * Pixel-art corners: one background-coloured block on each corner of a square box, so its
+ * border steps around the corner instead of meeting in a sharp point. Put it last inside.
+ */
+export function Notches({ size = Pixel.notch, color }: { size?: number; color?: string }) {
+  const Colors = useColors();
+  const c = color ?? Colors.background;
+  const at = -Pixel.border;
+  const box = { position: 'absolute' as const, width: size, height: size, backgroundColor: c };
+  return (
+    <>
+      <View pointerEvents="none" style={[box, { top: at, left: at }]} />
+      <View pointerEvents="none" style={[box, { top: at, right: at }]} />
+      <View pointerEvents="none" style={[box, { bottom: at, left: at }]} />
+      <View pointerEvents="none" style={[box, { bottom: at, right: at }]} />
+    </>
+  );
 }
 
 /** Square cover. Give `title` (and `author`) to look one up when `uri` is missing. */
@@ -139,7 +166,7 @@ export function EmptyState({
   const styles = useStyles();
   return (
     <View style={styles.empty}>
-      <Heading style={{ textAlign: 'center' }}>{title}</Heading>
+      <TypeOn text={title} style={[styles.heading, { textAlign: 'center' }]} />
       {body ? (
         <Body muted style={{ textAlign: 'center' }}>
           {body}
@@ -150,16 +177,15 @@ export function EmptyState({
   );
 }
 
-export function ProgressBar({ value }: { value: number }) {
+/** A pixel progress bar: fills in whole blocks, like an old loading meter. */
+export function ProgressBar({ value, blocks = 20 }: { value: number; blocks?: number }) {
   const styles = useStyles();
+  const filled = Math.round(Math.min(1, Math.max(0, value)) * blocks);
   return (
     <View style={styles.progressTrack}>
-      <View
-        style={[
-          styles.progressFill,
-          { width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` },
-        ]}
-      />
+      {Array.from({ length: blocks }, (_, i) => (
+        <View key={i} style={[styles.progressBlock, i < filled && styles.progressBlockOn]} />
+      ))}
     </View>
   );
 }
@@ -187,36 +213,38 @@ export function formatBytes(bytes?: number) {
 const useStyles = makeStyles((Colors) => ({
   title: {
     color: Colors.text,
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontFamily: PixelFontBold,
+    fontSize: 30,
+    letterSpacing: 0.5,
   },
-  heading: { color: Colors.text, fontSize: 18, fontWeight: '700' },
+  heading: { color: Colors.text, fontFamily: PixelFont, fontSize: 20, letterSpacing: 0.3 },
   body: { color: Colors.text, fontSize: 15, lineHeight: 22 },
   muted: { color: Colors.textSecondary },
   button: {
     minHeight: 46,
     paddingHorizontal: Spacing.three,
     borderRadius: Radius.md,
+    borderWidth: Pixel.border,
+    borderColor: Colors.text,
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: `${Pixel.shadow}px ${Pixel.shadow}px 0px #000000`,
   },
+  buttonPressed: { transform: [{ translateX: Pixel.shadow }, { translateY: Pixel.shadow }], boxShadow: 'none' },
   buttonPrimary: { backgroundColor: Colors.accent },
   buttonSecondary: {
     backgroundColor: Colors.surfaceRaised,
-    borderWidth: 1,
     borderColor: Colors.border,
   },
   buttonDanger: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
     borderColor: Colors.danger,
   },
-  buttonLabel: { color: Colors.text, fontSize: 15, fontWeight: '700' },
+  buttonLabel: { color: Colors.text, fontFamily: PixelFont, fontSize: 17, letterSpacing: 0.5 },
   input: {
     backgroundColor: Colors.surface,
     borderColor: Colors.border,
-    borderWidth: 1,
+    borderWidth: Pixel.border,
     borderRadius: Radius.md,
     color: Colors.text,
     paddingHorizontal: Spacing.three,
@@ -226,7 +254,7 @@ const useStyles = makeStyles((Colors) => ({
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    borderWidth: 1,
+    borderWidth: Pixel.border,
     borderColor: Colors.border,
     padding: Spacing.three,
     gap: Spacing.two,
@@ -240,16 +268,12 @@ const useStyles = makeStyles((Colors) => ({
   },
   coverFallback: {
     color: Colors.accent,
-    fontWeight: '900',
-    fontSize: 20,
+    fontFamily: PixelFontBold,
+    fontSize: 22,
     letterSpacing: 1,
   },
   empty: { alignItems: 'center', gap: Spacing.two, padding: Spacing.five },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.surfaceRaised,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', backgroundColor: Colors.accent },
+  progressTrack: { flexDirection: 'row', gap: 2, height: 6 },
+  progressBlock: { flex: 1, backgroundColor: Colors.surfaceRaised },
+  progressBlockOn: { backgroundColor: Colors.accent },
 }));

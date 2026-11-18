@@ -1,4 +1,9 @@
-import { PressStart2P_400Regular, useFonts } from '@expo-google-fonts/press-start-2p';
+import {
+  PixelifySans_400Regular,
+  PixelifySans_600SemiBold,
+  PixelifySans_700Bold,
+  useFonts,
+} from '@expo-google-fonts/pixelify-sans';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -6,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 
-import { useColors } from '@/constants/theme';
+import { PixelFontBold, useColors } from '@/constants/theme';
 import { BootSplash, FxOverlay } from '@/components/fx';
 import { HAS_BOOKS, IS_TV } from '@/constants/tv';
 import { syncHistoryToTracker } from '@/lib/tracker-sync';
@@ -74,7 +79,7 @@ function AppNavigator() {
   const Colors = useColors();
   const { loaded: prefsLoaded } = usePrefs();
   // The 128bit pixel font (headings, player); if it fails to load, the normal font is used.
-  const [fontLoaded, fontError] = useFonts({ PressStart2P_400Regular });
+  const [fontLoaded, fontError] = useFonts({ PixelifySans_400Regular, PixelifySans_600SemiBold, PixelifySans_700Bold });
   // Never sit on the black splash: if settings or the font take over 4 s, start anyway.
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
@@ -209,7 +214,7 @@ function AppNavigator() {
             headerTintColor: Colors.text,
             headerShadowVisible: false,
             headerStyle: { backgroundColor: Colors.background },
-            headerTitleStyle: { fontWeight: '800' },
+            headerTitleStyle: { fontFamily: PixelFontBold, fontSize: 22 },
             contentStyle: { backgroundColor: Colors.background },
           }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

@@ -12,7 +12,7 @@ import {
 
 import { PixelSpinner } from '@/components/fx';
 import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { LIVE_TYPES, fetchStreamsEach, streamAddons, type AddonStreams } from '@/lib/addons';
 import { usePrefs } from '@/lib/prefs';
 import { getActiveAddons, getTorboxKey } from '@/lib/storage';
@@ -451,5 +451,5 @@ const useStyles = makeStyles((Colors) => ({
   },
   chipActive: { backgroundColor: Colors.accent },
   providerChip: { paddingVertical: 6, backgroundColor: Colors.surface },
-  chipText: { color: Colors.text, fontWeight: '600', fontSize: 13 },
+  chipText: { color: Colors.text, fontFamily: PixelFont, fontSize: 15 },
 }));

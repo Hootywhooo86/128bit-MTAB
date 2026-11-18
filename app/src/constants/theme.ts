@@ -30,15 +30,16 @@ export function buildPalette(accent: AccentId, amoled: boolean, custom?: string)
         border: '#262626',
       }
     : {
-        background: '#121214',
-        surface: '#1C1C1F',
-        surfaceRaised: '#26262A',
-        border: '#323236',
+        // Night-sky pixel palette: deep blue-black, cool greys.
+        background: '#0C0C14',
+        surface: '#161622',
+        surfaceRaised: '#20202F',
+        border: '#30304A',
       };
   return {
     ...base,
-    text: '#FFFFFF',
-    textSecondary: '#9E9E9E',
+    text: '#F4F4FA',
+    textSecondary: '#9C9CB4',
     accent: a.color,
     accentText: a.onAccent,
     danger: '#FF5C5C',
@@ -82,8 +83,13 @@ export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
   };
 }
 
-/** The 128bit pixel font. Use small sizes (8–16): it's big for its point size. */
-export const PixelFont = 'PressStart2P_400Regular';
+/**
+ * The 128bit pixel fonts (Pixelify Sans): crisp pixel letters that still read at normal
+ * sizes. PixelFont for labels and titles, PixelFontBold for big headings.
+ */
+export const PixelFont = 'PixelifySans_600SemiBold';
+export const PixelFontBold = 'PixelifySans_700Bold';
+export const PixelFontRegular = 'PixelifySans_400Regular';
 
 export const Spacing = {
   one: 4,
@@ -93,6 +99,10 @@ export const Spacing = {
   five: 32,
 } as const;
 
-export const Radius = { sm: 8, md: 12, lg: 20 } as const;
+/** Pixel art has square corners: everything is squared off (Notches cuts the corner pixel). */
+export const Radius = { sm: 0, md: 0, lg: 0 } as const;
+
+/** Pixel-art borders and hard (unblurred) drop shadows. */
+export const Pixel = { border: 2, shadow: 3, notch: 3 } as const;
 
 export const MaxContentWidth = 800;

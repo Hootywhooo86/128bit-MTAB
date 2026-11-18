@@ -262,14 +262,14 @@ export function TrackerPlus({ item: given, size }: { item: TrackerRef; size: num
 
 const useStyles = makeStyles((Colors) => ({
   heading: { color: Colors.text, fontSize: 17, fontWeight: '800' },
-  label: { color: Colors.accent, fontFamily: PixelFont, fontSize: 10 },
+  label: { color: Colors.accent, fontFamily: PixelFont, fontSize: 16 },
   muted: { color: Colors.textSecondary, fontSize: 12 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.four },
   modal: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.four, gap: Spacing.three, maxWidth: 520, width: '100%', alignSelf: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, justifyContent: 'center' },
   // Square "pixel" number keys.
   num: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceRaised },
-  numText: { color: Colors.text, fontFamily: PixelFont, fontSize: 12 },
+  numText: { color: Colors.text, fontFamily: PixelFont, fontSize: 19 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.two },
   box: { width: 22, height: 22, borderWidth: 2, borderColor: Colors.textSecondary },
   listName: { color: Colors.text, fontWeight: '600', fontSize: 15, flex: 1 },

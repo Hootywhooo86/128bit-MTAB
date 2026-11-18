@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 
-import { FadeIn, PixelSpinner, usePressScale } from '@/components/fx';
+import { FadeIn, PosterSkeletons, usePressScale } from '@/components/fx';
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { fetchMetas, isBrowsable, supportsSearch, catalogTab } from '@/lib/addons';
@@ -313,7 +313,7 @@ export function CatalogRow({
           No matches.
         </Body>
       ) : !metas ? (
-        <PixelSpinner style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
+        <PosterSkeletons />
       ) : (
         <FlatList
           horizontal
@@ -453,7 +453,7 @@ function AnimeSearchRow({
           No matches.
         </Body>
       ) : !hits ? (
-        <PixelSpinner style={{ alignSelf: 'flex-start', marginLeft: Spacing.three }} />
+        <PosterSkeletons />
       ) : (
         <FlatList
           horizontal

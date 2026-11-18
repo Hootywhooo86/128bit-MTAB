@@ -412,7 +412,7 @@ const useStyles = makeStyles((Colors) => ({
     borderColor: Colors.border,
   },
   sectionOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  sectionText: { color: Colors.text, fontFamily: PixelFont, fontSize: 9 },
+  sectionText: { color: Colors.text, fontFamily: PixelFont, fontSize: 14 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

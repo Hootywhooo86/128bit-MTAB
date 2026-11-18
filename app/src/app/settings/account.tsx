@@ -452,7 +452,7 @@ const useStyles = makeStyles((Colors) => ({
     backgroundColor: Colors.surface,
     marginBottom: Spacing.three,
   },
-  heading: { color: Colors.accent, fontFamily: PixelFont, fontSize: 11, marginBottom: Spacing.one },
+  heading: { color: Colors.accent, fontFamily: PixelFont, fontSize: 17, marginBottom: Spacing.one },
   step: { fontSize: 13 },
-  code: { color: Colors.text, fontFamily: PixelFont, fontSize: 32, letterSpacing: 6, marginTop: Spacing.two },
+  code: { color: Colors.text, fontFamily: PixelFont, fontSize: 50, letterSpacing: 6, marginTop: Spacing.two },
 }));
