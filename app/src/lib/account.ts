@@ -310,7 +310,7 @@ const SECTIONS: Record<string, Section> = {
   },
   tracking: { secure: ['128bit.trakt', '128bit.traktApp', '128bit.simkl', '128bit.simklApp'] },
   books: {
-    keys: ['128bit.library', '128bit.favorites', '128bit.wanted', '128bit.feeds', '128bit.sources', '128bit.audiobookSearches'],
+    keys: ['128bit.library', '128bit.favorites', '128bit.wanted', '128bit.wanted.dismissed', '128bit.feeds', '128bit.sources', '128bit.audiobookSearches'],
     prefixes: ['128bit.progress.'],
     secure: ['128bit.abs'],
     phoneOnly: true,

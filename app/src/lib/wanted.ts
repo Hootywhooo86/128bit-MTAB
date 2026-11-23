@@ -147,6 +147,7 @@ export async function removeWanted(id: string) {
   const removed = await getRemoved();
   removed[id] = gone.trackerItemId ?? '';
   await AsyncStorage.setItem(REMOVED_KEY, JSON.stringify(removed));
+  if (gone.trackerItemId) await dismiss(gone.trackerItemId);
   syncWantedWithTracker().catch(() => {});
 }
 
@@ -164,6 +165,22 @@ export async function markSent(id: string, sentName: string, torboxId?: number) 
 // --- Tracker: Wanted is the Audiobooks list ---------------------------------------
 
 const REMOVED_KEY = '128bit.wanted.trackerRemoved';
+/** Tracker items you took off Wanted (item id → when), so a book still "planned" in Tracker doesn't come back. */
+const DISMISSED_KEY = '128bit.wanted.dismissed';
+
+async function getDismissed(): Promise<Record<string, number>> {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(DISMISSED_KEY)) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+async function dismiss(itemId: string) {
+  const d = await getDismissed();
+  d[itemId] = Date.now();
+  await AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(d));
+}
 const MIGRATED_KEY = '128bit.wanted.trackerMigrated';
 
 const bookRef = (w: { title: string; author?: string; cover?: string }, playKey?: string): TrackerRef => ({
@@ -233,6 +250,26 @@ export function syncWantedWithTracker(): Promise<void> {
       remote.push(...items);
       if (items.length < 200) break;
     }
+    // Books you marked "planned" in Tracker without putting them on the Audiobooks list:
+    // they go on it too (so Tracker and Wanted match), unless you took that book off Wanted
+    // here and haven't touched it in Tracker since.
+    const onList = new Set(remote.map((i) => i.id));
+    const dismissed = await getDismissed();
+    const planned = (await rpc<TrackerItem[]>('get_watchlist', { kind: 'book', max_rows: 500 }).catch(() => null)) ?? [];
+    // Already have it under another name ("The Capital" for "Ajax's Ascension: The Capital"):
+    // an old duplicate, not a new book.
+    // Same title exactly, with or without the series in front of a colon (so "Iron Blooded 4"
+    // is still a new book next to "Iron Blooded").
+    const key = (t: string) => titleWords(t).join(' ');
+    const known = new Set([...(await getLibrary()), ...(await getWanted())].flatMap((b) => [key(b.title), key(b.title.split(':').pop()!)]).filter(Boolean));
+    const haveAlready = (title: string) => known.has(key(title)) || known.has(key(title.split(':').pop()!));
+    for (const i of planned) {
+      if (onList.has(i.id) || haveAlready(i.title)) continue;
+      const touched = Date.parse((i as TrackerItem & { updated_at?: string }).updated_at ?? '') || 0;
+      if (dismissed[i.id] && touched <= dismissed[i.id] + 60_000) continue;
+      const added = await rpc('add_to_list', { list_id: listId, item: { id: i.id } }).then(() => true, () => false);
+      if (added) remote.push(i);
+    }
     const remoteById = new Map(remote.filter((i) => i.type === 'book').map((i) => [wantedId(i.title, creatorOf(i)), i]));
     for (const [id, itemId] of Object.entries(removed)) {
       const target = itemId || remoteById.get(id)?.id;
@@ -285,6 +322,15 @@ export function syncWantedWithTracker(): Promise<void> {
       syncing = null;
     });
   return syncing;
+}
+
+/** A title's words, lower-case, without filler ("the", "a", "book"…). */
+function titleWords(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .split(' ')
+    .filter((w) => w && !['the', 'a', 'an', 'of', 'and', 'book', 'books', 'vol', 'volume'].includes(w));
 }
 
 const creatorOf = (i: TrackerItem) => (i as TrackerItem & { creator?: string | null }).creator ?? undefined;
