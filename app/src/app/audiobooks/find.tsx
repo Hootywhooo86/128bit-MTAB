@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { AbbResults } from '@/components/abb-results';
+import { FreeBookResults } from '@/components/free-book-results';
 import { SourceResults } from '@/components/source-results';
 import { TorboxMatches } from '@/components/torbox-matches';
 import { Body, Button, Cover, Input, Title } from '@/components/ui';
@@ -113,6 +114,7 @@ export default function FindBookScreen() {
       </View>
       {submitted ? <TorboxMatches key={`tb:${submitted}`} query={submitted} onPick={onSent} /> : null}
       {submitted ? <AbbResults key={`abb:${submitted}`} query={submitted} book={book} onSent={onSent} /> : null}
+      {submitted ? <FreeBookResults key={`free:${submitted}`} query={submitted} author={p.author || undefined} /> : null}
       {submitted && downloadSources ? (
         <SourceResults
           key={submitted}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, Text, View } from 'react-native';
 
 import { AbbResults } from '@/components/abb-results';
+import { FreeBookResults } from '@/components/free-book-results';
 import { CatalogRows } from '@/components/catalog-rows';
 import { SourceResults } from '@/components/source-results';
 import { Body, Button, Cover, EmptyState, Heading, Input } from '@/components/ui';
@@ -136,6 +137,7 @@ export default function BrowseAudiobooksScreen() {
         : null}
       <CatalogRows query={submitted || undefined} />
       {submitted ? <AbbResults key={`abb:${submitted}`} query={submitted} /> : null}
+      {submitted ? <FreeBookResults key={`free:${submitted}`} query={submitted} /> : null}
       {submitted ? <SourceResults key={submitted} query={submitted} /> : null}
       {rows.length === 0 && !sourceCount && !catalogCount ? (
         <EmptyState
