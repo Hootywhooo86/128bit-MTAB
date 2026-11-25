@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
 import { languageName, type AddonSubtitle } from '@/lib/subtitles';
 import { Pressable } from '@/components/focusable';
+import { IS_TV } from '@/constants/tv';
 
 export type SubtitleChoice =
   | { kind: 'off' }
@@ -36,16 +37,19 @@ function Option({
   detail,
   selected,
   onPress,
+  focusFirst,
 }: {
   label: string;
   detail?: string;
   selected: boolean;
   onPress: () => void;
+  /** TV: the remote starts here when the sheet opens (the subtitle that's on now). */
+  focusFirst?: boolean;
 }) {
   const Colors = useColors();
   const styles = useStyles();
   return (
-    <Pressable style={styles.option} onPress={onPress}>
+    <Pressable style={styles.option} onPress={onPress} hasTVPreferredFocus={IS_TV && !!focusFirst && selected}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.optionText, selected && { color: Colors.accent }]}>{label}</Text>
         {detail ? <Text style={styles.detail}>{detail}</Text> : null}
@@ -96,7 +100,8 @@ export function TrackSheet(p: Props) {
       animationType="slide"
       onRequestClose={p.onClose}
       supportedOrientations={['portrait', 'landscape']}>
-      <Pressable style={styles.backdrop} onPress={p.onClose} />
+      {/* Tap outside to close (the TV remote skips it and closes with Back). */}
+      <Pressable style={styles.backdrop} onPress={p.onClose} focusable={!IS_TV} />
       <SafeAreaView edges={['bottom']} style={styles.sheet}>
         <View style={styles.handle} />
         <ScrollView contentContainerStyle={{ padding: Spacing.three, gap: Spacing.three }}>
@@ -104,6 +109,7 @@ export function TrackSheet(p: Props) {
             <Option
               label="Off"
               selected={isOn({ kind: 'off' })}
+              focusFirst
               onPress={() => p.onChoose({ kind: 'off' })}
             />
             {p.embedded.map((t, i) => (
@@ -112,6 +118,7 @@ export function TrackSheet(p: Props) {
                 label={trackLabel(t)}
                 detail="In the video"
                 selected={isOn({ kind: 'embedded', track: t })}
+                focusFirst
                 onPress={() => p.onChoose({ kind: 'embedded', track: t })}
               />
             ))}
@@ -121,6 +128,7 @@ export function TrackSheet(p: Props) {
                 label={label}
                 detail={s.addon}
                 selected={isOn({ kind: 'addon', sub: s })}
+                focusFirst
                 onPress={() => p.onChoose({ kind: 'addon', sub: s })}
               />
             ))}

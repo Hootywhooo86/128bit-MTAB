@@ -62,6 +62,8 @@ export type Prefs = {
   /** 3-letter code, e.g. "eng". */
   subtitleLanguage: string;
   autoSubtitles: boolean;
+  /** Which videos turn subtitles on by themselves: anime only (default), everything, or never. */
+  subtitlesFor: 'anime' | 'all' | 'off';
   subtitleSize: 'small' | 'medium' | 'large';
   autoPlayNextEpisode: boolean;
   /** Comics reader: scroll down (webtoon/manga), or page left-to-right / right-to-left. */
@@ -108,6 +110,7 @@ export const DEFAULT_PREFS: Prefs = {
   trackerWatchlist: false,
   subtitleLanguage: 'eng',
   autoSubtitles: false,
+  subtitlesFor: 'anime',
   subtitleSize: 'medium',
   autoPlayNextEpisode: true,
   readerMode: 'vertical',

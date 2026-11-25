@@ -144,24 +144,29 @@ export default function PlaybackSettings() {
 
       <SectionTitle>Subtitles</SectionTitle>
       <Group>
+        <ChoiceRow
+          title="Turn subtitles on for"
+          subtitle="Shows and movies start without them unless you pick Everything. You can always switch them with the CC button in the player."
+          value={prefs.subtitlesFor}
+          options={[
+            { value: 'anime', label: 'Anime only' },
+            { value: 'all', label: 'Everything' },
+            { value: 'off', label: 'Never' },
+          ]}
+          onChange={(v) => setPref('subtitlesFor', v)}
+        />
         <ToggleRow
           title="English first"
-          subtitle="Every video plays the English audio track when it has one (e.g. anime dubs) and turns on English subtitles whenever there are any."
+          subtitle="Plays the English audio track when there is one (e.g. anime dubs), and subtitles that turn on are in English."
           value={prefs.englishFirst}
           onChange={(v) => setPref('englishFirst', v)}
         />
         <ChoiceRow
           title="Preferred language"
-          subtitle="Listed first, and used when subtitles turn on automatically"
+          subtitle="Listed first; used when subtitles turn on (with English first off)"
           value={prefs.subtitleLanguage}
           options={SUBTITLE_LANGUAGES.map((l) => ({ value: l, label: languageName(l) }))}
           onChange={(v) => setPref('subtitleLanguage', v)}
-        />
-        <ToggleRow
-          title="Turn on subtitles automatically"
-          subtitle="Uses your preferred language when an addon has it."
-          value={prefs.autoSubtitles}
-          onChange={(v) => setPref('autoSubtitles', v)}
         />
         <ChoiceRow
           title="Subtitle size"

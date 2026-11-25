@@ -17,13 +17,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TrackSheet, type SubtitleChoice } from '@/components/track-sheet';
 import { EmptyState } from '@/components/ui';
-import { PixelFont, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { PixelFont, PixelFontBold, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { IS_TV } from '@/constants/tv';
 import { usePlayer } from '@/lib/player';
 import { usePrefs } from '@/lib/prefs';
 import {
   cueAt,
   fetchAddonSubtitles,
   findPreferred,
+  languageName,
   loadSubtitle,
   sortSubtitles,
   type AddonSubtitle,
@@ -308,6 +310,29 @@ export default function WatchScreen() {
   // English first (Settings → Playback, on by default): the English audio track when the
   // video has one, and English subtitles on whenever there are any — for every video.
   const englishFirst = prefs.englishFirst;
+  // Subtitles only turn on by themselves for what Settings → Playback says (anime only by
+  // default; shows and movies start without). null until we know whether this is anime.
+  const [animeFor, setAnimeFor] = useState<{ key: string; anime: boolean } | null>(null);
+  const subsKey = item?.live ? undefined : item?.key;
+  const subsLink = item?.link;
+  useEffect(() => {
+    if (!subsKey) return;
+    let cancelled = false;
+    isAnime(subsLink)
+      .catch(() => false)
+      .then((anime) => !cancelled && setAnimeFor({ key: subsKey, anime }));
+    return () => {
+      cancelled = true;
+    };
+  }, [subsKey, subsLink]);
+  const subsWanted: boolean | null =
+    prefs.subtitlesFor === 'off'
+      ? false
+      : prefs.subtitlesFor === 'all'
+        ? true
+        : animeFor && animeFor.key === subsKey
+          ? animeFor.anime
+          : null;
   const userPickedSubs = useRef(false);
   const audioSetFor = useRef<string | null>(null);
   const subsSetFor = useRef<string | null>(null);
@@ -529,30 +554,27 @@ export default function WatchScreen() {
   // English subtitles always on, even with English audio: the video's own English track
   // first; otherwise an English one from your subtitle addons (below).
   useEffect(() => {
-    if (!englishFirst || !playingKey || userPickedSubs.current || subsSetFor.current === playingKey) return;
+    if (!englishFirst || subsWanted !== true || !playingKey || userPickedSubs.current || subsSetFor.current === playingKey) return;
     if (status !== 'readyToPlay') return;
     const track = englishSubtitle(availableSubtitleTracks);
     if (!track) return;
     subsSetFor.current = playingKey;
     // After this render (the tracks just arrived).
     Promise.resolve().then(() => chooseSubtitle({ kind: 'embedded', track }));
-  }, [englishFirst, playingKey, status, availableSubtitleTracks, chooseSubtitle]);
+  }, [englishFirst, subsWanted, playingKey, status, availableSubtitleTracks, chooseSubtitle]);
 
   // Load addon subtitles for this movie/episode, and turn on the preferred language if wanted.
   const itemKey = item?.key;
   const itemType = item?.live ? undefined : item?.link?.type;
   useEffect(() => {
-    if (!itemKey || !itemType) return;
+    if (!itemKey || !itemType || subsWanted === null) return;
     let cancelled = false;
     fetchAddonSubtitles(itemType, itemKey).then((subs) => {
       if (cancelled) return;
       const sorted = sortSubtitles(subs, prefs.subtitleLanguage);
       setAddonSubs(sorted);
-      const preferred = englishFirst
-        ? findPreferred(sorted, 'en')
-        : prefs.autoSubtitles
-          ? findPreferred(sorted, prefs.subtitleLanguage)
-          : undefined;
+      // Listed either way (pick one with the CC button); only turned on when wanted.
+      const preferred = subsWanted ? findPreferred(sorted, englishFirst ? 'en' : prefs.subtitleLanguage) : undefined;
       // An addon subtitle only if the video's own English track isn't already on.
       if (userPickedSubs.current || subsSetFor.current === itemKey) return;
       if (preferred) chooseSubtitle({ kind: 'addon', sub: preferred });
@@ -560,7 +582,7 @@ export default function WatchScreen() {
     return () => {
       cancelled = true;
     };
-  }, [itemKey, itemType, prefs.subtitleLanguage, prefs.autoSubtitles, chooseSubtitle, englishFirst]);
+  }, [itemKey, itemType, prefs.subtitleLanguage, subsWanted, chooseSubtitle, englishFirst]);
 
   // --- Next episode ---
   // --- Live TV: channel up/down through the list the channel was opened from ---
@@ -770,15 +792,20 @@ export default function WatchScreen() {
           </>
         ) : null}
         {hasTracks ? (
+          // Subtitles (and audio language): a clear CC button that says what's on.
           <Pressable
             onPress={() => setSheetOpen(true)}
             hitSlop={12}
+            style={[styles.ccButton, subtitle.kind !== 'off' && { borderColor: Colors.accent }]}
             accessibilityLabel="Subtitles and audio">
-            <Ionicons
-              name="text"
-              size={24}
-              color={subtitle.kind === 'off' ? '#fff' : Colors.accent}
-            />
+            <Text style={[styles.ccBadge, subtitle.kind !== 'off' && { backgroundColor: Colors.accent, color: Colors.accentText }]}>CC</Text>
+            <Text style={styles.ccText} numberOfLines={1}>
+              {subtitle.kind === 'off'
+                ? 'Off'
+                : subtitle.kind === 'addon'
+                  ? languageName(subtitle.sub.lang)
+                  : (subtitle.track.label ?? subtitle.track.language ?? 'On')}
+            </Text>
           </Pressable>
         ) : null}
       </SafeAreaView>
@@ -883,6 +910,25 @@ const useStyles = makeStyles((Colors) => ({
   },
   title: { color: '#fff', fontWeight: '700', fontSize: 16 },
   subtitle: { color: '#ddd', fontSize: 12 },
+  ccButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: '#ffffff88',
+    backgroundColor: '#000000AA',
+    maxWidth: 200,
+  },
+  ccBadge: {
+    color: '#000',
+    backgroundColor: '#fff',
+    fontFamily: PixelFontBold,
+    fontSize: IS_TV ? 18 : 13,
+    paddingHorizontal: 5,
+  },
+  ccText: { color: '#fff', fontFamily: PixelFont, fontSize: IS_TV ? 18 : 14 },
   live: { color: Colors.danger, fontWeight: '800', fontSize: 12 },
   channelButton: {
     flexDirection: 'row',
