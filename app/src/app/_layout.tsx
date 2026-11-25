@@ -239,6 +239,7 @@ function AppNavigator() {
           />
           <Stack.Screen name="trakt" options={{ title: 'Trakt library' }} />
           <Stack.Screen name="tracker" options={{ title: '128bit Tracker' }} />
+          <Stack.Screen name="calendar" options={{ title: 'Calendar' }} />
           <Stack.Screen name="settings/comics" options={{ title: 'Comics' }} />
           <Stack.Screen name="settings/stats" options={{ title: 'Statistics' }} />
           <Stack.Screen name="settings/account" options={{ title: 'Account & sync' }} />

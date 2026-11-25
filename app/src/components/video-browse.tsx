@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 
+import { CalendarRow } from '@/components/calendar';
 import { FadeIn, PosterSkeletons, usePressScale } from '@/components/fx';
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
 import { PosterSize, Radius, Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
@@ -117,6 +118,7 @@ export function VideoBrowse({ type, noun }: Props) {
       </View>
 
       {!submitted ? <ContinueWatchingRow type={type} /> : null}
+      {!submitted && type !== 'movie' ? <CalendarRow type={type} /> : null}
       {!submitted ? <TrackerRows type={type} /> : null}
       {!submitted ? <TraktRows type={type} /> : null}
 

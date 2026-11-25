@@ -11,6 +11,7 @@ import { LinkToTrakt, TraktActions, useTraktConnected } from '@/components/trakt
 import { getShowProgress, onEpisodeFinished, rememberEpisode, setEpisodeWatched, traktLink } from '@/lib/trakt-library';
 import { idsFor } from '@/components/tracker-actions';
 import { TrackerPlus } from '@/components/tracker-sheet';
+import { CalendarButton } from '@/components/calendar';
 import { PixelBlock, PixelPlay } from '@/components/pixel-art';
 import { MoreLikeThis, RatingsRow, TmdbDetails, useEnrichment } from '@/components/title-extras';
 import { Body, EmptyState, Title } from '@/components/ui';
@@ -173,6 +174,13 @@ export default function TitleScreen() {
   }
 
   const isSeries = (type === 'series' || type === 'anime') && (meta.videos?.length ?? 0) > 0;
+  const trackerRef = {
+    type: type === 'movie' ? 'movie' : type === 'anime' || id.startsWith('kitsu:') ? 'anime' : 'show',
+    title: meta.name,
+    year: Number(String(meta.releaseInfo ?? '').slice(0, 4)) || undefined,
+    poster: meta.poster,
+    ids: { ...idsFor(id), ...idsFor(imdb) },
+  } as const;
   // Watch order for "Next episode": regular seasons in order, specials skipped.
   const watchOrder = (meta.videos ?? [])
     // Anime often has no seasons at all: then every episode counts.
@@ -286,17 +294,9 @@ export default function TitleScreen() {
               </Text>
             </PixelBlock>
           </Pressable>
-          <TrackerPlus
-            size={PLAY_HEIGHT}
-            item={{
-              type: type === 'movie' ? 'movie' : type === 'anime' || id.startsWith('kitsu:') ? 'anime' : 'show',
-              title: meta.name,
-              year: Number(String(meta.releaseInfo ?? '').slice(0, 4)) || undefined,
-              poster: meta.poster,
-              ids: { ...idsFor(id), ...idsFor(imdb) },
-            }}
-          />
+          <TrackerPlus size={PLAY_HEIGHT} item={trackerRef} />
         </View>
+        {type !== 'movie' ? <CalendarButton item={trackerRef} /> : null}
         {/* Play from a downloaded copy (movies). */}
         {isSeries ? null : <DownloadedPlay itemKey={id} />}
         <RatingsRow id={id} type={type} />
