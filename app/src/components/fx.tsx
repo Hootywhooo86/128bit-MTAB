@@ -19,7 +19,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { PixelFont, useColors } from '@/constants/theme';
+import { PixelFont, PosterSize, useColors } from '@/constants/theme';
 import { onFx, type Fx } from '@/lib/fx-events';
 
 // --- Reduce motion ------------------------------------------------------------------------
@@ -434,7 +434,7 @@ function Typing({ text, style, speed = 28 }: { text: string; style?: StyleProp<T
 // --- Loading placeholders -----------------------------------------------------------------------
 
 /** Poster-shaped placeholders with a pixel shimmer sweeping across, while a row loads. */
-export function PosterSkeletons({ count = 4, width = 112, height = 168 }: { count?: number; width?: number; height?: number }) {
+export function PosterSkeletons({ count = 4, width = PosterSize.width, height = PosterSize.height }: { count?: number; width?: number; height?: number }) {
   const Colors = useColors();
   const t = useValue(0);
   useEffect(() => {

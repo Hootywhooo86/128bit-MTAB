@@ -111,4 +111,7 @@ export const Pixel = { border: 2, shadow: 3, notch: 3 } as const;
 /** Room above and below a row of posters on TV, so the focused one (bigger, ringed) isn't cut off. */
 export const TvRowPad = IS_TV ? { paddingVertical: 14 } : {};
 
+/** Poster tiles: a size for the phone, a bigger one for a TV across the room. */
+export const PosterSize = IS_TV ? { width: 150, height: 225 } : { width: 112, height: 168 };
+
 export const MaxContentWidth = 800;

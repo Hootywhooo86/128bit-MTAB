@@ -17,7 +17,7 @@ import {
 
 import { FadeIn, PosterSkeletons, usePressScale } from '@/components/fx';
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
+import { PosterSize, Radius, Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
 import { fetchMetas, isBrowsable, supportsSearch, catalogTab } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
 import { searchAnilist } from '@/lib/anilist';
@@ -243,6 +243,8 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
                   source={{ uri: item.poster }}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={item.key}
                 />
               ) : null}
               {starting === item.key ? (
@@ -480,7 +482,7 @@ export function PosterTile({
   return (
     <FadeIn>
     <Pressable
-      style={{ width: 112, gap: 4 }}
+      style={{ width: PosterSize.width, gap: 4 }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       onPress={() => {
@@ -497,6 +499,9 @@ export function PosterTile({
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={150}
+            // Rows scroll back and forth a lot (TV remote): keep posters ready, reuse tiles cleanly.
+            cachePolicy="memory-disk"
+            recyclingKey={meta.id}
           />
         ) : (
           <Text style={styles.posterFallback} numberOfLines={3}>
@@ -518,8 +523,8 @@ const useStyles = makeStyles((Colors) => ({
   screen: { flex: 1, backgroundColor: Colors.background },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.three },
   poster: {
-    width: 112,
-    height: 168,
+    width: PosterSize.width,
+    height: PosterSize.height,
     borderRadius: Radius.md,
     backgroundColor: Colors.surfaceRaised,
     overflow: 'hidden',

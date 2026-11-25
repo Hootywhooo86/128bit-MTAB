@@ -13,6 +13,7 @@ import {
 import { PixelSpinner } from '@/components/fx';
 import { Body, Card, Heading, ProgressBar, formatBytes } from '@/components/ui';
 import { PixelFont, Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { IS_TV } from '@/constants/tv';
 import { LIVE_TYPES, fetchStreamsEach, streamAddons, type AddonStreams } from '@/lib/addons';
 import { usePrefs } from '@/lib/prefs';
 import { getActiveAddons, getTorboxKey } from '@/lib/storage';
@@ -238,14 +239,20 @@ export function StreamList({ type, id, title, subtitle, poster, link }: Props) {
   };
   // Failed before, or over your size limit (Settings → Playback): hidden unless you ask.
   const hidden = (s: Stream) => failedIds.has(streamId(s)) || tooBig(s, prefs.maxStreamGB);
-  // Keep each stream's original index for its key. Order: like what you watched last time,
-  // then TorBox-cached (if on), then (anime) English dubs; ties keep the addon's own order.
+  // Keep each stream's original index for its key; ties keep the addon's own order.
   const ordered = (streams: Stream[], addonName: string, addonId: string) => {
     const list = streams
       .map((s, i) => ({ s, i, like: likedScore(s, addonId, liked) }))
       .filter(({ s }) => matches(s, addonName) && (showHidden || !hidden(s)));
+    // On the TV (a 4K screen): 4K, then HDR, first within each of those.
+    const picture = (st: Stream) => {
+      if (!IS_TV) return 0;
+      const info = parseStream(st);
+      return qualityRank(info.quality) * 2 + (info.hdr.length ? 1 : 0);
+    };
     const rank = (x: (typeof list)[number]) =>
-      x.like * 100 + (prefs.cachedFirst && isCached(x.s) ? 10 : 0) + (anime && parseStream(x.s).dub ? 1 : 0);
+      // Like last time, then (anime) English dubs, then TorBox-cached, then picture quality.
+      x.like * 1000 + (anime && parseStream(x.s).dub ? 500 : 0) + (prefs.cachedFirst && isCached(x.s) ? 100 : 0) + picture(x.s) * 10;
     return list.sort((a, b) => rank(b) - rank(a));
   };
   const hiddenCount = showHidden
