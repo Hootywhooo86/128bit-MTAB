@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
+import { IS_TV } from '@/constants/tv';
 import { ACCENTS, usePrefs, type AccentId } from '@/lib/prefs';
 
 export type Palette = {
@@ -87,9 +88,11 @@ export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
  * The 128bit pixel fonts (Pixelify Sans): crisp pixel letters that still read at normal
  * sizes. PixelFont for labels and titles, PixelFontBold for big headings.
  */
-export const PixelFont = 'PixelifySans_600SemiBold';
-export const PixelFontBold = 'PixelifySans_700Bold';
-export const PixelFontRegular = 'PixelifySans_400Regular';
+// On a TV, across the room, pixel letters are hard to read: there the app keeps its pixel-art
+// look (square corners, pixel borders and shadows) but uses Android's clean, bold sans-serif.
+export const PixelFont = IS_TV ? 'sans-serif-medium' : 'PixelifySans_600SemiBold';
+export const PixelFontBold = IS_TV ? 'sans-serif-black' : 'PixelifySans_700Bold';
+export const PixelFontRegular = IS_TV ? 'sans-serif' : 'PixelifySans_400Regular';
 
 export const Spacing = {
   one: 4,
@@ -104,5 +107,8 @@ export const Radius = { sm: 0, md: 0, lg: 0 } as const;
 
 /** Pixel-art borders and hard (unblurred) drop shadows. */
 export const Pixel = { border: 2, shadow: 3, notch: 3 } as const;
+
+/** Room above and below a row of posters on TV, so the focused one (bigger, ringed) isn't cut off. */
+export const TvRowPad = IS_TV ? { paddingVertical: 14 } : {};
 
 export const MaxContentWidth = 800;

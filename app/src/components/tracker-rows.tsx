@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
 import { Body, Heading } from '@/components/ui';
-import { Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
 import { usePrefs } from '@/lib/prefs';
 import {
   asRowItems,
@@ -121,7 +121,7 @@ export function TrackerRows({ type }: { type: 'movie' | 'series' | 'anime' }) {
             data={r.items.slice(0, 40)}
             keyExtractor={(i) => `${i.id}:${i.subtitle ?? ''}`}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+            contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}
             renderItem={({ item }) => {
               const meta: MetaPreview = {
                 id: item.id,

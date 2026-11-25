@@ -17,7 +17,7 @@ import {
 
 import { FadeIn, PosterSkeletons, usePressScale } from '@/components/fx';
 import { Body, Button, EmptyState, Heading, Input, ProgressBar } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
 import { fetchMetas, isBrowsable, supportsSearch, catalogTab } from '@/lib/addons';
 import { useAddons } from '@/lib/hooks';
 import { searchAnilist } from '@/lib/anilist';
@@ -231,10 +231,7 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
         data={continuing}
         keyExtractor={(p) => p.key}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: Spacing.three,
-          gap: Spacing.three,
-        }}
+        contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}
         renderItem={({ item }) => (
           <Pressable
             style={{ width: 200, gap: 6 }}
@@ -324,10 +321,7 @@ export function CatalogRow({
           data={metas}
           keyExtractor={(m) => m.id}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: Spacing.three,
-            gap: Spacing.three,
-          }}
+          contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}
           renderItem={({ item }) => (
             <PosterTile
               meta={item}
@@ -463,7 +457,7 @@ function AnimeSearchRow({
           data={hits}
           keyExtractor={(h) => h.meta.id}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+          contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}
           renderItem={({ item }) => <PosterTile meta={item.meta} addonId={item.addonId} anime />}
         />
       )}

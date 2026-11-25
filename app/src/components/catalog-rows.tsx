@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
 import { Body, Cover, Heading } from '@/components/ui';
-import { Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
 import {
   discoverSection,
   getSources,
@@ -99,7 +99,7 @@ function BookRow({
           data={books}
           keyExtractor={(b, i) => `${b.id}:${i}`}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+          contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}
           renderItem={({ item }) => (
             <Pressable
               style={styles.tile}

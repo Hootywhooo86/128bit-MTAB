@@ -4,7 +4,7 @@ import { FlatList, Text, View } from 'react-native';
 
 import { useTraktConnected } from '@/components/trakt-actions';
 import { Body, Heading } from '@/components/ui';
-import { Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
 import { usePrefs } from '@/lib/prefs';
 import { TRAKT_ROWS, getAnimeRow, getLists, getTraktRow, poster, searchTrakt, type TraktItem } from '@/lib/trakt-library';
 import type { MetaPreview } from '@/lib/types';
@@ -109,7 +109,7 @@ function Row({
         data={(items ?? []).slice(0, 30)}
         keyExtractor={(i) => `${i.imdb}:${i.subtitle ?? ''}`}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}
+        contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}
         renderItem={({ item }) => {
           const meta: MetaPreview = {
             id: item.imdb!,

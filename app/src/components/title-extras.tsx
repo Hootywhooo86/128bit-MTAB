@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Heading } from '@/components/ui';
-import { Radius, Spacing, makeStyles, useColors } from '@/constants/theme';
+import { Radius, Spacing, makeStyles, useColors, TvRowPad } from '@/constants/theme';
 import { getRatings, type Rating } from '@/lib/mdblist';
 import { enrich, imdbIdFor, type Enrichment, type Similar } from '@/lib/tmdb';
 import { Pressable } from '@/components/focusable';
@@ -131,7 +131,7 @@ export function MoreLikeThis({ items }: { items: Similar[] }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: Spacing.three }}>
+        contentContainerStyle={[{ paddingHorizontal: Spacing.three, gap: Spacing.three }, TvRowPad]}>
         {items.map((s) => (
           <Pressable key={`${s.kind}:${s.tmdbId}`} style={{ width: 110, gap: 4 }} onPress={() => open(s)}>
             <View style={styles.poster}>

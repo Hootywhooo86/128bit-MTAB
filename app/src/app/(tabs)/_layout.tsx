@@ -55,6 +55,8 @@ export default function TabLayout() {
   const comicsComing = useComicsComing();
   return (
     <Tabs
+      // Phones open on Audiobooks; the TV and Windows apps (no audiobooks) on Shows.
+      initialRouteName={HAS_BOOKS ? 'audiobooks' : 'shows'}
       tabBar={(props) =>
         // No audiobooks on the TV or Windows app: no audiobook mini player.
         !HAS_BOOKS ? (
@@ -75,15 +77,30 @@ export default function TabLayout() {
         headerTintColor: Colors.text,
         headerShadowVisible: false,
         headerTitleStyle: { fontFamily: PixelFontBold, fontSize: 28 },
-        tabBarStyle: {
-          backgroundColor: Colors.background,
-          borderTopColor: Colors.border,
-          borderTopWidth: Pixel.border,
-        },
+        // TV: the tabs sit across the top (where the remote starts), big, label beside the icon.
+        tabBarPosition: IS_TV ? 'top' : 'bottom',
+        ...(IS_TV ? { tabBarLabelPosition: 'beside-icon' as const } : {}),
+        tabBarStyle: IS_TV
+          ? {
+              backgroundColor: Colors.surface,
+              borderBottomColor: Colors.border,
+              borderBottomWidth: Pixel.border,
+              borderTopWidth: 0,
+              height: 76,
+              paddingHorizontal: 48,
+            }
+          : {
+              backgroundColor: Colors.background,
+              borderTopColor: Colors.border,
+              borderTopWidth: Pixel.border,
+            },
         // Six tabs: keep the labels small enough to fit on a phone.
         // The pixel font sits taller than the system one: a little more room under the labels.
-        tabBarLabelStyle: { fontFamily: PixelFont, fontSize: IS_TV ? 16 : 11, lineHeight: IS_TV ? 20 : 13 },
-        tabBarIconStyle: { marginTop: -3 },
+        tabBarLabelStyle: IS_TV
+          ? { fontFamily: PixelFont, fontSize: 22, marginLeft: 12 }
+          : { fontFamily: PixelFont, fontSize: 11, lineHeight: 13 },
+        tabBarIconStyle: IS_TV ? undefined : { marginTop: -3 },
+        ...(IS_TV ? { tabBarItemStyle: { marginHorizontal: 8, marginVertical: 8 } } : {}),
         // TV remote: tab buttons show the focus ring.
         ...(IS_TV
           ? {
