@@ -25,7 +25,7 @@ index 45d3d7b..9b4fd41 100644
        videoPlayer?.hasBeenDisconnectedFromVideoView() // The video player is disconnected. We are only using the ExoPlayer it contained
      }
 diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt
-index 71b8501..c1c70f4 100644
+index 71b8501..7876380 100644
 --- a/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt
 +++ b/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoModule.kt
 @@ -220,6 +220,13 @@ class VideoModule : Module() {
@@ -42,6 +42,41 @@ index 71b8501..c1c70f4 100644
        Property("loop")
          .get { ref: VideoPlayer ->
            runBlocking(appContext.mainQueue.coroutineContext) {
+@@ -391,7 +398,8 @@ private inline fun <reified T : VideoView> ViewDefinitionBuilder<T>.VideoViewCom
+     "onPictureInPictureStop",
+     "onFullscreenEnter",
+     "onFullscreenExit",
+-    "onFirstFrameRender"
++    "onFirstFrameRender",
++    "onControlsVisibilityChange"
+   )
+   Prop("player") { view: T, player: VideoPlayer? ->
+     view.videoPlayer = player
+diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoView.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoView.kt
+index 58c8b10..86725e4 100644
+--- a/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoView.kt
++++ b/node_modules/expo-video/android/src/main/java/expo/modules/video/VideoView.kt
+@@ -52,6 +52,8 @@ open class VideoView(context: Context, appContext: AppContext, useTextureView: B
+   val onFullscreenEnter by EventDispatcher<Unit>()
+   val onFullscreenExit by EventDispatcher<Unit>()
+   val onFirstFrameRender by EventDispatcher<Unit>()
++  // 128bitPlay: the controls appeared or went away, so the app's own buttons can follow them.
++  val onControlsVisibilityChange by EventDispatcher<Map<String, Boolean>>()
+ 
+   // In some situations we can't detect if the view will enter PiP, in that case the playback will be paused
+   // We can get an event after PiP has started, that's when we should resume playback
+@@ -186,6 +188,11 @@ open class VideoView(context: Context, appContext: AppContext, useTextureView: B
+ 
+   init {
+     VideoManager.registerVideoView(this)
++    playerView.setControllerVisibilityListener(
++      PlayerView.ControllerVisibilityListener { visibility ->
++        onControlsVisibilityChange(mapOf("visible" to (visibility == View.VISIBLE)))
++      }
++    )
+     playerView.setFullscreenButtonClickListener { enterFullscreen() }
+     // The prop `useNativeControls` prop is sometimes applied after the view is created, and sometimes there is a visible
+     // flash of controls event when they are set to off. Initially we set it to `false` and apply it in `onAttachedToWindow` to avoid this.
 diff --git a/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt b/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt
 index 8bae522..7a57010 100644
 --- a/node_modules/expo-video/android/src/main/java/expo/modules/video/player/VideoPlayer.kt

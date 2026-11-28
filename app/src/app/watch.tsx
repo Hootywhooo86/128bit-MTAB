@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TrackSheet, type SubtitleChoice } from '@/components/track-sheet';
@@ -76,6 +76,8 @@ function setNextButton(player: unknown, on: boolean) {
 
 /** Show "Next episode" this many seconds before the end. */
 const NEXT_WINDOW_S = 45;
+/** How long the top bar stays up after a video starts. */
+const TOP_BAR_MS = 4000;
 const SUB_SIZES = { small: 16, medium: 20, large: 26 };
 
 const toSource = (item: WatchItem): VideoSource => ({
@@ -233,6 +235,21 @@ export default function WatchScreen() {
   // the stream picker for this episode instead.
   const fallbackFor = item?.fallback ? item : null;
   const started = startedFor === item?.key;
+
+  // The top bar (back, title, CC) gets out of the way while the video plays: it shows while
+  // loading, for a few seconds after the start, when paused, in menus, and whenever the
+  // player's own controls are up (tap the video).
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const [controlsShown, setControlsShown] = useState(false);
+  const [quietFor, setQuietFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!started || !item) return;
+    const key = item.key;
+    const t = setTimeout(() => setQuietFor(key), TOP_BAR_MS);
+    return () => clearTimeout(t);
+  }, [started, item]);
+  const topBar =
+    Platform.OS === 'web' || !started || quietFor !== item?.key || controlsShown || !isPlaying || sheetOpen;
   const failed = status === 'error';
   useEffect(() => {
     if (!fallbackFor || started) return;
@@ -718,6 +735,10 @@ export default function WatchScreen() {
         onPictureInPictureStart={() => setInPip(true)}
         onPictureInPictureStop={() => setInPip(false)}
         fullscreenOptions={{ enable: true }}
+        // Patched in (patches/expo-video): the player's controls appeared or went away.
+        {...({
+          onControlsVisibilityChange: (e: { nativeEvent: { visible: boolean } }) => setControlsShown(e.nativeEvent.visible),
+        } as object)}
       />
       {/* In picture-in-picture only the video shows; our buttons would crowd the small window. */}
       {inPip ? null : (
@@ -763,6 +784,7 @@ export default function WatchScreen() {
         </View>
       ) : null}
 
+      {topBar || status === 'error' ? (
       <SafeAreaView edges={['top']} style={styles.top} pointerEvents="box-none">
         <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Close">
           <Ionicons name="arrow-back" size={28} color="#fff" />
@@ -808,6 +830,7 @@ export default function WatchScreen() {
           </Pressable>
         ) : null}
       </SafeAreaView>
+      ) : null}
 
       {inSegment && !prefs.autoSkipIntro ? (
         <Pressable style={styles.skipButton} onPress={() => skipTo(inSegment.end)}>
