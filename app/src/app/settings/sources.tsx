@@ -26,6 +26,7 @@ import {
   type InstalledSource,
 } from '@/lib/sources';
 import { Pressable } from '@/components/focusable';
+import { SourceCheck } from '@/components/source-check';
 
 const CONFIG_SITE = 'https://pageturner-dsc.elfhosted.com/';
 
@@ -58,6 +59,10 @@ export default function SourcesSettings() {
 
   return (
     <SettingsPage>
+      <SectionTitle>Check connections</SectionTitle>
+      <View style={styles.card}>
+        <SourceCheck />
+      </View>
       <SectionTitle>Add a source</SectionTitle>
       <View style={styles.card}>
         <Text style={styles.body}>
