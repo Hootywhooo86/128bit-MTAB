@@ -589,6 +589,7 @@ type PlayerContextValue = {
   hasNext: boolean;
   hasPrevious: boolean;
   toggle: () => void;
+  pause: () => void;
   seekTo: (seconds: number) => void;
   seekBy: (seconds: number) => void;
   setRate: (rate: number) => void;
@@ -649,6 +650,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     hasNext,
     hasPrevious: !!book,
     toggle: () => (player.playing ? player.pause() : player.play()),
+    pause: () => player.pause(),
     seekTo: (s) => {
       markJump();
       player.seekTo(Math.max(0, s));

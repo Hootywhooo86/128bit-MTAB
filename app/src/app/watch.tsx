@@ -342,13 +342,12 @@ export default function WatchScreen() {
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upNext = item ? nextEpisode(item) : undefined;
 
-  // Stop any audiobook so the two don't play over each other.
-  const pauseAudio = audio.playing ? audio.toggle : null;
+  // No audiobook over a video: pause it on open, and again if it starts (or finishes
+  // loading) while you watch.
+  const { playing: bookPlaying, pause: pauseBook } = audio;
   useEffect(() => {
-    pauseAudio?.();
-    // Only on open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (bookPlaying) pauseBook();
+  }, [bookPlaying, pauseBook]);
 
   // Resume where you left off (not for live TV).
   useEffect(() => {
