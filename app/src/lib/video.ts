@@ -220,15 +220,27 @@ export async function removeWatchProgress(key: string) {
   await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden].slice(-500)));
 }
 
+/** Past this much of it (end credits and all), an episode or movie counts as watched. */
+export const WATCHED_AT = 0.9;
+
+/** Watched past WATCHED_AT? (Trakt's paused items count in percent, out of 100.) */
+export const isDone = (p: Pick<WatchProgress, 'position' | 'duration'>) =>
+  p.duration > 0 && p.position / p.duration >= WATCHED_AT;
+
 export async function saveWatchProgress(entry: Omit<WatchProgress, 'updatedAt'>) {
-  // Watching it again brings it back.
-  const hidden = await getHiddenContinue();
-  if (hidden.delete(entry.key)) await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
   const all = await getWatchProgress();
-  const finished = entry.duration > 0 && entry.position / entry.duration > 0.95;
   const rest = all.filter((p) => p.key !== entry.key);
-  const next = finished ? rest : [{ ...entry, updatedAt: Date.now() }, ...rest].slice(0, MAX_ITEMS);
-  await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(next));
+  const hidden = await getHiddenContinue();
+  if (isDone(entry)) {
+    // Done: off Continue watching, Trakt's paused copy too (watching it again brings it back).
+    hidden.add(entry.key);
+    await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden].slice(-500)));
+    await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(rest));
+    return;
+  }
+  // Watching it again brings it back.
+  if (hidden.delete(entry.key)) await AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
+  await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify([{ ...entry, updatedAt: Date.now() }, ...rest].slice(0, MAX_ITEMS)));
 }
 
 /** The stream picker for a Continue watching item (also the fallback when its stream fails). */

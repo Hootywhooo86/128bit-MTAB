@@ -53,6 +53,7 @@ import {
   resolveStream,
   saveWatchProgress,
   streamsRoute,
+  WATCHED_AT,
   type StreamResult,
   type WatchItem,
 } from '@/lib/video';
@@ -465,7 +466,7 @@ export default function WatchScreen() {
         !counted &&
         !item.live &&
         known.current.duration > 0 &&
-        known.current.time / known.current.duration > 0.9
+        known.current.time / known.current.duration >= WATCHED_AT
       ) {
         counted = true;
         setCleared(Date.now());

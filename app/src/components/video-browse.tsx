@@ -30,6 +30,7 @@ import { getPlaybackRows, linkedAnimeImdb, removePlayback } from '@/lib/trakt-li
 import {
   getHiddenContinue,
   getWatchProgress,
+  isDone,
   markAnime,
   removeWatchProgress,
   resumeSavedStream,
@@ -183,7 +184,7 @@ export function ContinueWatchingRow({ type }: { type?: string }) {
             ? await Promise.all(merged.map(async (p) => (await isAnime(p.link)) || linked.has(p.link?.id ?? '')))
             : [];
         const fits = (p: WatchProgress, i: number) => !type || (type === 'anime' ? anime[i] : p.link?.type === type);
-        if (!cancelled) setContinuing(merged.filter((p, i) => fits(p, i) && !hidden.has(p.key)));
+        if (!cancelled) setContinuing(merged.filter((p, i) => fits(p, i) && !hidden.has(p.key) && !isDone(p)));
       })();
       return () => {
         cancelled = true;
